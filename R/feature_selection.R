@@ -12,11 +12,22 @@
 #' feature_selection(input_data)
 feature_selection <- function(input_data){
 
-  remove_cols <- nearZeroVar(input_data, names = TRUE, freqCut = 2, uniqueCut = 20)
+  if (is.data.frame(input_data))
+  {
 
-  all_cols <- names(input_data)
-  data_features <- input_data[, setdiff(all_cols, remove_cols)]
+    if( nrow(input_data) == 0 || ncol(input_data) == 0  ){
+      return(warning("The *input_date* variable is empty"))
+    }
 
-  return(data_features)
+    remove_cols <- nearZeroVar(input_data, names = TRUE, freqCut = 2, uniqueCut = 20)
+
+    all_cols <- names(input_data)
+    data_features <- input_data[, setdiff(all_cols, remove_cols)]
+
+    return(data_features)
+  }else
+  {
+    return(warning("The *input_date* variable is not a data.frame"))
+  }
 
 }
