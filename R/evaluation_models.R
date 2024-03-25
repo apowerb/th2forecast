@@ -16,7 +16,7 @@ model_evaluation <- function(input_data, model_table){
   calib_tbl <- model_table %>%
     modeltime_calibrate(testing(input_data))
 
-  accuracy_model <- calib_tbl %>% modeltime_accuracy()
+  accuracy_model <- calib_tbl %>% modeltime_accuracy(metric_set = metric_set(mae, rmse, rsq))
 
   list("model_calibrated" = calib_tbl, "accuracy_models"= accuracy_model)
 }

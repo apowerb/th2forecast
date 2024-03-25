@@ -12,12 +12,18 @@
 #'
 #' @examples prediction_forecast(input_data, calib_tbl, h = "3 months")
 prediction_forecast <- function(input_data, model, h = "3 months"){
-  prediction_forecast_tbl <- model %>%
-    modeltime_refit(data = input_data) %>%
-    modeltime_forecast(
-      h = h,
-      actual_data = input_data
-    )
 
-  return(prediction_forecast_tbl)
+  if (is.data.frame(input_data)){
+    prediction_forecast_tbl <- model %>%
+      modeltime_refit(data = input_data) %>%
+      modeltime_forecast(
+        h = h,
+        actual_data = input_data
+      )
+
+    return(prediction_forecast_tbl)
+
+  }else{
+    return(warning("*input_data* is not a data.frame ."))
+  }
 }

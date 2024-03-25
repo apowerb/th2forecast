@@ -15,19 +15,30 @@
 #' preprocessing_data(input_data)
 preprocessing_data <- function(input_data){
 
-  input_data <- clean_names(input_data)
-  input_data <- na.omit(input_data)
-  input_data <- remove_empty(input_data)
+  if (is.data.frame(input_data))
+  {
 
-  output_data <- unique(input_data)
+    if( nrow(input_data) == 0 || ncol(input_data) == 0  ){
+      return(warning("The *input_date* variable is empty."))
+    }
 
-  number_miss <- n_miss(output_data)
-  percent_miss <- prop_miss(output_data) #proportion of missing values
+    input_data <- clean_names(input_data)
+    input_data <- na.omit(input_data)
+    input_data <- remove_empty(input_data)
 
-  number_complet <- n_complete(output_data)
-  percent_complet <- prop_complete(output_data)
+    output_data <- unique(input_data)
 
-  detail_missing <- miss_var_summary(output_data)
+    number_miss <- n_miss(output_data)
+    percent_miss <- prop_miss(output_data)
 
-  list("dataset_clean"=output_data, "numnber_missing" = number_miss)
+    number_complet <- n_complete(output_data)
+    percent_complet <- prop_complete(output_data)
+
+    detail_missing <- miss_var_summary(output_data)
+
+    list("dataset_clean"=output_data, "numnber_missing" = number_miss)
+
+  }else{
+    return(warning("The *input_date* variable is not a data.frame ."))
+  }
 }

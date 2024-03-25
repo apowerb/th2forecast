@@ -14,14 +14,31 @@
 #' split_dataset(input_data, "dteday", "cnt"; assess="3 months")
 split_dataset <- function(input_data, var_time, var_target, assess = "3 months" ){
 
-  if (!(var_time %in% colnames(input_data) && var_target %in%  colnames(input_data))){
-    print("Les variables sélectionnées n'existent pas")
-    stop()
+  if (is.data.frame(input_data))
+  {
+
+    if( nrow(input_data) == 0 || ncol(input_data) == 0  ){
+      return(warning("The *input_date* variable is empty"))
+    }else{
+      if(nrow(input_data) < 5){
+        return(warning("The rows of the dataset are very few"))
+      }
+    }
+
+
+    if (!(var_time %in% colnames(input_data) && var_target %in% colnames(input_data))){
+      return(warning("Selected variables do not exist"))
+    }
+
+    output_data <- input_data %>% select(all_of(c(var_time, var_target)))
+
+    train_size <- round(dim(output_data)[1] * 0.8)
+    test_size <- dim(output_data)[1] - train_size
+
+    data_train_test <- time_series_split(output_data, initial = train_size, assess = test_size, cumulative = TRUE)
+
+    list("traintest"= data_train_test, "data_selected"= output_data)
+  }else{
+    return(warning("The *input_date* variable is not a data.frame"))
   }
-
-  output_data <- input_data %>% select(var_time, var_target)
-
-  data_train_test <- time_series_split(output_data, assess = assess, cumulative = TRUE)
-
-  list("traintest"= data_train_test, "data_selected"= output_data)
 }
