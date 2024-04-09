@@ -13,6 +13,7 @@ library(modeltime)
 library(shinyalert)
 library(plotly)
 library(shinyalert)
+library(anomalize)
 
 
 
@@ -20,6 +21,7 @@ library(shinyalert)
 data_input <- data.frame()
 data_clean <- data.frame()
 data_train <- data.frame()
+data_feature_train <- data.frame()
 
 var_date_feature <- ""
 var_target <- ""

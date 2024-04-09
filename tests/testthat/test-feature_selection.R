@@ -1,5 +1,5 @@
 test_that("test feature_selection function", {
-  # Crear un dataframe de prueba
+  # Test dataframe
   input_data <- data.frame(
     a = c(1, 2, 3, 4, 5),
     b = c(1, 1, 1, 1, 1),
@@ -7,16 +7,16 @@ test_that("test feature_selection function", {
     stringsAsFactors = FALSE
   )
 
-  # Aplicar la función feature_selection
+  # Apply the feature_selection function
   result <- feature_selection(input_data)
 
-  # Comprobar que el resultado es un dataframe
+  # Check that the result is a dataframe
   expect_is(result, "data.frame")
 
-  # Comprobar que el dataframe no tiene la columna 'b'
+  # Check that the dataframe does not have column 'b'
   expect_false("b" %in% names(result))
 
-  # Comprobar que el dataframe tiene las columnas 'a' y 'c'
+  # Check that the dataframe has columns 'a' and 'c'
   expect_true(all(c("a", "c") %in% names(result)))
 
   # Check that the input_data is a dataframe

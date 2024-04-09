@@ -131,6 +131,36 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 }
 
 
+#' Création et entraînement du modèle Random Forest
+#'
+#' @param df_train
+#' @param df_test
+#' @param var_target
+#'
+#' @import randomForest
+#'
+#' @return
+#' @export
+#'
+#' @examples
+th2_random_forest <- function(df_train, df_test, var_target){
+
+  # Fit a Random Forest model
+  rf_model <- randomForest(x = select(df_train, -var_target), y = unlist(df_train[var_target]), ntree = 100)
+
+  # Make predictions on the test data
+  predictions <- predict(object =  rf_model, newdata = select(df_test, -var_target))
+
+  # Evaluate the model using RMSE
+  rmse <- sqrt(mean(( unlist(df_test[var_target]) - predictions)^2))
+
+  print(rmse)
+
+  return(rf_model)
+
+}
+
+
 #======Selection and train models
 #' Sélection et préparation des modèles
 #'
@@ -141,12 +171,13 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 #'
 #' @import modeltime
 #' @import tidymodels
+#' @import caTools
 #'
 #' @return Un tableau qui contient les modèles entraînés.
 #' @export
 #'
 #' @examples model_selection_train(input_data, c("arima", "prophet", "lr", "mars"), "value", "datetime")
-model_selection_train <- function (input_data, list_models, var_target, var_date){
+model_selection_train <- function (input_data, list_models, var_target, var_date, input_feature_data){
 
   if (setequal(class(input_data), c("ts_cv_split", "rsplit"))){
     error_models <- NULL
@@ -156,6 +187,19 @@ model_selection_train <- function (input_data, list_models, var_target, var_date
 
       if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
         return(warning("Selected variables do not exist in the data."))
+      }
+
+      if( !is.null(input_feature_data) || nrow(input_data) != 0 ){
+        # train_percentage <- 0.8
+        # train_size <- floor(train_percentage * nrow(final_data))
+        # train_data <- final_data[1:train_size, ]
+        # test_data <- final_data[(train_size + 1):nrow(final_data), ]
+        df_features <- sample.split(input_feature_data[[var_target]], SplitRatio = 0.8)
+        # print(df_features)
+
+        df_features_train  <- subset(input_feature_data, df_features == TRUE)
+        df_features_test   <- subset(input_feature_data, df_features == FALSE)
+        print(nrow(df_features_test))
       }
 
       list_output_models <- list()
@@ -173,6 +217,9 @@ model_selection_train <- function (input_data, list_models, var_target, var_date
         } else if(model == "mars"){
           model_mars <- th2_mars_engine(input_data, var_target, var_date)
           list_output_models[["model_mars"]] <- model_mars
+        } else if(model == "random_forest"){
+          model_random_forest <- th2_random_forest(df_features_train, df_features_test, var_target)
+          list_output_models[["model_random_forest"]] <- model_random_forest
         }else{
           error_models <- c(error_models, model)
         }
