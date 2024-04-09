@@ -131,7 +131,7 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 }
 
 
-#' Title
+#' Création et entraînement du modèle Random Forest
 #'
 #' @param df_train
 #' @param df_test
