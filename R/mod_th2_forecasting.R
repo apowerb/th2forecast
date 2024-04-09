@@ -8,6 +8,8 @@ mod_th2_forecasting_ui <- function(id) {
 
   fluidPage(
 
+    useWaiter(),
+
     titlePanel("Forecasting"),
 
     fluidPage(
@@ -18,7 +20,9 @@ mod_th2_forecasting_ui <- function(id) {
 
         selectInput(ns("features"), "Target variable:", choices = ""),
 
-        selectInput(ns("models"), "Model selection:", choices = c("Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr") , multiple = TRUE),
+        selectInput(ns("models"), "Model selection:", choices = c("Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest") , multiple = TRUE),
+
+        uiOutput(ns("conditional")),
 
         dateInput(ns("start_date"), "Time periode:"),
 
@@ -69,10 +73,26 @@ mod_th2_forecasting_server<- function(id) {
     # Generation of inputs when loading datasets
     observeEvent(input$dataset, {
 
-      data_clean <<- data.frame()
       models_trained <<- NULL
       start_date <<- NULL
       end_date <<- NULL
+
+      data_input <<- NULL
+      data_clean <<- NULL
+      data_train <<- NULL
+
+      var_date_feature <<- NULL
+      var_target <<- NULL
+      start_date <<- NULL
+      end_date <<- NULL
+
+      dataset_train_test <<- NULL
+      list_features <<- NULL
+
+      models_trained <<- NULL
+      models_predictions <<- NULL
+      df_prediction_test_forecas <<- NULL
+      first_horizon <<- NULL
 
       # Read dataset
       data_input <<- input_csv()
@@ -109,6 +129,19 @@ mod_th2_forecasting_server<- function(id) {
         plotly_empty()
       })
 
+      output$conditional <- renderUI({
+        if (any(input$models %in% c("lr", "random_forest")) && length(input$models) != 0  ) {
+          tagList(
+            selectInput(ns("features_variables"), "Features variables:", choices = list_features , multiple = TRUE),
+            actionButton(inputId = ns("feature_engineering") , label = "Feature engineering" , value = NULL),
+            hr()
+          )
+        }else if(is.null(input$models))
+        {
+          ""
+        }
+      })
+
     })
 
 ############################################################################################################
@@ -126,8 +159,10 @@ mod_th2_forecasting_server<- function(id) {
 
         # Cleaning and feature selection
         data <- preprocessing_data(data)$dataset_clean
-        data_clean <<- feature_selection(data)
 
+        # print(data_clean)
+        #
+        # stop()
 
         # Update of inputs according to clean dataset
         column_date <- sapply(data_clean, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
@@ -156,10 +191,61 @@ mod_th2_forecasting_server<- function(id) {
         models_trained <<- NULL
         models_predictions <<- NULL
 
-
         shinyalert("Processed data!", "The data was cleaned and the variables were selected.", type = "success")
       }
 
+    })
+
+    observeEvent(input$feature_engineering, {
+
+      # Dataset and inputs validation
+      if (is.null(input$dataset)) {
+        shinyalert("Warning", "You must select a data set.", type = "info" )
+      }
+      else if (length(input$models) == 0) {
+        shinyalert("Warning", "You must select at least one model.", type = "info" )
+      }
+      else if (length(input$features) == 0)
+      {
+        shinyalert("Warning", "You must select at least one target.", type = "info" )
+      }
+      else
+      {
+
+        # Input recovery
+        feature_target <- input$features
+        features_variables <- input$features_variables
+
+
+        # Validation for new training or to show predictions already made
+        # if ( is.null(models_trained) || forecast_horizon > first_horizon ||
+        #      (is.null(models_trained) || nrow(models_trained) != length(list_models))
+        #      || start_date != input$start_date
+        #      || end_date != input$end_date
+        #      || var_target != input$features
+        # )
+        # {
+
+        # Validation of dataset to use
+        if (length(data_clean)[1] == 0){
+          data_features <- data_input
+        }else{
+          data_features <- data_clean
+        }
+
+        data_features <- feature_selection(data_features, feature_target, features_variables)
+
+        data_features <- data_features[complete.cases(data_features), ] # %>% select(- "date")
+
+        print(data_features)
+        print(class(data_features))
+
+        view(data_features)
+
+        data_feature_train <<- data_features
+        # print(data_feature_train)
+        # }
+      }
     })
 
 
@@ -192,6 +278,7 @@ mod_th2_forecasting_server<- function(id) {
              (is.null(models_trained) || nrow(models_trained) != length(list_models))
              || start_date != input$start_date
              || end_date != input$end_date
+             || var_target != input$features
              )
         {
 
@@ -224,7 +311,7 @@ mod_th2_forecasting_server<- function(id) {
           dataset_train_test <<- split_data$traintest
 
           # Model training
-          models_trained <<- model_selection_train(dataset_train_test, list_models, var_target, var_date_feature )
+          models_trained <<- model_selection_train(dataset_train_test, list_models, var_target, var_date_feature, data_feature_train)
 
           # Model evaluation
           models_evaluated <<- model_evaluation(dataset_train_test, models_trained)
@@ -240,7 +327,13 @@ mod_th2_forecasting_server<- function(id) {
           # Model prediction
           models_predictions <<- prediction_forecast(data_train, models_evaluated, h=first_horizon)
 
-          limit_date <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + forecast_horizon
+          if (inherits(data_train[[var_date_feature]][1], "Date"))
+          {
+            limit_date <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + forecast_horizon
+          }else if(inherits(data_train[[var_date_feature]][1], "POSIXct"))
+          {
+            limit_date <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + hours(forecast_horizon)
+          }
 
           df_prediction_test_forecas <<- bind_rows(df_models_evaluated, models_predictions[ nrow(data_train)+1 : nrow(data_train), ])
 
@@ -261,7 +354,13 @@ mod_th2_forecasting_server<- function(id) {
           # Show forecast graph according to the prediction already made
           forecast_horizon <- input$forecast_predic
 
-          limit_date_show <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + forecast_horizon
+          if (inherits(data_train[[var_date_feature]][1], "Date"))
+          {
+            limit_date_show <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + forecast_horizon
+          }else if(inherits(data_train[[var_date_feature]][1], "POSIXct"))
+          {
+            limit_date_show <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + hours(forecast_horizon)
+          }
 
           plot_prediction_test_forecas <- df_prediction_test_forecas %>% filter(.index <= as.Date(limit_date_show))
           plot_predictions <- plot_prediction_test_forecas %>% plot_modeltime_forecast()

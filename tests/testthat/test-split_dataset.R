@@ -1,5 +1,5 @@
 test_that("test split_dataset function", {
-  # Crear un dataframe de prueba
+  # Test dataframe
   input_data <- data.frame(
     dteday = seq(as.Date("2020/1/1"), by = "month", length.out = 100),
     cnt = rnorm(100),
@@ -7,22 +7,22 @@ test_that("test split_dataset function", {
     stringsAsFactors = FALSE
   )
 
-  # Aplicar la función split_dataset
+  # Apply the split_dataset function
   result <- split_dataset(input_data, "dteday", "cnt")
 
-  # Comprobar que el resultado es una lista
+  # Check that the result is a list
   expect_is(result, "list")
 
-  # Comprobar que la lista tiene dos elementos
+  # Check that the list has two elements
   expect_equal(length(result), 2)
 
-  # Comprobar que el primer elemento es una lista
+  # Check that the first element is a list
   expect_s3_class(result$traintest, "ts_cv_split")
 
-  # Comprobar que el segundo elemento es un dataframe
+  # Check that the second element is a dataframe
   expect_is(result$data_selected, "data.frame")
 
-  # Comprobar que el dataframe tiene las columnas 'dteday' y 'cnt'
+  # Check that the dataframe has the columns 'dteday' and 'cnt'
   expect_true(all(c("dteday", "cnt") %in% names(result$data_selected)))
 
   # Errors
