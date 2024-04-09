@@ -13,14 +13,19 @@ Suggests:
     rmarkdown
 VignetteBuilder: knitr
 Imports: 
+    anomalize,
     caret,
+    caTools,
+    changepoint,
     dplyr,
     hts,
     janitor,
     modeltime,
     naniar,
     prophet,
-    timetk
+    randomForest,
+    timetk,
+    tsoutliers
 Depends: 
     tidymodels,
     tidyverse
