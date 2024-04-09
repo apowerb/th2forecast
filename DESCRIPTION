@@ -1,4 +1,4 @@
-Package: th2Forecast
+Package: th2forecast
 Title: Framework for the forecasting models
 Version: 0.0.0.1
 Authors@R: 
@@ -15,6 +15,7 @@ VignetteBuilder: knitr
 Imports: 
     caret,
     dplyr,
+    hts,
     janitor,
     modeltime,
     naniar,
