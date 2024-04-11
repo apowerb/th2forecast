@@ -18,7 +18,6 @@ Imports:
     caTools,
     changepoint,
     dplyr,
-    hts,
     janitor,
     modeltime,
     naniar,

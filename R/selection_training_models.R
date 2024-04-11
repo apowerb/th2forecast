@@ -146,10 +146,10 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 th2_random_forest <- function(df_train, df_test, var_target){
 
   # Fit a Random Forest model
-  rf_model <- randomForest(x = select(df_train, -var_target), y = unlist(df_train[var_target]), ntree = 100)
+  rf_model <- randomForest(x = dplyr::select(df_train, -var_target), y = unlist(df_train[var_target]), ntree = 100)
 
   # Make predictions on the test data
-  predictions <- predict(object =  rf_model, newdata = select(df_test, -var_target))
+  predictions <- predict(object =  rf_model, newdata = dplyr::select(df_test, -var_target))
 
   # Evaluate the model using RMSE
   rmse <- sqrt(mean(( unlist(df_test[var_target]) - predictions)^2))

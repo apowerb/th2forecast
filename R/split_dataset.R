@@ -6,8 +6,6 @@
 #' @param assess nombre d'échantillons utilisés pour chaque rééchantillonnage d'évaluation.
 #'
 #' @return renvoie une liste avec 2 objets: 1. un dataframe avec l'ensemble de training et de test  2. un dataframe avec les 2 variables sélectionnées.
-#' @import timetk
-#' @import dplyr
 #' @export
 #'
 #' @examples
@@ -30,12 +28,12 @@ split_dataset <- function(input_data, var_time, var_target, assess = "3 months" 
       return(warning("Selected variables do not exist"))
     }
 
-    output_data <- input_data %>% select(all_of(c(var_time, var_target)))
+    output_data <- input_data %>% dplyr::select(all_of(c(var_time, var_target)))
 
     train_size <- round(dim(output_data)[1] * 0.8)
     test_size <- dim(output_data)[1] - train_size
 
-    data_train_test <- time_series_split(output_data, initial = train_size, assess = test_size, cumulative = TRUE)
+    data_train_test <- timetk::time_series_split(output_data, initial = train_size, assess = test_size, cumulative = TRUE)
 
     list("traintest"= data_train_test, "data_selected"= output_data)
   }else{

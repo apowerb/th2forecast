@@ -1,7 +1,7 @@
 th_tsfeatures <- function(ts_movil) {
   ts <- ts(ts_movil)
   features <- tsfeatures(ts)
-  features <- features %>% select( c("trend", "spike", "linearity", "curvature", "e_acf1", "entropy"))
+  features <- features %>% dplyr::select( c("trend", "spike", "linearity", "curvature", "e_acf1", "entropy"))
   return(features)
 }
 
@@ -50,7 +50,7 @@ feature_selection <- function(input_data, feature_target, list_features = ""){
     lags = 5
 
     list_features <- c(var_date_feature,list_features, feature_target)
-    data_features <- select(input_data, list_features)
+    data_features <- dplyr::select(input_data, list_features)
 
     data_features["month"]  <- month(data_features[[var_date_feature]])
 
