@@ -1,6 +1,6 @@
 library(timetk)
 
-data <- m4_monthly %>% filter(id == "M750")
+data <- m4_monthly %>% dplyr::filter(id == "M750")
 data <- split_dataset(data, "date", "value")$traintest
 
 # # Test for th2_arima_engine

@@ -4,7 +4,7 @@ library(janitor)
 
 test_that("test preprocessing_data function", {
 
-  input_data <- m4_monthly %>% filter(id == "M750")
+  input_data <- m4_monthly %>% dplyr::filter(id == "M750")
 
   result <- preprocessing_data(input_data)
 
@@ -42,7 +42,7 @@ test_that("anomaly_detection works correctly", {
   #   value = rnorm(366)
   # )
 
-  input_data <- m4_monthly %>% filter(id == "M750")
+  input_data <- m4_monthly %>% dplyr::filter(id == "M750")
 
   # Execute the function
   result <- anomaly_detection(input_data)
@@ -70,7 +70,7 @@ library(testthat)
 
 test_that("outliers_detection function test", {
   # Test dataset
-  input_data <- m4_monthly %>% filter(id == "M750")
+  input_data <- m4_monthly %>% dplyr::filter(id == "M750")
 
   # Execute the function with the test data
   result <- outliers_detection(input_data, method_ls = "cpt")
