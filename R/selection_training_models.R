@@ -151,7 +151,6 @@ th2_random_forest_engine <- function(input_data, var_target, trees = 500){
     set_engine("randomForest") %>%
     set_mode("regression")
 
-
   # Fit a Random Forest model
   formula <- as.formula(paste(var_target, "~ ."))
 

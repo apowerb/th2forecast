@@ -2,7 +2,7 @@ library(timetk)
 library(modeltime)
 library(tidymodels)
 
-data <- m4_monthly %>% filter(id == "M750")
+data <- m4_monthly %>% dplyr::filter(id == "M750")
 data <- time_series_split(data, assess = "3 months", cumulative = TRUE)
 
 #Prophet

@@ -4,49 +4,36 @@
 
 mod_th2_forecasting_ui <- function(id) {
   ns <- NS(id)
-
-
   fluidPage(
+    fluidRow(
 
-    titlePanel("Forecasting"),
+      # Inputs
+      column(width = 2,  fileInput(ns("dataset"), "Upload your data file:", accept = c(".csv"))),
 
-    fluidPage(
-      fluidRow(
+      column(width = 2, selectInput(ns("features"), "Target variable", choices = "")),
 
-        # Inputs
-        fileInput(ns("dataset"), "Upload your data file:", accept = c(".csv")),
+      column(width = 2, selectInput(ns("models"), "Select Model", choices = c("ARIMA" = "arima", "Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest", "XGBoost" = "xgboost") , multiple = TRUE)),
 
-        selectInput(ns("features"), "Target variable:", choices = ""),
+      column(width = 2, uiOutput(ns("conditional_features"))),
 
-        selectInput(ns("models"), "Model selection:", choices = c("ARIMA" = "arima", "Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest", "XGBoost" = "xgboost") , multiple = TRUE),
+      column(width = 2, dateInput(ns("start_date"), "Start")),
 
-        uiOutput(ns("conditional_features")),
+      column(width = 2, dateInput(ns("end_date"), "End")),
 
-        dateInput(ns("start_date"), "Time periode:"),
-
-        dateInput(ns("end_date"), ""),
-
-        sliderInput(ns("forecast_predic"), "Forecast horizon:", min = 15,  max = 365, value = 30),
+      column(width = 2, sliderInput(ns("forecast_predic"), "Forecast horizon:", min = 15,  max = 365, value = 30)),
 
 
-        # Buttons
-        actionButton(inputId = ns("clean_data") , label = "Clean Data" , value = NULL),
-        # actionButton(inputId = ns("feature_engi") , label = "Feature engineering" , value = NULL),
-        # actionButton(inputId = ns("train_model") , label = "Training" , value = NULL),
-        actionButton(inputId = ns("forecasting") , label = "Forecasting" , value = NULL),
+      # Buttons
+      column(width = 2, actionButton(inputId = ns("clean_data") , label = "Clean Data" , class = "btn-primary")),
+      # actionButton(inputId = ns("feature_engi") , label = "Feature engineering" , value = NULL),
+      # actionButton(inputId = ns("train_model") , label = "Training" , value = NULL),
+      column(width = 2, actionButton(inputId = ns("forecasting") , label = "Forecasting" , class = "btn-primary")),
 
-      ),
-    mainPanel(
-
-      # Display interface
-      plotlyOutput(ns("plot_result_forecasting"), height = "100%"),
-
-      h3("Evaluation:"),
-
-      tableOutput(ns("table_performance"))
-    )
-    )
-
+    ),
+    # Display interface
+    plotly::plotlyOutput(ns("plot_result_forecasting"), height = "100%"),
+    h3("Evaluation:"),
+    tableOutput(ns("table_performance"))
   )
 
 }
@@ -101,7 +88,7 @@ mod_th2_forecasting_server<- function(id) {
 
       # Target feature
       var_date_feature <<- colnames(data_input[, column_date])
-      list_features <- as.list(colnames(select(data_input, -var_date_feature)))
+      list_features <- as.list(colnames(dplyr::select(data_input, -var_date_feature)))
 
       # Minimum and maximum tadaset date
       min_date <- sort(data_input[[var_date_feature]])[1]
@@ -124,7 +111,7 @@ mod_th2_forecasting_server<- function(id) {
       updateSliderInput(session, "forecast_predic", min = min_horizon, max = max_horizon, value = value_horizon)
 
       # Clear graphic
-      output$plot_result_forecasting <- renderPlotly({
+      output$plot_result_forecasting <- plotly::renderPlotly({
         plotly_empty()
       })
 
@@ -160,6 +147,9 @@ mod_th2_forecasting_server<- function(id) {
         data_clean <<- preprocessing_data(data)$dataset_clean
 
         # Update of inputs according to clean dataset
+        column_date <- sapply(data_clean, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
+        var_date_feature <<- colnames(data_clean[, column_date])
+        
         min_date <- sort(data_clean[[var_date_feature]])[1]
         max_date <- sort(data_clean[[var_date_feature]], decreasing = TRUE)[1]
 
@@ -169,7 +159,7 @@ mod_th2_forecasting_server<- function(id) {
 
 
         # Clear graphic and variables
-        output$plot_result_forecasting <- renderPlotly({
+        output$plot_result_forecasting <- plotly::renderPlotly({
           plotly_empty()
         })
 
@@ -223,7 +213,7 @@ mod_th2_forecasting_server<- function(id) {
 
         data_features <- feature_selection(data_features, feature_target, features_variables)
 
-        data_features <- data_features[complete.cases(data_features), ] # %>% select(- "date")
+        data_features <- data_features[complete.cases(data_features), ] # %>% dplyr::select(- "date")
 
         data_feature_train <<- data_features
 
@@ -257,7 +247,6 @@ mod_th2_forecasting_server<- function(id) {
 
         if(is.null(data_feature_train) && (any(list_models %in% c("random_forest", "xgboost")))){
           shinyalert("Warning", "You must do feature engineering.", type = "info" )
-
         }else{
 
           # Validation for new training or to show predictions already made

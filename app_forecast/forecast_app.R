@@ -45,7 +45,6 @@ ui <- fluidPage(
 
 
 server <- function(input, output) {
-
   mod_th2_forecasting_server("id_forecast")
 }
 

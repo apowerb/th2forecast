@@ -22,7 +22,7 @@ anomaly_detection <- function(input_data, input_alpha = 0.05, max_anoms = 0.2){
     date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct") )
     var_date_feature <- colnames(input_data[, date_variable])
 
-    filter_targets <- colnames(input_data %>% select(-all_of(var_date_feature)))
+    filter_targets <- colnames(input_data %>% dplyr::select(-all_of(var_date_feature)))
 
     for (variable in filter_targets) {
 
@@ -66,7 +66,7 @@ outliers_detection <- function(input_data, method_ls = "cpt"){
     date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct") )
     var_date_feature <- colnames(input_data[, date_variable])
 
-    filter_targets <- colnames(input_data %>% select(-all_of(var_date_feature)))
+    filter_targets <- colnames(input_data %>% dplyr::select(-all_of(var_date_feature)))
 
     for (variable in filter_targets) {
 
