@@ -30,7 +30,7 @@ split_dataset <- function(input_data, var_time, var_target, assess = "3 months" 
       return(warning("Selected variables do not exist"))
     }
 
-    output_data <- input_data %>% select(all_of(c(var_time, var_target)))
+    output_data <- input_data #%>% select(all_of(c(var_time, var_target)))
 
     train_size <- round(dim(output_data)[1] * 0.8)
     test_size <- dim(output_data)[1] - train_size

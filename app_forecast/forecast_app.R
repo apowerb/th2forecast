@@ -8,7 +8,7 @@
 #
 
 library(shiny)
-library(th2Forecast)
+library(th2forecast)
 library(modeltime)
 library(shinyalert)
 library(plotly)

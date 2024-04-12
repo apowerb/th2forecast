@@ -8,8 +8,6 @@ mod_th2_forecasting_ui <- function(id) {
 
   fluidPage(
 
-    useWaiter(),
-
     titlePanel("Forecasting"),
 
     fluidPage(
@@ -20,9 +18,9 @@ mod_th2_forecasting_ui <- function(id) {
 
         selectInput(ns("features"), "Target variable:", choices = ""),
 
-        selectInput(ns("models"), "Model selection:", choices = c("Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest") , multiple = TRUE),
+        selectInput(ns("models"), "Model selection:", choices = c("ARIMA" = "arima", "Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest", "XGBoost" = "xgboost") , multiple = TRUE),
 
-        uiOutput(ns("conditional")),
+        uiOutput(ns("conditional_features")),
 
         dateInput(ns("start_date"), "Time periode:"),
 
@@ -80,6 +78,7 @@ mod_th2_forecasting_server<- function(id) {
       data_input <<- NULL
       data_clean <<- NULL
       data_train <<- NULL
+      data_feature_train <<- NULL
 
       var_date_feature <<- NULL
       var_target <<- NULL
@@ -129,13 +128,13 @@ mod_th2_forecasting_server<- function(id) {
         plotly_empty()
       })
 
-      output$conditional <- renderUI({
-        if (any(input$models %in% c("lr", "random_forest")) && length(input$models) != 0  ) {
-          tagList(
-            selectInput(ns("features_variables"), "Features variables:", choices = list_features , multiple = TRUE),
-            actionButton(inputId = ns("feature_engineering") , label = "Feature engineering" , value = NULL),
-            hr()
-          )
+      output$conditional_features <- renderUI({
+        if (any(input$models %in% c("xgboost", "random_forest")) && length(input$models) != 0  ) {
+            tagList(
+              selectInput(ns("features_variables"), "Features variables:", choices = list_features , multiple = TRUE),
+              actionButton(inputId = ns("feature_engineering") , label = "Feature engineering" , value = NULL),
+              hr()
+            )
         }else if(is.null(input$models))
         {
           ""
@@ -158,26 +157,15 @@ mod_th2_forecasting_server<- function(id) {
         data <- input_csv()
 
         # Cleaning and feature selection
-        data <- preprocessing_data(data)$dataset_clean
-
-        # print(data_clean)
-        #
-        # stop()
+        data_clean <<- preprocessing_data(data)$dataset_clean
 
         # Update of inputs according to clean dataset
-        column_date <- sapply(data_clean, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
-        var_date_feature <<- colnames(data_clean[, column_date])
-        list_features <<- as.list(colnames(select(data_clean, -var_date_feature)))
-
         min_date <- sort(data_clean[[var_date_feature]])[1]
         max_date <- sort(data_clean[[var_date_feature]], decreasing = TRUE)[1]
 
 
         updateDateInput(session, "start_date", value = min_date, min = min_date, max = max_date)
         updateDateInput(session, "end_date", value = max_date, min = min_date, max = max_date)
-
-
-        updateSelectInput(session, "features", choices = list_features)
 
 
         # Clear graphic and variables
@@ -227,7 +215,7 @@ mod_th2_forecasting_server<- function(id) {
         # {
 
         # Validation of dataset to use
-        if (length(data_clean)[1] == 0){
+        if (nrow(data_clean) == 0 || is.null(data_clean)){
           data_features <- data_input
         }else{
           data_features <- data_clean
@@ -237,12 +225,9 @@ mod_th2_forecasting_server<- function(id) {
 
         data_features <- data_features[complete.cases(data_features), ] # %>% select(- "date")
 
-        print(data_features)
-        print(class(data_features))
-
-        view(data_features)
-
         data_feature_train <<- data_features
+
+        shinyalert("Processed data!", "Feature generation was correct.", type = "success")
         # print(data_feature_train)
         # }
       }
@@ -253,7 +238,6 @@ mod_th2_forecasting_server<- function(id) {
 
     #Forecasting
     observeEvent(input$forecasting, {
-
       # Dataset and inputs validation
       if (is.null(input$dataset)) {
         shinyalert("Warning", "You must select a data set.", type = "info" )
@@ -267,109 +251,116 @@ mod_th2_forecasting_server<- function(id) {
       }
       else
       {
-
         # Input recovery
         forecast_horizon <- input$forecast_predic
         list_models <<- input$models
 
-
-        # Validation for new training or to show predictions already made
-        if ( is.null(models_trained) || forecast_horizon > first_horizon ||
-             (is.null(models_trained) || nrow(models_trained) != length(list_models))
-             || start_date != input$start_date
-             || end_date != input$end_date
-             || var_target != input$features
-             )
-        {
-
-          # Validation of dataset to use
-          if (length(data_clean)[1] == 0){
-            data_train <<- data_input
-          }else{
-            data_train <<- data_clean
-          }
-
-          # Input recovery
-          forecast_horizon <- input$forecast_predic
-
-          # Horizon forecast validation
-          if (forecast_horizon > first_horizon )
-          {first_horizon <<- input$forecast_predic}
-
-          # Sub dataset according to time period
-          start_date <<- as.Date(input$start_date)
-          end_date <<- as.Date(input$end_date)
-
-          data_train <<- filter(data_train, data_train[[var_date_feature]] >= start_date)
-          data_train <<- filter(data_train, data_train[[var_date_feature]] <= end_date)
-
-          # Input recovery
-          var_target <<- input$features
-
-          # Generation of training and validation dataset
-          split_data <- split_dataset(data_train, var_date_feature, var_target)
-          dataset_train_test <<- split_data$traintest
-
-          # Model training
-          models_trained <<- model_selection_train(dataset_train_test, list_models, var_target, var_date_feature, data_feature_train)
-
-          # Model evaluation
-          models_evaluated <<- model_evaluation(dataset_train_test, models_trained)
-          table_performance <- models_evaluated$accuracy_models
-          models_evaluated <<- models_evaluated$model_calibrated
-
-          df_models_evaluated <- models_evaluated %>%
-            modeltime_forecast(
-              new_data = testing(dataset_train_test),
-              actual_data = data_train
-            )
-
-          # Model prediction
-          models_predictions <<- prediction_forecast(data_train, models_evaluated, h=first_horizon)
-
-          if (inherits(data_train[[var_date_feature]][1], "Date"))
-          {
-            limit_date <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + forecast_horizon
-          }else if(inherits(data_train[[var_date_feature]][1], "POSIXct"))
-          {
-            limit_date <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + hours(forecast_horizon)
-          }
-
-          df_prediction_test_forecas <<- bind_rows(df_models_evaluated, models_predictions[ nrow(data_train)+1 : nrow(data_train), ])
-
-          plot_prediction_test_forecas <- df_prediction_test_forecas %>% filter(.index <= as.Date(limit_date))
-          plot_predictions <- plot_prediction_test_forecas %>% plot_modeltime_forecast()
-
-
-          # Show forecast graphs
-          output$plot_result_forecasting <- renderPlotly({
-            ggplotly(plot_predictions)
-          })
-
-          # Show forecast performance
-          output$table_performance <- renderTable(table_performance)
+        if(is.null(data_feature_train) && (any(list_models %in% c("random_forest", "xgboost")))){
+          shinyalert("Warning", "You must do feature engineering.", type = "info" )
 
         }else{
 
-          # Show forecast graph according to the prediction already made
-          forecast_horizon <- input$forecast_predic
+          # Validation for new training or to show predictions already made
+          if ( is.null(models_trained) || forecast_horizon > first_horizon ||
+               (is.null(models_trained) || nrow(models_trained) != length(list_models))
+               || start_date != input$start_date
+               || end_date != input$end_date
+               || var_target != input$features
+               )
+          {
 
-          if (inherits(data_train[[var_date_feature]][1], "Date"))
-          {
-            limit_date_show <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + forecast_horizon
-          }else if(inherits(data_train[[var_date_feature]][1], "POSIXct"))
-          {
-            limit_date_show <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + hours(forecast_horizon)
+            # Validation of dataset to use
+            if ((nrow(data_clean) == 0 || is.null(data_clean)) && (nrow(data_feature_train) == 0 || is.null(data_feature_train))){
+              data_train <<- data_input
+            }else if (nrow(data_feature_train) > 0 && !is.null(data_feature_train)) {
+              data_train <<- data_feature_train
+            }else{
+              data_train <<- data_clean
+            }
+
+            # Input recovery
+            forecast_horizon <- input$forecast_predic
+
+            # Horizon forecast validation
+            if (forecast_horizon > first_horizon )
+            {first_horizon <<- input$forecast_predic}
+
+            # Sub dataset according to time period
+            start_date <<- as.Date(input$start_date)
+            end_date <<- as.Date(input$end_date)
+
+            data_train <<- filter(data_train, data_train[[var_date_feature]] >= start_date)
+            data_train <<- filter(data_train, data_train[[var_date_feature]] <= end_date)
+
+            # Input recovery
+            var_target <<- input$features
+
+            # Generation of training and validation dataset
+            # split_data <- split_dataset(data_train, var_date_feature, var_target)
+            split_data <- split_dataset(data_train, var_date_feature, var_target)
+            dataset_train_test <<- split_data$traintest
+
+            # Model training
+            models_trained <<- model_selection_train(dataset_train_test, list_models, var_target, var_date_feature)
+
+            # Model evaluation
+            models_evaluated <<- model_evaluation(dataset_train_test, models_trained)
+            table_performance <- models_evaluated$accuracy_models
+            models_evaluated <<- models_evaluated$model_calibrated
+
+            df_models_evaluated <- models_evaluated %>%
+              modeltime_forecast(
+                new_data = testing(dataset_train_test),
+                actual_data = data_train
+              )
+
+            # Model prediction
+            models_predictions <<- prediction_forecast(data_train, models_evaluated, h=first_horizon)
+
+            if (inherits(data_train[[var_date_feature]][1], "Date"))
+            {
+              limit_date <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + forecast_horizon
+            }else if(inherits(data_train[[var_date_feature]][1], "POSIXct"))
+            {
+              limit_date <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + hours(forecast_horizon)
+            }
+
+            df_prediction_test_forecas <<- bind_rows(df_models_evaluated, models_predictions[ nrow(data_train)+1 : nrow(data_train), ])
+
+            plot_prediction_test_forecas <- df_prediction_test_forecas %>% filter(.index <= as.Date(limit_date))
+            plot_predictions <- plot_prediction_test_forecas %>% plot_modeltime_forecast(.legend_max_width = 15)
+
+
+            # Show forecast graphs
+            output$plot_result_forecasting <- renderPlotly({
+              ggplotly(plot_predictions)
+            })
+
+            # Show forecast performance
+            output$table_performance <- renderTable(table_performance)
+
+          }else{
+
+            # Show forecast graph according to the prediction already made
+            forecast_horizon <- input$forecast_predic
+
+            if (inherits(data_train[[var_date_feature]][1], "Date"))
+            {
+              limit_date_show <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + forecast_horizon
+            }else if(inherits(data_train[[var_date_feature]][1], "POSIXct"))
+            {
+              limit_date_show <- sort(data_train[[var_date_feature]], decreasing = TRUE)[1] + hours(forecast_horizon)
+            }
+
+            plot_prediction_test_forecas <- df_prediction_test_forecas %>% filter(.index <= as.Date(limit_date_show))
+            plot_predictions <- plot_prediction_test_forecas %>% plot_modeltime_forecast( .legend_max_width = 15)
+
+            # Show forecast graphs
+            output$plot_result_forecasting <- renderPlotly({
+              ggplotly(plot_predictions)
+            })
+
           }
-
-          plot_prediction_test_forecas <- df_prediction_test_forecas %>% filter(.index <= as.Date(limit_date_show))
-          plot_predictions <- plot_prediction_test_forecas %>% plot_modeltime_forecast()
-
-          # Show forecast graphs
-          output$plot_result_forecasting <- renderPlotly({
-            ggplotly(plot_predictions)
-          })
-
         }
       }
 

@@ -87,7 +87,6 @@ outliers_detection <- function(input_data, method_ls = "cpt"){
         input_data[variable] <- resul_out$yadj
       }else if(method_ls == "cpt")
       {
-
         cpt <- cpt.meanvar(y)
 
         indices_cpt <- c(0, cpts(cpt), length(y))
