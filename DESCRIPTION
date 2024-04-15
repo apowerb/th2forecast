@@ -24,7 +24,6 @@ Imports:
     prophet,
     randomForest,
     timetk,
-    tsoutliers
-Depends: 
+    tsoutliers,
     tidymodels,
     tidyverse
