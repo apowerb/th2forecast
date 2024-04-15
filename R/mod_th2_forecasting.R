@@ -111,6 +111,7 @@ mod_th2_forecasting_server<- function(id) {
 
       output$cond_forecast_predic <- renderUI({
         sliderInput(ns("forecast_predic"), "Forecast horizon:", min = min_horizon, max = max_horizon, value = value_horizon)
+
       })
 
       output$conditional_features <- renderUI({
@@ -342,7 +343,6 @@ mod_th2_forecasting_server<- function(id) {
             plot_predictions <- plot_prediction_test_forecas %>%
               modeltime::plot_modeltime_forecast(.legend_max_width = 15)
 
-
             # Show forecast graphs
             output$plot_result_forecasting <- renderPlotly({
               plotly::ggplotly(plot_predictions)
@@ -368,6 +368,7 @@ mod_th2_forecasting_server<- function(id) {
               dplyr::filter(.index <= as.Date(limit_date_show))
             plot_predictions <- plot_prediction_test_forecas %>%
               modeltime::plot_modeltime_forecast( .legend_max_width = 15)
+
 
             # Show forecast graphs
             output$plot_result_forecasting <- renderPlotly({
