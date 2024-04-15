@@ -1,13 +1,11 @@
-library(timetk)
-
-data <- m4_monthly %>% dplyr::filter(id == "M750")
+data <- timetk::m4_monthly %>% filter(id == "M750")
 data <- split_dataset(data, "date", "value")$traintest
 
-# # Test for th2_arima_engine
-# test_that("th2_arima_engine returns an ARIMA model", {
-#   model_arima <- th2_arima_engine(data, "value", "date", engine="auto_arima")
-#   expect_is(model_arima, "model_fit")
-# })
+# Test for th2_arima_engine
+test_that("th2_arima_engine returns an ARIMA model", {
+  model_arima <- th2_arima_engine(data, "value", "date", engine="auto_arima")
+  expect_is(model_arima, "model_fit")
+})
 
 # Test for th2_prophet_engine
 test_that("th2_prophet_engine returns a Prophet model", {
@@ -43,6 +41,21 @@ test_that("th2_mars_engine returns a MARS model", {
     mars_features = "month")
     )
 })
+
+
+# Test for th2_random_forest
+test_that("th2_random_forest returns a workflow", {
+  model_rf_fit <- th2_random_forest_engine(data, "value")
+  expect_is(model_rf_fit, "model_fit")
+})
+
+
+# Test for th2_xgboost
+test_that("th2_xgboost returns a workflow", {
+  model_xgboost_fit <- th2_xgboost_engine(data, "value")
+  expect_is(model_xgboost_fit, "model_fit")
+})
+
 
 # Test for model_selection_train
 test_that("model_selection_train returns a modeltime table", {

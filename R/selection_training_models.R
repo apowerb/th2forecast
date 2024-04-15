@@ -7,9 +7,6 @@
 #' @param var_date Le nom de la colonne qui contient les dates dans le dataframe.
 #' @param engine Le moteur à utiliser pour le modèle arime_reg. Par défaut, c'est "auto_arima".
 #'
-#' @import modeltime
-#' @import tidymodels
-#'
 #' @return Un modèle Arima entraîné.
 #' @export
 #'
@@ -21,9 +18,10 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
-    model_arima <- arima_reg() %>%
-      set_engine(engine = engine) %>%
-      fit(formula, training(input_data))
+    set.seed(1234)
+    model_arima <- modeltime::arima_reg() %>%
+      parsnip::set_engine(engine = engine) %>%
+      parsnip::fit(formula, data = training(input_data))
     return(model_arima)
   }
 }
@@ -36,10 +34,6 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
 #' @param var_date Le nom de la colonne qui contient les dates dans le dataframe.
 #' @param engine Le moteur à utiliser pour le modèle Prophet. Par défaut, c'est "prophet".
 #'
-#' @import modeltime
-#' @import tidymodels
-#' @import prophet
-#'
 #' @return Un modèle Prophet entraîné.
 #' @export
 #'
@@ -51,9 +45,9 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
-    model_prophet <- prophet_reg() %>%
-      set_engine(engine = engine) %>%
-      fit(formula, data = training(input_data))
+    model_prophet <- modeltime::prophet_reg() %>%
+      parsnip::set_engine(engine = engine) %>%
+      parsnip::fit(formula, data = training(input_data))
 
     return(model_prophet)
   }
@@ -66,9 +60,6 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
 #' @param var_date Le nom de la colonne qui contient les dates dans le dataframe.
 #' @param engine Le moteur à utiliser pour le modèle linear_reg. Par défaut, c'est "lm".
 #'
-#' @import modeltime
-#' @import tidymodels
-#'
 #' @return Un modèle de régression linéaire entraîné.
 #' @export
 #'
@@ -80,10 +71,11 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm"){
   }else
   {
     formula <- as.formula(paste(var_target, "~", "as.numeric(",var_date,") + factor(month(",var_date,", label = TRUE), ordered = FALSE)"))
+    # formula <- as.formula(paste(var_target, "~ ."))
 
-    model_linear <- linear_reg() %>%
-      set_engine(engine = engine) %>%
-      fit(formula, data = training(input_data))
+    model_linear <- parsnip::linear_reg() %>%
+      parsnip::set_engine(engine = engine) %>%
+      parsnip::fit(formula, data = training(input_data))
 
     return(model_linear)
   }
@@ -95,9 +87,6 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm"){
 #' @param var_target Le nom de la colonne target dans le dataframe.
 #' @param var_date Le nom de la colonne qui contient les dates dans le dataframe.
 #' @param engine Le moteur à utiliser pour le modèle mars Par défaut, c'est "earth".
-#'
-#' @import modeltime
-#' @import tidymodels
 #'
 #' @return Un modèle MARs entraîné.
 #' @export
@@ -111,19 +100,19 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
-    model_mars <- mars(mode = "regression") %>%
-      set_engine(engine)
+    model_mars <- parsnip::mars(mode = "regression") %>%
+      parsnip::set_engine(engine)
 
-    recipe_spec <- recipe(formula, data = training(input_data)) %>%
-      step_date(var_date, features = mars_features, ordinal = FALSE) %>%
-      step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
-      step_normalize(date_num) %>%
-      step_rm(var_date)
+    recipe_spec <- recipes::recipe(formula, data = training(input_data)) %>%
+      recipes::step_date(var_date, features = mars_features, ordinal = FALSE) %>%
+      recipes::step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
+      recipes::step_normalize(date_num) %>%
+      recipes::step_rm(var_date)
 
-    model_fit_mars <- workflow() %>%
-      add_recipe(recipe_spec) %>%
-      add_model(model_mars) %>%
-      fit(training(input_data))
+    model_fit_mars <- workflows::workflow() %>%
+      workflows::add_recipe(recipe_spec) %>%
+      workflows::add_model(model_mars) %>%
+      parsnip::fit(training(input_data))
 
     return(model_fit_mars)
   }
@@ -133,30 +122,57 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 
 #' Création et entraînement du modèle Random Forest
 #'
-#' @param df_train
-#' @param df_test
-#' @param var_target
+#' @param input_data Un dataframe qui contient les données à utiliser pour l'entraînement du modèle.
+#' @param var_target Le nom de la colonne target dans le dataframe.
+#' @param trees Nombre d'arbres
 #'
-#' @import randomForest
-#'
-#' @return
+#' @return Un modèle Random Forest entraîné.
 #' @export
 #'
 #' @examples
-th2_random_forest <- function(df_train, df_test, var_target){
+th2_random_forest_engine <- function(input_data, var_target, trees = 500){
+
+  model_rf <- parsnip::rand_forest( trees = trees ) %>%
+    parsnip::set_engine("randomForest") %>%
+    parsnip::set_mode("regression")
 
   # Fit a Random Forest model
-  rf_model <- randomForest(x = dplyr::select(df_train, -var_target), y = unlist(df_train[var_target]), ntree = 100)
+  formula <- as.formula(paste(var_target, "~ ."))
 
-  # Make predictions on the test data
-  predictions <- predict(object =  rf_model, newdata = dplyr::select(df_test, -var_target))
+  model_rf_fit <- model_rf %>%
+    parsnip::fit(formula, data = training(input_data))
 
-  # Evaluate the model using RMSE
-  rmse <- sqrt(mean(( unlist(df_test[var_target]) - predictions)^2))
+  return(model_rf_fit)
 
-  print(rmse)
+}
 
-  return(rf_model)
+
+#' Création et entraînement du modèle XGBoost
+#'
+#' @param input_data Un dataframe qui contient les données à utiliser pour l'entraînement du modèle.
+#' @param var_target Le nom de la colonne target dans le dataframe.
+#' @param trees Nombre d'arbres
+#'
+#' @return Un modèle XGBoost entraîné.
+#' @export
+#'
+#' @examples
+th2_xgboost_engine <- function(input_data, var_target, trees = 15){
+
+  model_xgboost <-
+    parsnip::boost_tree(trees = trees) %>%
+    parsnip::set_mode("regression") %>%
+    parsnip::set_engine("xgboost")
+
+
+  # Fit a Random Forest model
+  formula <- as.formula(paste(var_target, "~ ."))
+
+  set.seed(1)
+  model_xgboost_fit <- model_xgboost %>%
+    parsnip::fit(formula, data = training(input_data))
+
+  return(model_xgboost_fit)
 
 }
 
@@ -169,10 +185,6 @@ th2_random_forest <- function(df_train, df_test, var_target){
 #' @param var_target Le nom de la colonne cible dans le dataframe.
 #' @param var_date Le nom de la colonne qui contient les dates dans le dataframe.
 #'
-#' @import modeltime
-#' @import tidymodels
-#' @import caTools
-#'
 #' @return Un tableau qui contient les modèles entraînés.
 #' @export
 #'
@@ -184,22 +196,8 @@ model_selection_train <- function (input_data, list_models, var_target, var_date
 
     if (length(list_models) > 0 && is.character(list_models))
     {
-
       if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
         return(warning("Selected variables do not exist in the data."))
-      }
-
-      if( !is.null(input_feature_data) || nrow(input_data) != 0 ){
-        # train_percentage <- 0.8
-        # train_size <- floor(train_percentage * nrow(final_data))
-        # train_data <- final_data[1:train_size, ]
-        # test_data <- final_data[(train_size + 1):nrow(final_data), ]
-        df_features <- sample.split(input_feature_data[[var_target]], SplitRatio = 0.8)
-        # print(df_features)
-
-        df_features_train  <- subset(input_feature_data, df_features == TRUE)
-        df_features_test   <- subset(input_feature_data, df_features == FALSE)
-        print(nrow(df_features_test))
       }
 
       list_output_models <- list()
@@ -218,8 +216,11 @@ model_selection_train <- function (input_data, list_models, var_target, var_date
           model_mars <- th2_mars_engine(input_data, var_target, var_date)
           list_output_models[["model_mars"]] <- model_mars
         } else if(model == "random_forest"){
-          model_random_forest <- th2_random_forest(df_features_train, df_features_test, var_target)
+          model_random_forest <- th2_random_forest_engine(input_data, var_target, 200)
           list_output_models[["model_random_forest"]] <- model_random_forest
+        }else if(model == "xgboost"){
+          model_xgboost <- th2_xgboost_engine(input_data, var_target, 15)
+          list_output_models[["model_xgboost"]] <- model_xgboost
         }else{
           error_models <- c(error_models, model)
         }
