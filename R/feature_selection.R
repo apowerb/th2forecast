@@ -2,10 +2,10 @@
 #'
 #' Une fonction permettant augmenter les caractéristiques
 #'
-#' @param ts_movil
-#' @param features_input
+#' @param ts_movil liste pour le calcul des features
+#' @param features_input sélection des features à retourner
 #'
-#' @return
+#' @return features
 #' @export
 #'
 #' @examples
@@ -67,7 +67,7 @@ feature_selection <- function(
     data_features["weekend"] <- ifelse(data_features$dayofweek %in% c(1, 7), 1, 0)
 
     for (i in 1:lags) {
-      data_features[paste("lag_", i, sep = "")] <- lag(data_features[feature_target], i)
+      data_features[paste("lag_", i, sep = "")] <- dplyr::lag(data_features[feature_target], i)
     }
 
     window <- window
@@ -75,7 +75,13 @@ feature_selection <- function(
     data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], window, mean, fill = NA)
     data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], window, sd, fill = NA)
 
-    st_features <- zoo::rollapplyr(input_data[feature_target], width = window, FUN = th2_tsfeatures, by.column = FALSE, fill = NA)
+    st_features <- zoo::rollapplyr(
+      input_data[feature_target],
+      width = window,
+      FUN = th2_tsfeatures,
+      by.column = FALSE,
+      fill = NA
+      )
 
     data_features <- cbind(data_features, st_features)
 

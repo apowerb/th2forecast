@@ -23,7 +23,6 @@ split_dataset <- function(input_data, var_time, var_target, assess = "3 months" 
       }
     }
 
-
     if (!(var_time %in% colnames(input_data) && var_target %in% colnames(input_data))){
       return(warning("Selected variables do not exist"))
     }
