@@ -1,3 +1,12 @@
+#' Génère des sous-groupes à partir d'un dataset
+#'
+#' @param dataset_input données d'entrée
+#' @param var_date date variable
+#'
+#' @return renvoie une liste de sous-ensembles
+#' @export
+#'
+#' @examples
 th2_resamples <- function(dataset_input, var_date){
 
   dataset_date <- dataset_input
@@ -27,9 +36,21 @@ th2_resamples <- function(dataset_input, var_date){
     slice_limit = 4
   )
 
+  return(resamples_tscv)
+
 }
 
 
+#' Effectue le réglage fin d'un modèle en fonction d'hyperparamètres
+#'
+#' @param resample_data sous-ensembles
+#' @param model modèle entraîné
+#' @param tuning_param liste des hyperparamètres
+#'
+#' @return un modèle affiné
+#' @export
+#'
+#' @examples
 th2_tune_model <- function(resample_data, model, tuning_param){
 
   cv_results <- tune::tune_grid(
@@ -49,6 +70,19 @@ th2_tune_model <- function(resample_data, model, tuning_param){
 
 }
 
+#' Génère une chaîne de modèles ajustés
+#'
+#' @param dataset_input données d'entrée
+#' @param dataset_split données pour l'évaluation et la formation
+#' @param var_date date var
+#' @param var_target targget
+#' @param models liste des modèles
+#' @param ensamble_type type d'assemblée
+#'
+#' @return renvoie un ensemble de plusieurs modèles entraînés
+#' @export
+#'
+#' @examples
 th2_ensemble_engine <- function(dataset_input, dataset_split, var_date, var_target, models, ensamble_type = "mean"){
 
   list_output_models <- list()
@@ -101,19 +135,11 @@ th2_ensemble_engine <- function(dataset_input, dataset_split, var_date, var_targ
       error_models <- c(error_models, model)
     }
 
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-    print(label_model)
-    print(training_model)
-
     best_params <- th2_tune_model(resample_data, training_model$fit, tuning_param)
-
-    print(best_params)
 
     fitted_model <- training_model$model %>%
       tune::finalize_model(best_params) %>%
       parsnip::fit(formula, data = training(dataset_split))
-
-    print(fitted_model)
 
     list_output_models[[label_model]] <- fitted_model
 
@@ -121,12 +147,22 @@ th2_ensemble_engine <- function(dataset_input, dataset_split, var_date, var_targ
 
   model_table <- do.call(modeltime::modeltime_table, list_output_models)
 
-  tuning_models <- model_table %>%
-    modeltime.resample::modeltime_fit_resamples(
-      resamples = resample_data,
-      control = control_resamples(verbose=TRUE)
-    )
+  # tuning_models <- model_table %>%
+  #   modeltime.resample::modeltime_fit_resamples(
+  #     resamples = resample_data,
+  #     control = control_resamples(verbose=TRUE)
+  #   )
 
-  ensemble_fit <- tuning_models %>%
-    modeltime.ensemble::ensemble_average(type = ensamble_type)
+  ensemble_fit <- model_table %>%
+    modeltime.ensemble::ensemble_average(type = "mean")
+
+  calibration_tbl <-  modeltime_table(
+    ensemble_fit
+  ) %>%
+    modeltime::modeltime_calibrate(testing(dataset_split), quiet = FALSE)
+
+  refit_tbl <- calibration_tbl %>%
+    modeltime::modeltime_refit(dataset_input)
+
+  return(refit_tbl)
 }

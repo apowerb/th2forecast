@@ -20,11 +20,14 @@ Imports:
     dplyr,
     janitor,
     modeltime,
+    modeltime.ensemble,
+    modeltime.resample,
     naniar,
     prophet,
     randomForest,
     timetk,
-    tsoutliers
+    tsoutliers,
+    tune
 Depends: 
     tidymodels,
     tidyverse
