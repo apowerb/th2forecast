@@ -38,18 +38,31 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
 #' @export
 #'
 #' @examples th2_prophet_engine(input_data, "value", "datetime", engine="prophet")
-th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet"){
+th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet", changepoint_num = NULL, changepoint_range = NULL, fit_model = FALSE){
   if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
     return(warning("Selected variables do not exist in the data."))
   }else
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
-    model_prophet <- modeltime::prophet_reg() %>%
-      parsnip::set_engine(engine = engine) %>%
-      parsnip::fit(formula, data = training(input_data))
+    model_prophet <- modeltime::prophet_reg(
+      changepoint_num = tune(),
+      changepoint_range = tune()
+      ) %>%
+      parsnip::set_engine(engine = engine)
 
-    return(model_prophet)
+    if(fit_model == TRUE){
+      model_prophet_fit <- model_prophet %>%
+        parsnip::fit(formula, data = training(input_data))
+    }else{
+      model_prophet_fit <- workflow() %>%
+        add_recipe(recipe(formula, data = training(input_data))) %>%
+        add_model(model_prophet)
+
+      model_prophet_fit <- list("fit" = model_prophet_fit, "model"= model_prophet)
+    }
+
+    return(model_prophet_fit)
   }
 }
 
@@ -130,17 +143,27 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 #' @export
 #'
 #' @examples
-th2_random_forest_engine <- function(input_data, var_target, trees = 500){
+th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, fit_model = TRUE){
 
-  model_rf <- parsnip::rand_forest( trees = trees ) %>%
+  model_rf <- parsnip::rand_forest(
+    min_n = tune(),
+    trees = tune() ) %>%
     parsnip::set_engine("randomForest") %>%
     parsnip::set_mode("regression")
 
   # Fit a Random Forest model
   formula <- as.formula(paste(var_target, "~ ."))
 
-  model_rf_fit <- model_rf %>%
-    parsnip::fit(formula, data = training(input_data))
+  if(fit_model == TRUE){
+    model_rf_fit <- model_rf %>%
+      parsnip::fit(formula, data = training(input_data))
+  }else{
+    model_rf_fit <- workflow() %>%
+      add_recipe(recipe(formula, data = training(input_data))) %>%
+      add_model(model_rf)
+
+    model_rf_fit <- list("fit" = model_rf_fit, "model"= model_rf)
+  }
 
   return(model_rf_fit)
 

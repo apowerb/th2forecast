@@ -1,6 +1,6 @@
 Package: th2forecast
 Title: Framework for the forecasting models
-Version: 0.0.2
+Version: 0.0.3
 Authors@R: 
     person("Harold", "Villafuerte", , "harold.villafuerte@thaink2.com", role = c("aut", "cre"))
 Description: Implements all the functions necessary to apply the complete forecasting pipeline.
@@ -19,10 +19,11 @@ Imports:
     dplyr,
     janitor,
     modeltime,
+    modeltime.ensemble,
+    modeltime.resample,
     naniar,
     prophet,
     randomForest,
     timetk,
     tsoutliers,
-    tidymodels,
-    tidyverse
+    tune
