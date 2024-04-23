@@ -18,7 +18,7 @@ test_that("th2_prophet_engine returns a Prophet model", {
 # Test for th2_linear_engine
 test_that("th2_linear_engine returns a linear regression model", {
   model_linear <- th2_linear_engine(data, "value", "date", engine = "lm")
-  expect_is(model_linear, "model_fit")
+  expect_is(model_linear, "workflow")
 
   expect_warning(th2_linear_engine(data, "valor", "date", engine = "lm"))
 })
@@ -52,7 +52,7 @@ test_that("th2_random_forest returns a workflow", {
 
 # Test for th2_xgboost
 test_that("th2_xgboost returns a workflow", {
-  model_xgboost_fit <- th2_xgboost_engine(data, "value")
+  model_xgboost_fit <- th2_xgboost_engine(data, "date", "value")
   expect_is(model_xgboost_fit, "model_fit")
 })
 

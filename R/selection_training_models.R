@@ -11,7 +11,7 @@
 #' @export
 #'
 #' @examples th2_arima_engine(input_data, "value", "datetime", engine="auto_arima")
-th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arima"){
+th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arima", p = 1, d = 1, q = 1, fit_model = TRUE){
   if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
     return(warning("Selected variables do not exist in the data."))
   }else
@@ -19,10 +19,27 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
     formula <- as.formula(paste(var_target, "~", var_date))
 
     set.seed(1234)
-    model_arima <- modeltime::arima_reg() %>%
-      parsnip::set_engine(engine = engine) %>%
-      parsnip::fit(formula, data = training(input_data))
-    return(model_arima)
+    model_arima <- modeltime::arima_reg(
+      non_seasonal_ar = ifelse(fit_model, p, tune()),
+      non_seasonal_differences = ifelse(fit_model, d, tune()),
+      non_seasonal_ma = ifelse(fit_model, q, tune())
+    ) %>%
+      parsnip::set_engine(engine = engine)
+
+    # %>%
+    # parsnip::fit(formula, data = training(input_data))
+
+    if(fit_model == TRUE){
+      model_arima_fit <- model_arima %>%
+        parsnip::fit(formula, data = training(input_data))
+    }else{
+      model_arima_fit <- workflows::workflow() %>%
+        workflows::add_recipe(recipes::recipe(formula, data = training(input_data))) %>%
+        workflows::add_model(model_arima)
+
+      model_arima_fit <- list("fit" = model_arima_fit, "model"= model_arima)
+    }
+    return(model_arima_fit)
   }
 }
 
@@ -38,7 +55,7 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
 #' @export
 #'
 #' @examples th2_prophet_engine(input_data, "value", "datetime", engine="prophet")
-th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet", changepoint_num = NULL, changepoint_range = NULL, fit_model = FALSE){
+th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet", changepoint_num = 25, changepoint_range = 0.8, fit_model = TRUE){
   if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
     return(warning("Selected variables do not exist in the data."))
   }else
@@ -46,8 +63,8 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
     formula <- as.formula(paste(var_target, "~", var_date))
 
     model_prophet <- modeltime::prophet_reg(
-      changepoint_num = tune(),
-      changepoint_range = tune()
+      changepoint_num = ifelse(fit_model, changepoint_num, tune()),
+      changepoint_range = ifelse(fit_model, changepoint_range, tune())
       ) %>%
       parsnip::set_engine(engine = engine)
 
@@ -55,9 +72,9 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
       model_prophet_fit <- model_prophet %>%
         parsnip::fit(formula, data = training(input_data))
     }else{
-      model_prophet_fit <- workflow() %>%
-        add_recipe(recipe(formula, data = training(input_data))) %>%
-        add_model(model_prophet)
+      model_prophet_fit <- workflows::workflow() %>%
+        workflows::add_recipe(recipes::recipe(formula, data = training(input_data))) %>%
+        workflows::add_model(model_prophet)
 
       model_prophet_fit <- list("fit" = model_prophet_fit, "model"= model_prophet)
     }
@@ -77,20 +94,42 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
 #' @export
 #'
 #' @examples th2_linear_engine(input_data, "value", "datetime", engine="lm")
-th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm"){
+th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", fit_model = TRUE){
 
   if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
     return(warning("Selected variables do not exist in the data."))
   }else
   {
-    formula <- as.formula(paste(var_target, "~", "as.numeric(",var_date,") + factor(month(",var_date,", label = TRUE), ordered = FALSE)"))
-    # formula <- as.formula(paste(var_target, "~ ."))
+    # formula <- as.formula(paste(var_target, "~", "as.numeric(",var_date,") + factor(month(",var_date,", label = TRUE), ordered = FALSE)"))
+    formula <- as.formula(paste(var_target, "~", var_date))
 
     model_linear <- parsnip::linear_reg() %>%
       parsnip::set_engine(engine = engine) %>%
-      parsnip::fit(formula, data = training(input_data))
+      parsnip::set_mode("regression")
 
-    return(model_linear)
+    recipe_spec <- recipes::recipe(formula, data = training(input_data)) %>%
+      recipes::step_date(var_date, features = "month", ordinal = FALSE) %>%
+      recipes::step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
+      recipes::step_normalize(date_num) %>%
+      recipes::step_rm(var_date)
+
+
+    if(fit_model == TRUE){
+
+      model_linear_fit <- workflows::workflow() %>%
+        workflows::add_recipe(recipe_spec) %>%
+        workflows::add_model(model_linear) %>%
+        parsnip::fit(training(input_data))
+
+    }else{
+      model_linear_fit <- workflows::workflow() %>%
+        workflows::add_recipe(recipe_spec) %>%
+        workflows::add_model(model_linear)
+
+      model_linear_fit <- list("fit" = model_linear_fit, "model"= model_linear)
+    }
+
+    return(model_linear_fit)
   }
 }
 
@@ -105,7 +144,7 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm"){
 #' @export
 #'
 #' @examples th2_mars_engine(input_data, "value", "datetime", engine="earth", mars_features="month")
-th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", mars_features="month"){
+th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", mars_features="month", num_terms = 5, prod_degree = 5, fit_model = TRUE){
 
   if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
     return(warning("Selected variables do not exist in the data."))
@@ -113,8 +152,13 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
-    model_mars <- parsnip::mars(mode = "regression") %>%
-      parsnip::set_engine(engine)
+    model_mars <- parsnip::mars(
+      num_terms = ifelse(fit_model, num_terms, tune() ) ,
+      prod_degree = ifelse(fit_model, prod_degree, tune() )
+
+    ) %>%
+      parsnip::set_engine(engine) %>%
+      parsnip::set_mode("regression")
 
     recipe_spec <- recipes::recipe(formula, data = training(input_data)) %>%
       recipes::step_date(var_date, features = mars_features, ordinal = FALSE) %>%
@@ -122,10 +166,22 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
       recipes::step_normalize(date_num) %>%
       recipes::step_rm(var_date)
 
-    model_fit_mars <- workflows::workflow() %>%
-      workflows::add_recipe(recipe_spec) %>%
-      workflows::add_model(model_mars) %>%
-      parsnip::fit(training(input_data))
+    if (fit_model == TRUE) {
+
+      model_fit_mars <- workflows::workflow() %>%
+        workflows::add_recipe(recipe_spec) %>%
+        workflows::add_model(model_mars) %>%
+        parsnip::fit(training(input_data))
+    }else{
+
+      model_fit_mars <- workflows::workflow() %>%
+        workflows::add_recipe(recipe_spec) %>%
+        workflows::add_model(model_mars)
+
+      model_fit_mars <- list("fit" = model_fit_mars, "model"= model_mars)
+    }
+
+
 
     return(model_fit_mars)
   }
@@ -146,8 +202,8 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, fit_model = TRUE){
 
   model_rf <- parsnip::rand_forest(
-    min_n = tune(),
-    trees = tune() ) %>%
+    min_n = ifelse(fit_model, min_n, tune()),
+    trees = ifelse(fit_model, trees, tune()) ) %>%
     parsnip::set_engine("randomForest") %>%
     parsnip::set_mode("regression")
 
@@ -158,9 +214,9 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
     model_rf_fit <- model_rf %>%
       parsnip::fit(formula, data = training(input_data))
   }else{
-    model_rf_fit <- workflow() %>%
-      add_recipe(recipe(formula, data = training(input_data))) %>%
-      add_model(model_rf)
+    model_rf_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipes::recipe(formula, data = training(input_data))) %>%
+      workflows::add_model(model_rf)
 
     model_rf_fit <- list("fit" = model_rf_fit, "model"= model_rf)
   }
@@ -180,20 +236,33 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 #' @export
 #'
 #' @examples
-th2_xgboost_engine <- function(input_data, var_target, trees = 15){
+th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , trees = 15, min_n = 5, learn_rate = 0.1, fit_model = TRUE ){
 
   model_xgboost <-
-    parsnip::boost_tree(trees = trees) %>%
+    parsnip::boost_tree(
+      mtry = ifelse(fit_model, mtry, tune()),
+      trees = ifelse(fit_model, trees, tune()),
+      min_n = ifelse(fit_model, min_n, tune()),
+      learn_rate = ifelse(fit_model, learn_rate, tune())
+      ) %>%
     parsnip::set_mode("regression") %>%
     parsnip::set_engine("xgboost")
 
 
-  # Fit a Random Forest model
+  # Fit a XGBoost model
   formula <- as.formula(paste(var_target, "~ ."))
 
-  set.seed(1)
-  model_xgboost_fit <- model_xgboost %>%
-    parsnip::fit(formula, data = training(input_data))
+  if(fit_model == TRUE){
+    set.seed(1)
+    model_xgboost_fit <- model_xgboost %>%
+      parsnip::fit(formula, data = training(input_data))
+  }else{
+    model_xgboost_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipes::recipe(formula, data = dplyr::select(training(input_data), - var_date) )) %>%
+      workflows::add_model(model_xgboost)
+
+    model_xgboost_fit <- list("fit" = model_xgboost_fit, "model"= model_xgboost)
+  }
 
   return(model_xgboost_fit)
 
@@ -242,7 +311,7 @@ model_selection_train <- function (input_data, list_models, var_target, var_date
           model_random_forest <- th2_random_forest_engine(input_data, var_target, 200)
           list_output_models[["model_random_forest"]] <- model_random_forest
         }else if(model == "xgboost"){
-          model_xgboost <- th2_xgboost_engine(input_data, var_target, 15)
+          model_xgboost <- th2_xgboost_engine(input_data, var_date, var_target, 15)
           list_output_models[["model_xgboost"]] <- model_xgboost
         }else{
           error_models <- c(error_models, model)

@@ -50,19 +50,21 @@ feature_selection <- function(
 
     if (length(list_features) > 0) {
       list_features <- c(var_date_feature, list_features, feature_target)
-      data_features <- input_data %>% dplyr::select(all_of(list_features))
+      data_features <- input_data %>%
+        dplyr::select(all_of(list_features))
     }else {
       list_features <- c(var_date_feature, feature_target)
-      data_features <- input_data %>% dplyr::select(all_of(list_features))
+      data_features <- input_data %>%
+        dplyr::select(all_of(list_features))
     }
 
-    data_features["month"]  <- month(data_features[[var_date_feature]])
+    data_features["month"]  <- lubridate::month(data_features[[var_date_feature]])
 
     if (inherits(data_features[[var_date_feature]], "POSIXct")) {
-      data_features["hour"]  <- hour(data_features[[var_date_feature]])
+      data_features["hour"]  <- lubridate::hour(data_features[[var_date_feature]])
     }
 
-    data_features["dayofweek"] <- wday(data_features[[var_date_feature]])
+    data_features["dayofweek"] <- lubridate::wday(data_features[[var_date_feature]])
 
     data_features["weekend"] <- ifelse(data_features$dayofweek %in% c(1, 7), 1, 0)
 
