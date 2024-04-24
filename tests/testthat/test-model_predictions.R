@@ -14,8 +14,8 @@ model_prophet <- prophet_reg(seasonality_yearly = TRUE) %>%
 model_glment <- linear_reg(penalty = 0.01) %>%
   set_engine("glmnet") %>%
   fit(
-    value ~ wday(date, label = TRUE)
-    + month(date, label = TRUE)
+    value ~ lubridate::wday(date, label = TRUE)
+    + lubridate::month(date, label = TRUE)
     + as.numeric(date),
     training(data)
   )
