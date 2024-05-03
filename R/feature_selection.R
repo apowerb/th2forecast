@@ -87,6 +87,8 @@ feature_selection <- function(
 
     data_features <- cbind(data_features, st_features)
 
+    data_features <- data_features[complete.cases(data_features), ]
+
     return(data_features)
   }else {
     return(warning("The *input_date* variable is not a data.frame"))

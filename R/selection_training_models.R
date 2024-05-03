@@ -12,7 +12,7 @@
 #'
 #' @examples th2_arima_engine(input_data, "value", "datetime", engine="auto_arima")
 th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arima", p = 1, d = 1, q = 1, fit_model = TRUE){
-  if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
+  if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))){
     return(warning("Selected variables do not exist in the data."))
   }else
   {
@@ -20,9 +20,9 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
 
     set.seed(1234)
     model_arima <- modeltime::arima_reg(
-      non_seasonal_ar = ifelse(fit_model, p, tune()),
-      non_seasonal_differences = ifelse(fit_model, d, tune()),
-      non_seasonal_ma = ifelse(fit_model, q, tune())
+      non_seasonal_ar = ifelse(fit_model == FALSE, tune(), p),
+      non_seasonal_differences = ifelse(fit_model == FALSE, tune(), d),
+      non_seasonal_ma = ifelse(fit_model == FALSE, tune(), q)
     ) %>%
       parsnip::set_engine(engine = engine)
 
@@ -31,10 +31,10 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
 
     if(fit_model == TRUE){
       model_arima_fit <- model_arima %>%
-        parsnip::fit(formula, data = training(input_data))
+        parsnip::fit(formula, data = input_data)
     }else{
       model_arima_fit <- workflows::workflow() %>%
-        workflows::add_recipe(recipes::recipe(formula, data = training(input_data))) %>%
+        workflows::add_recipe(recipes::recipe(formula, data = input_data)) %>%
         workflows::add_model(model_arima)
 
       model_arima_fit <- list("fit" = model_arima_fit, "model"= model_arima)
@@ -56,24 +56,24 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
 #'
 #' @examples th2_prophet_engine(input_data, "value", "datetime", engine="prophet")
 th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet", changepoint_num = 25, changepoint_range = 0.8, fit_model = TRUE){
-  if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
+  if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))){
     return(warning("Selected variables do not exist in the data."))
   }else
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
     model_prophet <- modeltime::prophet_reg(
-      changepoint_num = ifelse(fit_model, changepoint_num, tune()),
-      changepoint_range = ifelse(fit_model, changepoint_range, tune())
+      changepoint_num = ifelse(fit_model == FALSE, tune(), changepoint_num),
+      changepoint_range = ifelse(fit_model == FALSE, tune(), changepoint_range)
       ) %>%
       parsnip::set_engine(engine = engine)
 
     if(fit_model == TRUE){
       model_prophet_fit <- model_prophet %>%
-        parsnip::fit(formula, data = training(input_data))
+        parsnip::fit(formula, data = input_data)
     }else{
       model_prophet_fit <- workflows::workflow() %>%
-        workflows::add_recipe(recipes::recipe(formula, data = training(input_data))) %>%
+        workflows::add_recipe(recipes::recipe(formula, data = input_data)) %>%
         workflows::add_model(model_prophet)
 
       model_prophet_fit <- list("fit" = model_prophet_fit, "model"= model_prophet)
@@ -95,8 +95,7 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
 #'
 #' @examples th2_linear_engine(input_data, "value", "datetime", engine="lm")
 th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", fit_model = TRUE){
-
-  if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
+  if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))){
     return(warning("Selected variables do not exist in the data."))
   }else
   {
@@ -107,7 +106,7 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", f
       parsnip::set_engine(engine = engine) %>%
       parsnip::set_mode("regression")
 
-    recipe_spec <- recipes::recipe(formula, data = training(input_data)) %>%
+    recipe_spec <- recipes::recipe(formula, data = input_data) %>%
       recipes::step_date(var_date, features = "month", ordinal = FALSE) %>%
       recipes::step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
       recipes::step_normalize(date_num) %>%
@@ -119,7 +118,7 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", f
       model_linear_fit <- workflows::workflow() %>%
         workflows::add_recipe(recipe_spec) %>%
         workflows::add_model(model_linear) %>%
-        parsnip::fit(training(input_data))
+        parsnip::fit(input_data)
 
     }else{
       model_linear_fit <- workflows::workflow() %>%
@@ -128,6 +127,7 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", f
 
       model_linear_fit <- list("fit" = model_linear_fit, "model"= model_linear)
     }
+    print(model_linear_fit)
 
     return(model_linear_fit)
   }
@@ -144,23 +144,23 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", f
 #' @export
 #'
 #' @examples th2_mars_engine(input_data, "value", "datetime", engine="earth", mars_features="month")
-th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", mars_features="month", num_terms = 5, prod_degree = 5, fit_model = TRUE){
+th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", mars_features="doy", num_terms = 5, prod_degree = 5, fit_model = TRUE){
 
-  if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
+  if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))){
     return(warning("Selected variables do not exist in the data."))
   }else
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
     model_mars <- parsnip::mars(
-      num_terms = ifelse(fit_model, num_terms, tune() ) ,
-      prod_degree = ifelse(fit_model, prod_degree, tune() )
+      num_terms = ifelse(fit_model == FALSE, tune(), num_terms),
+      prod_degree = ifelse(fit_model == FALSE, tune(), prod_degree)
 
     ) %>%
       parsnip::set_engine(engine) %>%
       parsnip::set_mode("regression")
 
-    recipe_spec <- recipes::recipe(formula, data = training(input_data)) %>%
+    recipe_spec <- recipes::recipe(formula, data = input_data) %>%
       recipes::step_date(var_date, features = mars_features, ordinal = FALSE) %>%
       recipes::step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
       recipes::step_normalize(date_num) %>%
@@ -171,7 +171,7 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
       model_fit_mars <- workflows::workflow() %>%
         workflows::add_recipe(recipe_spec) %>%
         workflows::add_model(model_mars) %>%
-        parsnip::fit(training(input_data))
+        parsnip::fit(input_data)
     }else{
 
       model_fit_mars <- workflows::workflow() %>%
@@ -180,8 +180,6 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 
       model_fit_mars <- list("fit" = model_fit_mars, "model"= model_mars)
     }
-
-
 
     return(model_fit_mars)
   }
@@ -212,10 +210,10 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 
   if(fit_model == TRUE){
     model_rf_fit <- model_rf %>%
-      parsnip::fit(formula, data = training(input_data))
+      parsnip::fit(formula, data = input_data)
   }else{
     model_rf_fit <- workflows::workflow() %>%
-      workflows::add_recipe(recipes::recipe(formula, data = training(input_data))) %>%
+      workflows::add_recipe(recipes::recipe(formula, data = input_data)) %>%
       workflows::add_model(model_rf)
 
     model_rf_fit <- list("fit" = model_rf_fit, "model"= model_rf)
@@ -255,11 +253,21 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
   if(fit_model == TRUE){
     set.seed(1)
     model_xgboost_fit <- model_xgboost %>%
-      parsnip::fit(formula, data = training(input_data))
+      parsnip::fit(formula, data = input_data)
   }else{
+    # model_xgboost_fit <- workflows::workflow() %>%
+    #   workflows::add_recipe(recipes::recipe(formula, data = dplyr::select(training(input_data), - var_date) )) %>%
+    #   workflows::add_model(model_xgboost)
+    #
+    # model_xgboost_fit <- list("fit" = model_xgboost_fit, "model"= model_xgboost)
+
+    th2_recipe_custom <- recipes::recipe(formula, input_data) %>%
+      # feature_selection(feature_target = var_target) %>%
+      step_rm(var_date)
+
     model_xgboost_fit <- workflows::workflow() %>%
-      workflows::add_recipe(recipes::recipe(formula, data = dplyr::select(training(input_data), - var_date) )) %>%
-      workflows::add_model(model_xgboost)
+        workflows::add_recipe(th2_recipe_custom) %>%
+        workflows::add_model(model_xgboost)
 
     model_xgboost_fit <- list("fit" = model_xgboost_fit, "model"= model_xgboost)
   }
@@ -283,12 +291,12 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
 #' @examples model_selection_train(input_data, c("arima", "prophet", "lr", "mars"), "value", "datetime")
 model_selection_train <- function (input_data, list_models, var_target, var_date, input_feature_data){
 
-  if (setequal(class(input_data), c("ts_cv_split", "rsplit"))){
+  if (setequal(class(input_data), c("spec_tbl_df", "tbl_df", "tbl", "data.frame")) || class(input_data) == "data.frame"){
     error_models <- NULL
 
     if (length(list_models) > 0 && is.character(list_models))
     {
-      if (!(var_date %in% colnames(training(input_data)) && var_target %in% colnames(training(input_data)))){
+      if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))){
         return(warning("Selected variables do not exist in the data."))
       }
 
@@ -329,6 +337,6 @@ model_selection_train <- function (input_data, list_models, var_target, var_date
       return(warning("No model was selected."))
     }
   }else{
-    return(warning("A data type *ts_cv_split* was expected."))
+    return(warning("A data type *data.frame* was expected."))
   }
 }
