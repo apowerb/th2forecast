@@ -83,13 +83,18 @@ th2_tune_model <- function(resample_data, model, tuning_param){
 #' @export
 #'
 #' @examples
-th2_ensemble_engine <- function(dataset_input, dataset_split, var_date, var_target, models, ensamble_type = "mean"){
+th2_ensemble_engine <- function(dataset_input, var_date, var_target, models, list_features = c(),  ensamble_type = "mean"){
 
   list_output_models <- list()
   error_models <- NULL
 
-  input_data <- dataset_input
-  resample_data <- th2_resamples(input_data, var_date)
+  data_features <- feature_selection(dataset_input, var_target, list_features)
+  data_features <- data_features[complete.cases(data_features), ]
+
+  dataset_split <- split_dataset(data_features, var_date, var_target)$traintest
+
+  # input_data <- dataset_input
+  resample_data <- th2_resamples(data_features, var_date)
 
   for (model in models) {
     # tune -- for
@@ -99,21 +104,21 @@ th2_ensemble_engine <- function(dataset_input, dataset_split, var_date, var_targ
 
     if(model == "arima"){
 
-      training_model <-  th2_arima_engine(dataset_split, var_target, var_date, fit_model = FALSE)
+      training_model <-  th2_arima_engine(training(dataset_split), var_target, var_date, fit_model = FALSE)
       formula <- as.formula(paste(var_target, "~", var_date))
       tuning_param <- list(non_seasonal_ar = seq(1, 2, 3), non_seasonal_differences = seq(0, 1, 2), non_seasonal_ma = seq(1, 2, 3))
       label_model <- "model_arima"
 
     } else if(model == "prophet"){
 
-      training_model <-  th2_prophet_engine(dataset_split, var_target, var_date, engine = "prophet", fit_model = FALSE)
+      training_model <-  th2_prophet_engine(training(dataset_split), var_target, var_date, engine = "prophet", fit_model = FALSE)
       formula <- as.formula(paste(var_target, "~", var_date))
       tuning_param <- list(changepoint_num = seq(10, 15, 25), changepoint_range = seq(0.6, 0.7, 0.8))
       label_model <- "model_prophet"
 
     } else  if(model == "lr"){
 
-      training_model <- th2_linear_engine(dataset_split, var_target, var_date, fit_model = FALSE)
+      training_model <- th2_linear_engine(training(dataset_split), var_target, var_date, fit_model = FALSE)
       # formula <- as.formula(paste(var_target, "~", "as.numeric(",var_date,") + factor(month(",var_date,", label = TRUE), ordered = FALSE)"))
       formula <- as.formula(paste(var_target, "~", var_date))
       tuning_param <- FALSE
@@ -121,21 +126,21 @@ th2_ensemble_engine <- function(dataset_input, dataset_split, var_date, var_targ
 
     } else if(model == "mars"){
 
-      training_model <- th2_mars_engine(dataset_split, var_target, var_date, fit_model = FALSE)
+      training_model <- th2_mars_engine(training(dataset_split), var_target, var_date, fit_model = FALSE)
       formula <- as.formula(paste(var_target, "~", var_date))
       tuning_param <- list(num_terms = seq(5, 10, 20), prod_degree = seq(2, 4, 10))
       label_model <- "model_mars"
 
     } else if(model == "random_forest"){
 
-      training_model <- th2_random_forest_engine(dataset_split, var_target, fit_model = FALSE)
+      training_model <- th2_random_forest_engine(training(dataset_split), var_target, fit_model = FALSE)
       formula <- as.formula(paste(var_target, "~ ."))
       tuning_param <- list(min_n = seq(2, 4, 1), trees = seq(20, 200, 400))
       label_model <- "model_random_forest"
 
     }else if(model == "xgboost"){
 
-      training_model <- th2_xgboost_engine(dataset_split, var_date, var_target, fit_model = FALSE)
+      training_model <- th2_xgboost_engine(training(dataset_split), var_date, var_target, fit_model = FALSE)
       formula <- as.formula(paste(var_target, "~ ."))
       tuning_param <- list(mtry = seq(2, 4, 10), trees = seq(50, 150, 400), min_n = seq(1, 5, 10), learn_rate = seq(0.01, 0.1, 0.2))
       label_model <- "model_xgboost"
@@ -165,7 +170,7 @@ th2_ensemble_engine <- function(dataset_input, dataset_split, var_date, var_targ
     modeltime::modeltime_calibrate(testing(dataset_split), quiet = FALSE)
 
   refit_tbl <- calibration_tbl %>%
-    modeltime::modeltime_refit(dataset_input)
+    modeltime::modeltime_refit(data_features)
 
   return(refit_tbl)
 }

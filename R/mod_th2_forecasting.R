@@ -226,7 +226,7 @@ mod_th2_forecasting_server<- function(id) {
 
         data_features <- feature_selection(data_features, feature_target, features_variables)
 
-        data_features <- data_features[complete.cases(data_features), ] # %>% dplyr::select(- "date")
+        # data_features <- data_features[complete.cases(data_features), ] # %>% dplyr::select(- "date")
 
         data_feature_train(data_features)
 
@@ -312,7 +312,7 @@ mod_th2_forecasting_server<- function(id) {
             split_data <- split_dataset(data_train(), var_date_feature(), var_target())
             dataset_train_test <- split_data$traintest
 
-            models_trained(model_selection_train(dataset_train_test, list_models, var_target(), var_date_feature()))
+            models_trained(model_selection_train(training(dataset_train_test), list_models, var_target(), var_date_feature()))
 
             # Model evaluation
             models_evaluated <- model_evaluation(dataset_train_test, models_trained())
