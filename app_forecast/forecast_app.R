@@ -19,12 +19,14 @@ library(rsample)
 # Shiny application
 ui <- fluidPage(
 
-  mod_th2_forecasting_ui("id_forecast")
+  # mod_th2_forecasting_ui("id_forecast")
+  mod_forecasting_viewer_ui("forecsating_viz")
 )
 
 
 server <- function(input, output) {
-  mod_th2_forecasting_server("id_forecast")
+  # mod_th2_forecasting_server("id_forecast")
+  mod_forecasting_viewer_server("forecsating_viz")
 }
 
 
