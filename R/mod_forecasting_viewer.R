@@ -23,7 +23,9 @@ mod_forecasting_viewer_ui <- function(id) {
       column(width = 2, uiOutput(ns("kpi_value"))),
       column(width = 2, uiOutput(ns("run")))
 
-      ))
+      ),
+    uiOutput(ns("graph_output"))
+    )
 }
 
 
@@ -72,46 +74,72 @@ mod_forecasting_viewer_server <- function(id) {
     selectInput(inputId = ns("output_table"), label = "Output", choices = available_data_tables(), multiple = F)
   })
 
+
     output$kpi_value <- renderUI({
       req(available_data_tables(), input$output_table)
+      selected_table_output <- input$output_table
 
-      data_source_server <- paste0(input$host, "/", input$db_name)
-      db_conn <- DatabaseConnector::connect(
-        dbms = "postgresql",
-        server = data_source_server,
-        user = input$username,
-        password = input$password,
-        port = as.numeric(input$port)
-      )
-
-      selected_table <- input$output_table
+     db_conn <- db_conn_function(dbms = "postgresql",
+                      user = input$username, password = input$password,
+                      port = input$port , host = input$host, db_name = input$db_name)
 
       available_tables <- DBI::dbListTables(conn = db_conn)
-      if (!selected_table %in% available_tables) {
-        DBI::dbDisconnect(db_conn)
-        stop(paste("La table ",selected_table, "n'existe pas dans la base de données."))
 
+       if (!selected_table_output %in% available_tables) {
+        DBI::dbDisconnect(db_conn)
+        stop(paste("La table ",selected_table_output, "n'existe pas dans la base de données."))
       }else{
         query_statement <- glue::glue(
-          paste("SELECT distinct(family)  FROM " , selected_table)
-        )
-      }
-
+          paste("SELECT distinct(family) FROM " , selected_table_output)
+        )}
       query_res <- DBI::dbSendQuery(db_conn, statement = query_statement)
       #Récupération des résultats de la requête
-      table_cols <- DBI::dbFetch(query_res)
+      kpi_values <- DBI::dbFetch(query_res)
       DBI::dbDisconnect(db_conn)
-      print(table_cols)
-      selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = table_cols, multiple = FALSE)
+      selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
 
     })
+
 
     output$run <- renderUI({
       req(available_data_tables(), input$output_table, input$kpi_value)
       actionButton(inputId = ns("run"), label = "Run",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
     })
 
+#========= forecesting viewer
+    observeEvent(input$run,{
+      db_conn <- db_conn_function(dbms = "postgresql",
+                                  user = input$username, password = input$password,
+                                  port = input$port , host = input$host, db_name = input$db_name)
+
+      available_tables <- DBI::dbListTables(conn = db_conn)
+
+      merged_data_result <- merged_data(selected_table_input = input$input_table,
+                                        selected_table_output = input$output_table,
+                                        db_conn = db_conn,
+                                        available_tables = available_tables)
+
+      print(head(merged_data_result))
+
+      # output$graph_output <-
+
+    })
+
+
+    db_conn_function <- function(dbms = "postgresql" ,server = NULL, user = NULL, password = NULL, port = NULL , host = NULL, db_name = NULL)  {
+       db_conn <- DatabaseConnector::connect(
+        dbms = "postgresql",
+        server = paste0(host, "/", db_name),
+        user = user,
+        password = password,
+        port = as.numeric(port)
+    )
+       return(db_conn)
+    }
+
+
   })
+
   }
 
 

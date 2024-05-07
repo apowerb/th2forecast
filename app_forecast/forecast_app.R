@@ -15,6 +15,7 @@ library(plotly)
 library(shinyalert)
 library(anomalize)
 library(rsample)
+library(dygraphs)
 
 # Shiny application
 ui <- fluidPage(
