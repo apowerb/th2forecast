@@ -8,6 +8,10 @@
 mod_forecasting_viewer_ui <- function(id) {
   ns <- NS(id)
 
+  bs4Dash::tabBox(
+    id = "forecastViz_tabbox", width = 12,
+    tabPanel(
+      title = "DB Connection", icon = icon("database"),
   fluidPage(
     fluidRow(
       column(width = 2, textInput(inputId = ns("host"), label = "Hostname")),
@@ -20,12 +24,21 @@ mod_forecasting_viewer_ui <- function(id) {
     fluidRow(
       column(width = 2, uiOutput(ns("input_table"))),
       column(width = 2, uiOutput(ns("output_table"))),
+      column(width = 2, uiOutput(ns("first_run")))
+    )
+  )
+  ),
+  tabPanel(
+    title = "Forecasting Viewer", icon = icon("chart-line"),
+    fluidPage(
+      fluidRow(
       column(width = 2, uiOutput(ns("kpi_value"))),
+      column(width = 2, uiOutput(ns("model"))),
       column(width = 2, uiOutput(ns("run")))
-
       ),
     uiOutput(ns("graph_output"))
-    )
+    ))
+  )
 }
 
 
@@ -36,7 +49,7 @@ mod_forecasting_viewer_server <- function(id) {
 
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
-
+    merged_data_result <- reactiveVal()
 
 
   output$connect_btn <- renderUI({
@@ -75,54 +88,59 @@ mod_forecasting_viewer_server <- function(id) {
   })
 
 
+  output$first_run <- renderUI({
+    req(available_data_tables(), input$output_table)
+    actionButton(inputId = ns("first_run"), label = "Run",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
+  })
+
+
+
+  observeEvent(input$first_run,{
+    db_conn <- db_conn_function(dbms = "postgresql",
+                                user = input$username, password = input$password,
+                                port = input$port , host = input$host, db_name = input$db_name)
+
+    available_tables <- DBI::dbListTables(conn = db_conn)
+
+    merged_data_result(merged_data(selected_table_input = input$input_table,
+                                      selected_table_output = input$output_table,
+                                      db_conn = db_conn,
+                                      available_tables = available_tables))
+
+  })
+
+#=====Forecating Viewer ==================
+
     output$kpi_value <- renderUI({
-      req(available_data_tables(), input$output_table)
-      selected_table_output <- input$output_table
-
-     db_conn <- db_conn_function(dbms = "postgresql",
-                      user = input$username, password = input$password,
-                      port = input$port , host = input$host, db_name = input$db_name)
-
-      available_tables <- DBI::dbListTables(conn = db_conn)
-
-       if (!selected_table_output %in% available_tables) {
-        DBI::dbDisconnect(db_conn)
-        stop(paste("La table ",selected_table_output, "n'existe pas dans la base de données."))
-      }else{
-        query_statement <- glue::glue(
-          paste("SELECT distinct(family) FROM " , selected_table_output)
-        )}
-      query_res <- DBI::dbSendQuery(db_conn, statement = query_statement)
-      #Récupération des résultats de la requête
-      kpi_values <- DBI::dbFetch(query_res)
-      DBI::dbDisconnect(db_conn)
-      selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
-
+     req(merged_data_result())
+     kpi_values <- base::unique(merged_data_result()$family)
+     selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
     })
 
+    output$model <- renderUI({
+    req(merged_data_result())
+    model_names <- base::unique(merged_data_result()$`_model_desc`)
+    selectInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
+  })
 
     output$run <- renderUI({
-      req(available_data_tables(), input$output_table, input$kpi_value)
-      actionButton(inputId = ns("run"), label = "Run",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
+     req(merged_data_result())
+     req(input$kpi_value, input$model)
+     actionButton(inputId = ns("run"), label = "Run",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
     })
 
-#========= forecesting viewer
     observeEvent(input$run,{
-      db_conn <- db_conn_function(dbms = "postgresql",
-                                  user = input$username, password = input$password,
-                                  port = input$port , host = input$host, db_name = input$db_name)
+      merged_data_filtred_result <<- merged_data_filtred(merged_data = merged_data_result(),
+                                                        kpi_value = input$kpi_value ,
+                                                        model = input$model )
 
-      available_tables <- DBI::dbListTables(conn = db_conn)
-
-      merged_data_result <- merged_data(selected_table_input = input$input_table,
-                                        selected_table_output = input$output_table,
-                                        db_conn = db_conn,
-                                        available_tables = available_tables)
-
-      print(head(merged_data_result))
-
-      # output$graph_output <-
-
+      if (!is.null(merged_data_filtred_result) && nrow(merged_data_filtred_result) > 0) {
+        output$graph_output <- renderUI({
+          create_time_series_plot(data = merged_data_filtred_result)
+        })
+      } else {
+       output$graph_output <- renderText("Aucune donnée disponible pour les filtres sélectionnés.")
+      }
     })
 
 
@@ -139,8 +157,9 @@ mod_forecasting_viewer_server <- function(id) {
 
 
   })
-
   }
+
+
 
 
 
