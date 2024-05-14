@@ -9,7 +9,7 @@ mod_forecasting_viewer_ui <- function(id) {
   ns <- NS(id)
 
   bs4Dash::tabBox(
-    id = "forecastViz_tabbox", width = 12,
+    id = ns("forecastViz_tabbox"), width = 12, selected = "DB Connection",
     tabPanel(
       title = "DB Connection", icon = icon("database"),
   fluidPage(
@@ -107,6 +107,9 @@ mod_forecasting_viewer_server <- function(id) {
                                       db_conn = db_conn,
                                       available_tables = available_tables))
 
+    # shiny::showNotification("Success ! Show Forecasting Viewer",type = "message")
+    updateTabsetPanel(session, "forecastViz_tabbox", selected = "Forecasting Viewer")
+
   })
 
 #=====Forecating Viewer ==================
@@ -134,7 +137,7 @@ mod_forecasting_viewer_server <- function(id) {
                                                         kpi_value = input$kpi_value ,
                                                         model = input$model )
 
-      if (!is.null(merged_data_filtred_result) && nrow(merged_data_filtred_result) > 0) {
+      if (!is.null(merged_data_filtred_result)) {
         output$graph_output <- renderUI({
           create_time_series_plot(data = merged_data_filtred_result)
         })
