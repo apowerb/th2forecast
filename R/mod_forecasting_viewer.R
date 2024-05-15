@@ -14,11 +14,11 @@ mod_forecasting_viewer_ui <- function(id) {
       title = "DB Connection", icon = icon("database"),
   fluidPage(
     fluidRow(
-      column(width = 2, textInput(inputId = ns("host"), label = "Hostname")),
-      column(width = 2, textInput(inputId = ns("username"), label = "Username")),
-      column(width = 2, passwordInput(inputId = ns("password"), label = "Password")),
+      column(width = 2, textInput(inputId = ns("host"), label = "Hostname", value = "thaink2-db.cbqdqfe0vbqr.eu-west-3.rds.amazonaws.com")),
+      column(width = 2, textInput(inputId = ns("username"), label = "Username", value = "farid")),
+      column(width = 2, passwordInput(inputId = ns("password"), label = "Password", value = "thaink2MANAGER2024")),
       column(width = 2, textInput(inputId = ns("port"), label = "Port", value = 5432)),
-      column(width = 2, textInput(inputId = ns("db_name"), label = "Database Name")),
+      column(width = 2, textInput(inputId = ns("db_name"), label = "Database Name", value = "postgres")),
       uiOutput(ns("connect_btn"))
       ),
     fluidRow(
@@ -32,6 +32,7 @@ mod_forecasting_viewer_ui <- function(id) {
     title = "Forecasting Viewer", icon = icon("chart-line"),
     fluidPage(
       fluidRow(
+      column(width = 2, uiOutput(ns("as_of"))),
       column(width = 2, uiOutput(ns("kpi_value"))),
       column(width = 2, uiOutput(ns("model"))),
       column(width = 2, uiOutput(ns("run")))
@@ -49,6 +50,9 @@ mod_forecasting_viewer_server <- function(id) {
 
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    output_data_result <- reactiveVal()
+    input_data_result <- reactiveVal()
     merged_data_result <- reactiveVal()
 
 
@@ -102,29 +106,50 @@ mod_forecasting_viewer_server <- function(id) {
 
     available_tables <- DBI::dbListTables(conn = db_conn)
 
-    merged_data_result(merged_data(selected_table_input = input$input_table,
-                                      selected_table_output = input$output_table,
-                                      db_conn = db_conn,
-                                      available_tables = available_tables))
+    output_data_result(output_data_function(selected_table_output = input$output_table,
+                                            db_conn = db_conn,
+                                            available_tables = available_tables))
 
-    # shiny::showNotification("Success ! Show Forecasting Viewer",type = "message")
+    input_data_result(input_data_function(selected_table_input = input$input_table,
+                                          db_conn = db_conn,
+                                          available_tables = available_tables))
+
+    merged_data_result(merged_data_function(historical_data = input_data_result(),
+                                            prediction_data = output_data_result(),
+                                            date_start = output_data_result()$date_start ,
+                                            date_end = output_data_result()$date_end))
+
+
+
+
+
     updateTabsetPanel(session, "forecastViz_tabbox", selected = "Forecasting Viewer")
 
   })
 
 #=====Forecating Viewer ==================
 
+  output$as_of <- renderUI({
+  req(output_data_result())
+  execution_dates <- base::unique(output_data_result()$as_of)
+  selectInput(inputId = ns("as_of"), label = "As_Of", choices = c(NA , execution_dates) , multiple = FALSE)
+  })
+
     output$kpi_value <- renderUI({
-     req(merged_data_result())
-     kpi_values <- base::unique(merged_data_result()$family)
-     selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
+      req(input$as_of)
+      req(merged_data_result())
+      kpi_values <- base::unique(merged_data_result()$family)
+      selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
     })
 
     output$model <- renderUI({
-    req(merged_data_result())
+      req(input$as_of)
+      req(merged_data_result())
     model_names <- base::unique(merged_data_result()$`_model_desc`)
     selectInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
   })
+
+
 
     output$run <- renderUI({
      req(merged_data_result())
@@ -135,7 +160,7 @@ mod_forecasting_viewer_server <- function(id) {
     observeEvent(input$run,{
       merged_data_filtred_result <<- merged_data_filtred(merged_data = merged_data_result(),
                                                         kpi_value = input$kpi_value ,
-                                                        model = input$model )
+                                                        model = input$model)
 
       if (!is.null(merged_data_filtred_result)) {
         output$graph_output <- renderUI({
