@@ -5,26 +5,24 @@
 #' @export
 
 
-mod_forecasting_viewer_ui <- function(id) {
+mod_conn_forecasting_viewer_ui <- function(id) {
   ns <- NS(id)
 
   bs4Dash::tabBox(
     id = ns("forecastViz_tabbox"), width = 12, selected = "DB Connection",
     tabPanel(
-      title = "DB Connection", icon = icon("database"),
+      title = "Forecasting Pipelines", icon = icon("database"),
   fluidPage(
     fluidRow(
-      column(width = 2, textInput(inputId = ns("host"), label = "Hostname", value = "thaink2-db.cbqdqfe0vbqr.eu-west-3.rds.amazonaws.com")),
-      column(width = 2, textInput(inputId = ns("username"), label = "Username", value = "farid")),
-      column(width = 2, passwordInput(inputId = ns("password"), label = "Password", value = "thaink2MANAGER2024")),
+      column(width = 2, textInput(inputId = ns("host"), label = "Hostname")),
+      column(width = 2, textInput(inputId = ns("username"), label = "Username")),
+      column(width = 2, passwordInput(inputId = ns("password"), label = "Password")),
       column(width = 2, textInput(inputId = ns("port"), label = "Port", value = 5432)),
-      column(width = 2, textInput(inputId = ns("db_name"), label = "Database Name", value = "postgres")),
+      column(width = 2, textInput(inputId = ns("db_name"), label = "Database Name")),
       uiOutput(ns("connect_btn"))
       ),
     fluidRow(
-      column(width = 2, uiOutput(ns("input_table"))),
-      column(width = 2, uiOutput(ns("output_table"))),
-      column(width = 2, uiOutput(ns("first_run")))
+      DT::dataTableOutput(ns("pipelines_table"))
     )
   )
   ),
@@ -46,7 +44,7 @@ mod_forecasting_viewer_ui <- function(id) {
 
 #'mod_forecasting_viewer_server
 #' @export
-mod_forecasting_viewer_server <- function(id) {
+mod_conn_forecasting_viewer_server <- function(id) {
 
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -81,20 +79,37 @@ mod_forecasting_viewer_server <- function(id) {
 
 #===================================
 
-  output$input_table <- renderUI({
+  output$pipelines_table <-  DT::renderDataTable({
     req(available_data_tables())
-      selectInput(inputId = ns("input_table"), label = "Input", choices = available_data_tables(), multiple = F)
+
+    user_permissions <- th2blender::get_user_data_permissions()
+
+    pipelines_metadata <- th2product::fetch_data_from_db(table = "th2_forecast_project")
+
+#
+#     if (nrow(pipelines_metadata) == 0) {
+#       return(NULL)
+#     }
+#     pipelines_metadata <- user_permissions %>%
+#       dplyr::rename(project_name = OBJECT_ID) %>%
+#       dplyr::select(project_name) %>%
+#       dplyr::inner_join(pipelines_metadata, by = c("project_name"))
+#     if (nrow(pipelines_metadata) == 0) {
+#       return(NULL)
+#     }
+    pipelines_metadata
   })
 
-  output$output_table <- renderUI({
-    req(available_data_tables())
-    selectInput(inputId = ns("output_table"), label = "Output", choices = available_data_tables(), multiple = F)
-  })
+  observeEvent(input$pipelines_table_rows_selected, {
+    selected_row <- input$pipelines_table_rows_selected
+    # Vérifier si une ligne est sélectionnée
+    if (length(selected_row) > 0) {
 
 
-  output$first_run <- renderUI({
-    req(available_data_tables(), input$output_table)
-    actionButton(inputId = ns("first_run"), label = "Run",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
+
+
+    updateTabsetPanel(session, "forecastViz_tabbox", selected = "Forecasting Viewer")
+    }
   })
 
 
@@ -177,7 +192,8 @@ mod_forecasting_viewer_server <- function(id) {
     })
 
 
-    db_conn_function <- function(dbms = "postgresql" ,server = NULL, user = NULL, password = NULL, port = NULL , host = NULL, db_name = NULL)  {
+    db_conn_function <- function(dbms = NULL ,server = NULL, user = NULL, password = NULL, port =NULL ,
+                                 host = NULL, db_name = NULL)  {
        db_conn <- DatabaseConnector::connect(
         dbms = "postgresql",
         server = paste0(host, "/", db_name),

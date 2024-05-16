@@ -15,19 +15,23 @@ library(plotly)
 library(shinyalert)
 library(anomalize)
 library(rsample)
-library(dygraphs)
+
+
 
 # Shiny application
 ui <- fluidPage(
 
   # mod_th2_forecasting_ui("id_forecast")
-  mod_forecasting_viewer_ui("forecsating_viz")
+  # mod_forecasting_viewer_ui("forecsating_viz")
+  mod_conn_forecasting_viewer_ui("forecsating_viz")
 )
 
 
 server <- function(input, output) {
+  if (file.exists("../R/initializer.R")) th2forecast:::init_forecast()
   # mod_th2_forecasting_server("id_forecast")
-  mod_forecasting_viewer_server("forecsating_viz")
+  # mod_forecasting_viewer_server("forecsating_viz")
+  mod_conn_forecasting_viewer_server("forecsating_viz")
 }
 
 
