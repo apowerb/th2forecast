@@ -2,8 +2,6 @@
 
 export(feature_selection)
 export(hello_th2)
-export(mod_conn_forecasting_viewer_server)
-export(mod_conn_forecasting_viewer_ui)
 export(mod_forecasting_viewer_server)
 export(mod_forecasting_viewer_ui)
 export(mod_th2_forecasting_server)

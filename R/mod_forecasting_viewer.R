@@ -9,24 +9,12 @@ mod_forecasting_viewer_ui <- function(id) {
   ns <- NS(id)
 
   bs4Dash::tabBox(
-    id = ns("forecastViz_tabbox"), width = 12, selected = "DB Connection",
+    id = ns("forecastViz_tabbox"), width = 12, selected = "Forecasting Pipelines",
     tabPanel(
-      title = "DB Connection", icon = icon("database"),
+      title = "Forecasting Pipelines", icon = icon("database"),
   fluidPage(
-    fluidRow(
-      column(width = 2, textInput(inputId = ns("host"), label = "Hostname", value = "thaink2-db.cbqdqfe0vbqr.eu-west-3.rds.amazonaws.com")),
-      column(width = 2, textInput(inputId = ns("username"), label = "Username", value = "farid")),
-      column(width = 2, passwordInput(inputId = ns("password"), label = "Password", value = "thaink2MANAGER2024")),
-      column(width = 2, textInput(inputId = ns("port"), label = "Port", value = 5432)),
-      column(width = 2, textInput(inputId = ns("db_name"), label = "Database Name", value = "postgres")),
-      uiOutput(ns("connect_btn"))
-      ),
-    fluidRow(
-      column(width = 2, uiOutput(ns("input_table"))),
-      column(width = 2, uiOutput(ns("output_table"))),
-      column(width = 2, uiOutput(ns("first_run")))
+      DT::dataTableOutput(ns("pipelines_table"))
     )
-  )
   ),
   tabPanel(
     title = "Forecasting Viewer", icon = icon("chart-line"),
@@ -35,6 +23,8 @@ mod_forecasting_viewer_ui <- function(id) {
       column(width = 2, uiOutput(ns("as_of"))),
       column(width = 2, uiOutput(ns("kpi_value"))),
       column(width = 2, uiOutput(ns("model"))),
+      column(width = 2, uiOutput(ns("target_variable"))),
+      column(width = 2, uiOutput(ns("aggregation"))),
       column(width = 2, uiOutput(ns("run")))
       ),
     uiOutput(ns("graph_output"))
@@ -51,67 +41,78 @@ mod_forecasting_viewer_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
-    output_data_result <- reactiveVal()
+    selected_info <- reactiveVal()
+    pipelines_metadata <- reactiveVal()
     input_data_result <- reactiveVal()
-    merged_data_result <- reactiveVal()
+    output_data_result <- reactiveVal()
 
 
-  output$connect_btn <- renderUI({
-    req(input$host, input$username, input$password, input$port, input$db_name)
-    actionButton(inputId = ns("connect"), label = "Connect",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;", icon = icon("nfc-symbol"))
-  })
 
-#==== db Connection and return valable tables
-
-  available_data_tables <- eventReactive(input$connect, {
-    connection_items <- th2blender::th2_connect_to_data_source(data_source_params = list(
-      data_source= "postgresql",
-      postgresql = list(
-        host = input$host,
-        database = input$db_name,
-        password = input$password,
-        username = input$username,
-        port = input$port
+##=============connect to Db and return pipelines metadata ======
+  pipelines_metadata <- reactiveVal({
+      user = Sys.getenv("SHINYPROXY_USERNAME")
+      sql <- glue::glue(
+        "select tb1.*,
+          tb_in.param1 as input_meta_connection,tb_in.data_source as input_datasource_type,
+          tb_out.param1 as output_meta_connection,tb_out.data_source as output_datasource_type
+          from th2_forecast_project tb1
+          join th2_wf_permissions  tb2 on tb1.pipeline_uuid = tb2.object_id
+          join data_connection_params tb_in on tb1.input_id = tb_in.table_id
+          join data_connection_params tb_out on tb1.output_id = tb_out.table_id
+          where tb2.permitted_users = '{user}'"
       )
-    ),
-    target_action = "list_tables")
-    showNotification(paste(input$db_name, "(postgresql)","Connection Successfull"), type = "message")
-    return(connection_items)
-  })
 
-#===================================
-
-  output$input_table <- renderUI({
-    req(available_data_tables())
-      selectInput(inputId = ns("input_table"), label = "Input", choices = available_data_tables(), multiple = F)
-  })
-
-  output$output_table <- renderUI({
-    req(available_data_tables())
-    selectInput(inputId = ns("output_table"), label = "Output", choices = available_data_tables(), multiple = F)
-  })
+      pipelines_metadata <- th2product::fetch_data_from_db_by_sql(sql)
+      pipelines_metadata
+    })
 
 
-  output$first_run <- renderUI({
-    req(available_data_tables(), input$output_table)
-    actionButton(inputId = ns("first_run"), label = "Run",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
-  })
+    output$pipelines_table <-  DT::renderDataTable({
+      user_permissions <- th2blender::get_user_data_permissions(target_table = "th2_wf_permissions", object_type = "fc")
+      pipelines_metadata <- th2product::fetch_data_from_db(table = "th2_forecast_project")
+
+      if (nrow(pipelines_metadata) == 0) {
+        return(NULL)
+      }
+      pipelines_metadata <- user_permissions %>%
+        dplyr::rename(pipeline_uuid = OBJECT_ID) %>%
+        dplyr::select(pipeline_uuid) %>%
+        dplyr::inner_join(pipelines_metadata, by = c("pipeline_uuid"))
+      if (nrow(pipelines_metadata) == 0) {
+        return(NULL)
+      }
+      pipelines_metadata
+      DT::datatable(pipelines_metadata(), selection = list(mode = "single"))
+    })
 
 
+  observeEvent(input$pipelines_table_rows_selected, {
+    selected_row <- NULL
+    selected_row <- input$pipelines_table_rows_selected
 
-  observeEvent(input$first_run,{
-    db_conn <- db_conn_function(dbms = "postgresql",
-                                user = input$username, password = input$password,
-                                port = input$port , host = input$host, db_name = input$db_name)
+    if (length(selected_row) > 0) {
+      selected_info(pipelines_metadata()[selected_row, ])
 
-    available_tables <- DBI::dbListTables(conn = db_conn)
+      output_connection <- th2product::decrypt_column(selected_info()['output_meta_connection'])
 
-    output_data_result(output_data_function(selected_table_output = input$output_table,
-                                            db_conn = db_conn,
-                                            available_tables = available_tables))
+      decrypted_output_connection <- jsonlite::fromJSON(output_connection)
+
+      db_conn <- db_conn_function(dbms = "postgresql",
+                                  user = decrypted_output_connection$username,
+                                  password = decrypted_output_connection$password,
+                                  port = decrypted_output_connection$port ,
+                                  host = decrypted_output_connection$host,
+                                  db_name = decrypted_output_connection$database)
+
+      output_data_result(output_data_fetch(db_conn = db_conn,
+                                           target_table = decrypted_output_connection$target_table,
+                                           schema = decrypted_output_connection$schema,
+                                           target_var = selected_info()$target_var,
+                                           group_target_var = selected_info()$group_target_var,
+                                           date_var = selected_info()$date_var))
 
     updateTabsetPanel(session, "forecastViz_tabbox", selected = "Forecasting Viewer")
-
+    }
   })
 
 #=====Forecating Viewer ==================
@@ -119,27 +120,41 @@ mod_forecasting_viewer_server <- function(id) {
   output$as_of <- renderUI({
   req(output_data_result())
   execution_dates <- base::unique(output_data_result()$as_of)
-  selectInput(inputId = ns("as_of"), label = "As_Of", choices = execution_dates, multiple = FALSE)
+  selectInput(inputId = ns("as_of"), label = "As_Of", choices = c("",format(execution_dates, "%Y-%m-%d")))
   })
 
   observeEvent(input$as_of,{
-    db_conn <- db_conn_function(dbms = "postgresql",
-                                user = input$username, password = input$password,
-                                port = input$port , host = input$host, db_name = input$db_name)
 
-    available_tables <- DBI::dbListTables(conn = db_conn)
+      input_connection <- th2product::decrypt_column(selected_info()['input_meta_connection'])
+      print(input_connection)
 
-    input_data_result(input_data_function(selected_table_input = input$input_table,
-                                          prediction_data = output_data_result(),
-                                          db_conn = db_conn,
-                                          as_of = input$as_of,
-                                          available_tables = available_tables))
+      decrypted_input_connection <- jsonlite::fromJSON(input_connection)
+      print(decrypted_input_connection)
+
+      db_conn <- db_conn_function(dbms = "postgresql",
+                                  user = decrypted_input_connection$username,
+                                  password = decrypted_input_connection$password,
+                                  port = decrypted_input_connection$port ,
+                                  host = decrypted_input_connection$host,
+                                  db_name = decrypted_input_connection$database)
+
+    input_data_result(input_data_fetch(prediction_data = output_data_result(),
+                                       db_conn = db_conn,
+                                       target_table = decrypted_input_connection$target_table,
+                                       target_var = selected_info()$target_var,
+                                       group_target_var = selected_info()$group_target_var,
+                                       date_var = selected_info()$date_var,
+                                       as_of = input$as_of))
+
   })
 
     output$kpi_value <- renderUI({
       req(input$as_of)
+      req(selected_info())
       req(input_data_result())
-      kpi_values <- base::unique(input_data_result()$family)
+
+      group_target_var <- selected_info()$group_target_var
+      kpi_values <- base::unique(input_data_result()[group_target_var])
       selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
     })
 
@@ -149,6 +164,22 @@ mod_forecasting_viewer_server <- function(id) {
       model_names <- base::unique(output_data_result()$`_model_desc`)
       selectInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
   })
+
+    output$target_variable <- renderUI({
+      req(input$as_of)
+      # req(output_data_result())
+      target_variables <- base::unique()
+      selectInput(inputId = ns("target_variable"), label = "Target Variable", choices = target_variables, multiple = FALSE)
+    })
+
+    output$aggregation <- renderUI({
+      req(input$as_of)
+      selectInput(inputId = ns("agg_type"), "Aggregation", choices = c("", "Sum" = "sum", "Mean"="mean", "Count"="count"))
+
+    })
+
+
+
     output$run <- renderUI({
      req(input_data_result())
      req(output_data_result())
@@ -159,12 +190,14 @@ mod_forecasting_viewer_server <- function(id) {
 
     observeEvent(input$run,{
 
-      prediction_data_filtred_result <<- prediction_data_filtred(prediction_data = output_data_result(),
+      prediction_data_filtred_result <- prediction_data_filtred(prediction_data = output_data_result(),
+                                                                group_target_var = selected_info()$group_target_var,
                                                                  model = input$model,
                                                                  kpi_value = input$kpi_value)
 
-      historical_data_filtred_result <<- historical_data_filtred(historical_data = input_data_result(),
-                                                                 kpi_value = input$kpi_value)
+      historical_data_filtred_result <- historical_data_filtred(historical_data = input_data_result(),
+                                                                group_target_var = selected_info()$group_target_var,
+                                                                kpi_value = input$kpi_value)
 
       if (!is.null(historical_data_filtred_result) && !is.null(prediction_data_filtred_result)) {
 
@@ -175,19 +208,6 @@ mod_forecasting_viewer_server <- function(id) {
        output$graph_output <- renderText("Aucune donnée disponible pour les filtres sélectionnés.")
       }
     })
-
-
-    db_conn_function <- function(dbms = "postgresql" ,server = NULL, user = NULL, password = NULL, port = NULL , host = NULL, db_name = NULL)  {
-       db_conn <- DatabaseConnector::connect(
-        dbms = "postgresql",
-        server = paste0(host, "/", db_name),
-        user = user,
-        password = password,
-        port = as.numeric(port)
-    )
-       return(db_conn)
-    }
-
 
   })
   }
