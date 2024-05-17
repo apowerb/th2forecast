@@ -1,5 +1,5 @@
 #===================== output data function ( prediction data)==================
-output_data_function <- function (selected_table_output= NULL , db_conn = NULL, available_tables = NULL ) {
+output_data_function <- function (selected_table_output= NULL , selected_info = NULL,  db_conn = NULL, available_tables = NULL ) {
 
   # Vérifier si la table sélectionnée existe dans la base de données
   if (!selected_table_output %in% available_tables) {
@@ -8,7 +8,8 @@ output_data_function <- function (selected_table_output= NULL , db_conn = NULL, 
   }
 
   # Récupérer les données de prédiction
-  query_statement_output <- glue::glue("SELECT distinct(family) , _model_desc, _date, sales, _conf_lo, _conf_hi,as_of, date_start, date_end FROM {selected_table_output}")
+  query_statement_output <- glue::glue("SELECT DISTINCT group_target_var,target_var, date_var FROM {selected_info},
+                                       _model_desc, _conf_lo, _conf_hi,as_of, date_start, date_end FROM {selected_table_output}")
   query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
   prediction_data <- DBI::dbFetch(query_res_output)
 

@@ -9,7 +9,7 @@ mod_conn_forecasting_viewer_ui <- function(id) {
   ns <- NS(id)
 
   bs4Dash::tabBox(
-    id = ns("forecastViz_tabbox"), width = 12, selected = "DB Connection",
+    id = ns("forecastViz_tabbox"), width = 12, selected = "Forecasting Pipelines",
     tabPanel(
       title = "Forecasting Pipelines", icon = icon("database"),
   fluidPage(
@@ -49,6 +49,8 @@ mod_conn_forecasting_viewer_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
 
+    selected_row_info <- reactiveVal()
+
     output_data_result <- reactiveVal()
     input_data_result <- reactiveVal()
     merged_data_result <- reactiveVal()
@@ -86,26 +88,45 @@ mod_conn_forecasting_viewer_server <- function(id) {
 
     pipelines_metadata <- th2product::fetch_data_from_db(table = "th2_forecast_project")
 
-#
-#     if (nrow(pipelines_metadata) == 0) {
-#       return(NULL)
-#     }
-#     pipelines_metadata <- user_permissions %>%
-#       dplyr::rename(project_name = OBJECT_ID) %>%
-#       dplyr::select(project_name) %>%
-#       dplyr::inner_join(pipelines_metadata, by = c("project_name"))
-#     if (nrow(pipelines_metadata) == 0) {
-#       return(NULL)
-#     }
-    pipelines_metadata
+
+  #   if (nrow(pipelines_metadata) == 0) {
+  #     return(NULL)
+  #   }
+  #   pipelines_metadata <- user_permissions %>%
+  #     dplyr::rename(project_name = OBJECT_ID) %>%
+  #     dplyr::select(project_name) %>%
+  #     dplyr::inner_join(pipelines_metadata, by = c("project_name"))
+  #   if (nrow(pipelines_metadata) == 0) {
+  #     return(NULL)
+  #   }
+  #   pipelines_metadata
   })
+
 
   observeEvent(input$pipelines_table_rows_selected, {
     selected_row <- input$pipelines_table_rows_selected
-    # Vérifier si une ligne est sélectionnée
-    if (length(selected_row) > 0) {
+    #Récupérer les infos de la ligne sélectionnée
+    if (length(selected_row) == 1) {
+      pipelines_metadata <- th2product::fetch_data_from_db(table = "th2_forecast_project")
+      selected_info <<- pipelines_metadata[selected_row, ]
+
+      selected_row_info(selected_info)
+
+      db_conn <- db_conn_function(dbms = "postgresql",
+                                  user = input$username, password = input$password,
+                                  port = input$port , host = input$host, db_name = input$db_name)
+
+      available_tables <- DBI::dbListTables(conn = db_conn)
+
+      print(selected_row_info()$output_id)
+
+      output_data_result(output_data_function(selected_info = selected_row_info(),
+                                              selected_table_output = selected_row_info()$output_id,
+                                              db_conn = db_conn,
+                                              available_tables = available_tables))
 
 
+      print(output_data_result())
 
 
     updateTabsetPanel(session, "forecastViz_tabbox", selected = "Forecasting Viewer")
@@ -114,25 +135,13 @@ mod_conn_forecasting_viewer_server <- function(id) {
 
 
 
-  observeEvent(input$first_run,{
-    db_conn <- db_conn_function(dbms = "postgresql",
-                                user = input$username, password = input$password,
-                                port = input$port , host = input$host, db_name = input$db_name)
 
-    available_tables <- DBI::dbListTables(conn = db_conn)
-
-    output_data_result(output_data_function(selected_table_output = input$output_table,
-                                            db_conn = db_conn,
-                                            available_tables = available_tables))
-
-    updateTabsetPanel(session, "forecastViz_tabbox", selected = "Forecasting Viewer")
-
-  })
 
 #=====Forecating Viewer ==================
 
   output$as_of <- renderUI({
-  req(output_data_result())
+  req(selected_row_info())
+
   execution_dates <- base::unique(output_data_result()$as_of)
   selectInput(inputId = ns("as_of"), label = "As_Of", choices = execution_dates, multiple = FALSE)
   })
