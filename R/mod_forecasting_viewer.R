@@ -23,7 +23,7 @@ mod_forecasting_viewer_ui <- function(id) {
       column(width = 2, uiOutput(ns("as_of"))),
       column(width = 2, uiOutput(ns("kpi_value"))),
       column(width = 2, uiOutput(ns("model"))),
-      column(width = 2, uiOutput(ns("target_variable"))),
+      # column(width = 2, uiOutput(ns("target_variable"))),
       column(width = 2, uiOutput(ns("aggregation"))),
       column(width = 2, uiOutput(ns("run")))
       ),
@@ -45,6 +45,8 @@ mod_forecasting_viewer_server <- function(id) {
     pipelines_metadata <- reactiveVal()
     input_data_result <- reactiveVal()
     output_data_result <- reactiveVal()
+
+
 
 
 
@@ -165,16 +167,16 @@ mod_forecasting_viewer_server <- function(id) {
       selectInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
   })
 
-    output$target_variable <- renderUI({
-      req(input$as_of)
-      # req(output_data_result())
-      target_variables <- base::unique()
-      selectInput(inputId = ns("target_variable"), label = "Target Variable", choices = target_variables, multiple = FALSE)
-    })
+    # output$target_variable <- renderUI({
+    #   req(input$as_of)
+    #   target_var <- selected_info()$target_var
+    #   target_variables <- base::unique(target_var)
+    #   selectInput(inputId = ns("target_variable"), label = "Target Variable", choices = target_variables, multiple = FALSE)
+    # })
 
     output$aggregation <- renderUI({
       req(input$as_of)
-      selectInput(inputId = ns("agg_type"), "Aggregation", choices = c("", "Sum" = "sum", "Mean"="mean", "Count"="count"))
+      selectInput(inputId = ns("agg_type"), "Aggregation", choices = c("", "Sum" = "sum"))
 
     })
 
@@ -183,7 +185,7 @@ mod_forecasting_viewer_server <- function(id) {
     output$run <- renderUI({
      req(input_data_result())
      req(output_data_result())
-     req(input$kpi_value, input$model)
+     req(input$kpi_value, input$model, input$agg_type)
      actionButton(inputId = ns("run"), label = "Run",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
     })
 
@@ -195,14 +197,41 @@ mod_forecasting_viewer_server <- function(id) {
                                                                  model = input$model,
                                                                  kpi_value = input$kpi_value)
 
+
+
+
+
       historical_data_filtred_result <- historical_data_filtred(historical_data = input_data_result(),
                                                                 group_target_var = selected_info()$group_target_var,
                                                                 kpi_value = input$kpi_value)
 
-      if (!is.null(historical_data_filtred_result) && !is.null(prediction_data_filtred_result)) {
+      if(input$agg_type == "sum"){
+
+        prediction_data_aggregated <- prediction_data_filtred_result %>%
+                                     dplyr::group_by_at(vars(`_date`)) %>%
+                                     dplyr::summarise_at(vars(selected_info()$target_var),sum) %>%
+                                     dplyr::summarise_at(vars(prediction_data_filtred_result$`conf_lo`),sum) %>%
+                                     dplyr::summarise_at(vars(prediction_data_filtred_result$`conf_hi`),sum)
+
+        View(prediction_data_aggregated)
+
+
+
+
+
+        historical_data_aggregated <-  historical_data_filtred_result %>%
+                                       dplyr::group_by_at(vars(`_date`)) %>%
+                                       dplyr::summarise_at(vars(selected_info()$target_var), sum)
+
+
+      }
+
+
+
+      if (!is.null( historical_data_filtred_result) && !is.null(prediction_data_filtred_result )) {
 
         output$graph_output <- renderUI({
-          create_time_series_plot(historical_data = historical_data_filtred_result ,prediction_data =prediction_data_filtred_result )
+          create_time_series_plot(historical_data =  historical_data_filtred_result ,prediction_data = prediction_data_filtred_result)
         })
       } else {
        output$graph_output <- renderText("Aucune donnée disponible pour les filtres sélectionnés.")

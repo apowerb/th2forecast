@@ -34,6 +34,8 @@ input_data_fetch <- function (prediction_data = NULL, db_conn= NULL, target_tabl
 
 
 
+
+
   date_start <- dplyr::first(output_data_filtred$date_start)
   date_end <- dplyr::first(output_data_filtred$date_end)
 
@@ -48,7 +50,7 @@ input_data_fetch <- function (prediction_data = NULL, db_conn= NULL, target_tabl
 
   historical_data_filtred <- historical_data %>% dplyr:: filter(historical_data[[date_var]] >= date_start & historical_data[[date_var]] <= date_end)
 
-  View(historical_data_filtred)
+
   DBI::dbDisconnect(db_conn)
   return(historical_data_filtred)
 }
@@ -61,7 +63,7 @@ prediction_data_filtred <- function(prediction_data = NULL, model = NULL, kpi_va
   if (!is.null(model)) {
     prediction_data_filtred  <- prediction_data %>% dplyr::filter(`_model_desc` == !!model , prediction_data[[group_target_var]] == !!kpi_value )
   }
- print(prediction_data_filtred)
+
   return(prediction_data_filtred)
 }
 
@@ -70,7 +72,7 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
   if (!is.null(kpi_value)) {
     historical_data_filtred  <- historical_data %>% dplyr::filter(historical_data[[group_target_var]] == !!kpi_value)
   }
- print(historical_data_filtred)
+
   return(historical_data_filtred)
 }
 
