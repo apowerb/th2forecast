@@ -1,6 +1,3 @@
-
-
-
 #' mod_forecasting_viewer_ui
 #' @export
 
@@ -23,7 +20,6 @@ mod_forecasting_viewer_ui <- function(id) {
       column(width = 2, uiOutput(ns("as_of"))),
       column(width = 2, uiOutput(ns("kpi_value"))),
       column(width = 2, uiOutput(ns("model"))),
-      # column(width = 2, uiOutput(ns("target_variable"))),
       column(width = 2, uiOutput(ns("aggregation"))),
       column(width = 2, uiOutput(ns("run")))
       ),
@@ -45,10 +41,6 @@ mod_forecasting_viewer_server <- function(id) {
     pipelines_metadata <- reactiveVal()
     input_data_result <- reactiveVal()
     output_data_result <- reactiveVal()
-
-
-
-
 
 ##=============connect to Db and return pipelines metadata ======
   pipelines_metadata <- reactiveVal({
@@ -84,9 +76,8 @@ mod_forecasting_viewer_server <- function(id) {
         return(NULL)
       }
       pipelines_metadata
-      DT::datatable(pipelines_metadata(), selection = list(mode = "single"))
+      DT::datatable(dplyr::select(pipelines_metadata(),-id, -input_meta_connection, -output_meta_connection), selection = list(mode = "single"))
     })
-
 
   observeEvent(input$pipelines_table_rows_selected, {
     selected_row <- NULL
@@ -150,6 +141,7 @@ mod_forecasting_viewer_server <- function(id) {
 
   })
 
+
     output$kpi_value <- renderUI({
       req(input$as_of)
       req(selected_info())
@@ -167,17 +159,9 @@ mod_forecasting_viewer_server <- function(id) {
       selectInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
   })
 
-    # output$target_variable <- renderUI({
-    #   req(input$as_of)
-    #   target_var <- selected_info()$target_var
-    #   target_variables <- base::unique(target_var)
-    #   selectInput(inputId = ns("target_variable"), label = "Target Variable", choices = target_variables, multiple = FALSE)
-    # })
-
     output$aggregation <- renderUI({
       req(input$as_of)
       selectInput(inputId = ns("agg_type"), "Aggregation", choices = c("", "Sum" = "sum"))
-
     })
 
 
@@ -185,57 +169,56 @@ mod_forecasting_viewer_server <- function(id) {
     output$run <- renderUI({
      req(input_data_result())
      req(output_data_result())
-     req(input$kpi_value, input$model, input$agg_type)
+     req(input$kpi_value, input$model)
      actionButton(inputId = ns("run"), label = "Run",style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
     })
 
-
-    observeEvent(input$run,{
-
+    data_to_visualize <- eventReactive(input$run,{
       prediction_data_filtred_result <- prediction_data_filtred(prediction_data = output_data_result(),
                                                                 group_target_var = selected_info()$group_target_var,
-                                                                 model = input$model,
-                                                                 kpi_value = input$kpi_value)
-
-
-
-
+                                                                model = input$model,
+                                                                kpi_value = input$kpi_value)
 
       historical_data_filtred_result <- historical_data_filtred(historical_data = input_data_result(),
                                                                 group_target_var = selected_info()$group_target_var,
                                                                 kpi_value = input$kpi_value)
 
+
       if(input$agg_type == "sum"){
 
         prediction_data_aggregated <- prediction_data_filtred_result %>%
-                                     dplyr::group_by_at(vars(`_date`)) %>%
-                                     dplyr::summarise_at(vars(selected_info()$target_var),sum) %>%
-                                     dplyr::summarise_at(vars(prediction_data_filtred_result$`conf_lo`),sum) %>%
-                                     dplyr::summarise_at(vars(prediction_data_filtred_result$`conf_hi`),sum)
-
-        View(prediction_data_aggregated)
-
-
-
-
+                                     dplyr::group_by_at(vars(selected_info()$date_var)) %>%
+                                     dplyr::summarise(across(where(is.numeric), sum))
 
         historical_data_aggregated <-  historical_data_filtred_result %>%
-                                       dplyr::group_by_at(vars(`_date`)) %>%
+                                       dplyr::group_by_at(vars(selected_info()$date_var)) %>%
                                        dplyr::summarise_at(vars(selected_info()$target_var), sum)
-
-
       }
 
 
+      # Ajustement du nombre de lignes de historical_data_aggregated
+      prediction_rows <- nrow(prediction_data_aggregated)
+      historical_rows <- prediction_rows * 3
 
-      if (!is.null( historical_data_filtred_result) && !is.null(prediction_data_filtred_result )) {
-
-        output$graph_output <- renderUI({
-          create_time_series_plot(historical_data =  historical_data_filtred_result ,prediction_data = prediction_data_filtred_result)
-        })
+      if (nrow(historical_data_aggregated) >= historical_rows) {
+        historical_data_aggregated <- tail(historical_data_aggregated, historical_rows)
       } else {
-       output$graph_output <- renderText("Aucune donnée disponible pour les filtres sélectionnés.")
+        # Si historical_data_aggregated contient moins de lignes que nécessaire
+        historical_data_aggregated <- historical_data_aggregated
       }
+
+
+      if (!is.null( historical_data_aggregated) && !is.null(prediction_data_aggregated )) {
+          create_time_series_plot(historical_data =  historical_data_aggregated ,prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var,  y_var = selected_info()$target_var)
+
+      } else {
+       renderText("Aucune donnée disponible pour les filtres sélectionnés.")
+      }
+    })
+
+#====================== Graph output
+    output$graph_output <- renderUI({
+      data_to_visualize()
     })
 
   })

@@ -15,7 +15,7 @@ db_conn_function <- function(dbms = NULL ,server = NULL, user = NULL, password =
 output_data_fetch <- function (db_conn= NULL , target_table = NULL,  schema = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL ) {
 
   #Récupérer les données de prédiction
-  query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,as_of, date_start, date_end
+  query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,as_of, start_date, end_date
                                         FROM {schema}.{target_table}")
 
   query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
@@ -36,8 +36,8 @@ input_data_fetch <- function (prediction_data = NULL, db_conn= NULL, target_tabl
 
 
 
-  date_start <- dplyr::first(output_data_filtred$date_start)
-  date_end <- dplyr::first(output_data_filtred$date_end)
+  start_date <- dplyr::first(output_data_filtred$start_date)
+  end_date <- dplyr::first(output_data_filtred$end_date)
 
   query_statement_input <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var}
                                        FROM {target_table}")
@@ -48,7 +48,7 @@ input_data_fetch <- function (prediction_data = NULL, db_conn= NULL, target_tabl
 
   historical_data[[date_var]] <- as.Date(historical_data[[date_var]])
 
-  historical_data_filtred <- historical_data %>% dplyr:: filter(historical_data[[date_var]] >= date_start & historical_data[[date_var]] <= date_end)
+  historical_data_filtred <- historical_data %>% dplyr:: filter(historical_data[[date_var]] >= start_date & historical_data[[date_var]] <= end_date)
 
 
   DBI::dbDisconnect(db_conn)
@@ -78,24 +78,25 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
 
 
 #=========== #create plot (time series) function ==================================
-create_time_series_plot <- function(historical_data = NULL , prediction_data = NULL) {
-  historical_data <- historical_data[order(historical_data$`_date`), ]
-  prediction_data <- prediction_data[order(prediction_data$`_date`), ]
+create_time_series_plot <- function(historical_data = NULL , prediction_data = NULL, x_var = NULL, y_var = NULL) {
+  historical_data <- historical_data[order(historical_data[[x_var]]), ]
+  prediction_data <- prediction_data[order(prediction_data[[x_var]]), ]
 
   time_series_plot <- plotly::plot_ly() %>%
     plotly::add_trace(data = historical_data, type = 'scatter', mode = 'lines',
-                      x = ~`_date`, y = ~sales, name = 'Historical Values', color = I("blue")) %>%
+                      x = ~get(x_var), y = ~get(y_var), name = 'Historical Values', color = I("blue")) %>%
 
     plotly::add_trace(data = prediction_data, type = 'scatter', mode = 'lines',
-                      x = ~`_date`, y = ~sales, name = 'Prediction Values', color = I("red")) %>%
+                      x = ~get(x_var), y = ~get(y_var), name = 'Prediction Values', color = I("red")) %>%
 
     plotly::add_trace(data = prediction_data, type = 'scatter', mode = 'lines',
-                      x = ~`_date`, y = ~`_conf_lo`, name = "Lower Confidence",
-                      line = list(shape = "spline"),color = 'rgba(255,250,250)', fill = 'tozeroy', fillcolor = 'rgba(11,156,49,0.2)') %>%
+                      x = ~get(x_var), y = ~`_conf_lo`, name = "Lower Confidence",
+                      line = list(shape = "spline"),color = 'rgba(255,250,250)') %>%
 
     plotly::add_trace(data = prediction_data, type = 'scatter', mode = 'lines',
-                      x = ~`_date`, y = ~`_conf_hi`, name = "High Confidence",
-                      line = list(shape = "spline"),color = 'rgba(255,250,250)', fill = 'tozeroy', fillcolor = 'rgba(11,156,49,0.2)') %>%
+                      x = ~get(x_var), y = ~`_conf_hi`, name = "High Confidence",
+                      line = list(shape = "spline"),color = 'rgba(255,250,250)', fill = 'tonexty', fillcolor = 'rgba(11,156,49,0.2)') %>%
+
 
     plotly::layout(title = "Time Series with Confidence Interval",
                    xaxis = list(title = "Date"),
