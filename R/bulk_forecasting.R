@@ -17,17 +17,24 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   if (group_target == "all_columns"){
     data_tbl <- input_data %>%
-      tidyr::pivot_longer(!date_var , names_to = "id", values_to = target_var)
+      tidyr::pivot_longer(!date_var , names_to = "id", values_to = target_var) %>%
+      rename(date = date_var)
     group_target <- "id"
   }else{
 
     select_vars <- c(group_target, date_var, target_var)
 
     data_tbl <- input_data %>%
-      dplyr::select(all_of(select_vars))
+      dplyr::select(all_of(select_vars)) %>%
+      rename(id = group_target, date = date_var)
+    group_target <- "id"
     # data_tbl <- data_tbl %>%
     #   mutate(id_group = paste(store_nbr, family, sep = "_"))
   }
+
+  data_tbl <-  data_tbl %>%
+    dplyr::group_by_at(vars(date_var, group_target)) %>%
+    dplyr::summarise_at(vars(target_var), sum)
 
   count_data <- table(data_tbl[[group_target]])
   column_value <- as.numeric(count_data[1])
@@ -38,17 +45,23 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_data_tbl <- data_tbl %>%
     modeltime::extend_timeseries(
-      .id_var        = !!group_target,
-      .date_var      = !!date_var,
+      .id_var        = id,
+      .date_var      = date,
       .length_future = future_forecast
     ) %>%
     modeltime::nest_timeseries(
-      .id_var        = !!group_target,
+      .id_var        = id,
       .length_future = future_forecast
     ) %>%
     modeltime::split_nested_timeseries(
       .length_test = test_size
     )
+
+  for (i in 1:nrow(nested_data_tbl)) {
+    list_nestede_data <- nested_data_tbl[i,]$.actual_data
+    data_output_t <- preprocessing_data(list_nestede_data)[["dataset_clean"]]
+    nested_data_tbl[i,]$.actual_data[[1]] <- data_output_t
+  }
 
   nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
 
@@ -93,20 +106,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
 
-  print(nested_modeltime_tbl %>%
-          extract_nested_test_accuracy() %>%
-          table_modeltime_accuracy(.interactive = F))
-
-  print(nested_modeltime_tbl %>%
-         modeltime::extract_nested_error_report())
-
-  print(nested_modeltime_tbl %>%
-          modeltime::extract_nested_test_forecast() %>%
-          group_by(id) %>%
-          modeltime::plot_modeltime_forecast(
-            .facet_ncol  = 1,
-            .interactive = FALSE
-          ))
 
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
@@ -116,18 +115,11 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     )
 
 
-  nested_modeltime_refit_tbl <- best_nested_modeltime_tbl %>%
+  nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_refit(
       control = control_nested_refit(verbose = TRUE)
     )
 
-  print(nested_modeltime_refit_tbl %>%
-    extract_nested_future_forecast() %>%
-    group_by(id) %>%
-    plot_modeltime_forecast(
-      .interactive = FALSE,
-      .facet_ncol  = 1
-    ))
 
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(

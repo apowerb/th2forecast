@@ -34,8 +34,7 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
         parsnip::fit(formula, data = input_data)
     }else if(fit_model == "bulk"){
 
-      recipe_arima <- recipes::recipe(formula, data = input_data) %>%
-        step_th2_pre_processing(recipes::all_predictors())
+      recipe_arima <- recipes::recipe(formula, data = input_data)
 
       model_arima_fit <- workflows::workflow() %>%
         workflows::add_recipe(recipe_arima) %>%
@@ -84,8 +83,6 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
     }else if(fit_model == "bulk"){
 
       recipe_prophet <- recipes::recipe(formula, data = input_data)
-      # %>%
-      #   step_th2_pre_processing(recipes::all_predictors())
 
       model_prophet_fit <- workflows::workflow() %>%
         workflows::add_recipe(recipe_prophet) %>%
@@ -129,7 +126,6 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", f
       parsnip::set_mode("regression")
 
     recipe_spec <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_pre_processing(recipes::all_predictors()) %>%
       recipes::step_date(var_date, features = "month", ordinal = FALSE) %>%
       recipes::step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
       recipes::step_normalize(date_num) %>%
@@ -184,7 +180,8 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
       parsnip::set_mode("regression")
 
     recipe_spec <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_pre_processing(recipes::all_predictors()) %>%
+      # step_th2_pre_processing(value) %>%
+      # ifelse(fit_model == "bulk", step_th2_pre_processing(value) )%>%
       recipes::step_date(var_date, features = mars_features, ordinal = FALSE) %>%
       recipes::step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
       recipes::step_normalize(date_num) %>%
@@ -241,8 +238,7 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
   }else if(fit_model == "bulk"){
 
     recipe_rf <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_pre_processing(recipes::all_predictors()) %>%
-      step_th2_feature_engineering(feature_target = var_target)
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target)
 
     model_rf_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_rf) %>%
@@ -296,12 +292,8 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
   }else if(fit_model == "bulk"){
 
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
-      # step_th2_pre_processing(recipes::all_predictors()) %>%
-      step_th2_feature_engineering(feature_target = var_target) %>%
-      step_rm(var_date) %>%
-      step_zv(all_predictors()) %>%
-      step_dummy(all_nominal_predictors(), one_hot = TRUE)
-    print(recipe_xgboost)
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target)%>%
+      step_rm(var_date)
 
     model_xgboost_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_xgboost) %>%

@@ -89,7 +89,7 @@ outliers_detection <- function(input_data, method_ls = "cpt"){
 
         for (i in 1:(length(indexes_cpt) - 1)) {
           segment <- y[(indexes_cpt[i]):indexes_cpt[i + 1]]
-          fixed_series[(indexes_cpt[i]):indexes_cpt[i + 1]] <- segment - mean(segment)
+          fixed_series[(indexes_cpt[i]):indexes_cpt[i + 1]] <- segment
         }
 
         input_data[variable] <- fixed_series
@@ -119,8 +119,12 @@ outliers_detection <- function(input_data, method_ls = "cpt"){
 #' preprocessing_data(input_data)
 preprocessing_data <- function(input_data){
 
-  if (is.data.frame(input_data))
+  if (is.data.frame(input_data) || is.list(input_data))
   {
+    if(is.list(input_data)){
+      input_data <- as.data.frame(input_data)
+      input_data <- as_tibble(input_data)
+    }
 
     if( nrow(input_data) == 0 || ncol(input_data) == 0  ){
       return(warning("The *input_date* variable is empty."))
