@@ -10,9 +10,7 @@
 #' @import janitor
 #'
 #' @export
-#'
-#' @examples
-#' preprocessing_data(input_data)
+#' @examples preprocessing_data(input_data)
 preprocessing_data <- function(input_data){
 
   input_data <- clean_names(input_data)

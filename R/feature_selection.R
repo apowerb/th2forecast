@@ -7,8 +7,6 @@
 #'
 #' @return features
 #' @export
-#'
-#' @examples
 th2_tsfeatures <- function(
     ts_movil,
     features_input = c("trend", "spike", "linearity", "curvature", "e_acf1", "entropy")) {
@@ -28,8 +26,7 @@ th2_tsfeatures <- function(
 #' @return a fonction renvoie un dataset avec les caractéristiques importantes
 #' @export
 #'
-#' @examples
-#' feature_selection(input_data)
+#' @examples feature_selection(input_data)
 feature_selection <- function(
     input_data,
     feature_target,
