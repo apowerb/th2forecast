@@ -32,6 +32,15 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
     if(fit_model == TRUE){
       model_arima_fit <- model_arima %>%
         parsnip::fit(formula, data = input_data)
+    }else if(fit_model == "bulk"){
+
+      recipe_arima <- recipes::recipe(formula, data = input_data)
+
+      model_arima_fit <- workflows::workflow() %>%
+        workflows::add_recipe(recipe_arima) %>%
+        workflows::add_model(model_arima)
+
+      model_arima_fit <- list("fit" = model_arima_fit, "model"= model_arima)
     }else{
       model_arima_fit <- workflows::workflow() %>%
         workflows::add_recipe(recipes::recipe(formula, data = input_data)) %>%
@@ -71,6 +80,16 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
     if(fit_model == TRUE){
       model_prophet_fit <- model_prophet %>%
         parsnip::fit(formula, data = input_data)
+    }else if(fit_model == "bulk"){
+
+      recipe_prophet <- recipes::recipe(formula, data = input_data)
+
+      model_prophet_fit <- workflows::workflow() %>%
+        workflows::add_recipe(recipe_prophet) %>%
+        workflows::add_model(model_prophet)
+
+      model_prophet_fit <- list("fit" = model_prophet_fit, "model"= model_prophet)
+
     }else{
       model_prophet_fit <- workflows::workflow() %>%
         workflows::add_recipe(recipes::recipe(formula, data = input_data)) %>%
@@ -161,6 +180,8 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
       parsnip::set_mode("regression")
 
     recipe_spec <- recipes::recipe(formula, data = input_data) %>%
+      # step_th2_pre_processing(value) %>%
+      # ifelse(fit_model == "bulk", step_th2_pre_processing(value) )%>%
       recipes::step_date(var_date, features = mars_features, ordinal = FALSE) %>%
       recipes::step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
       recipes::step_normalize(date_num) %>%
@@ -200,8 +221,11 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, fit_model = TRUE){
 
   model_rf <- parsnip::rand_forest(
-    min_n = ifelse(fit_model, min_n, tune()),
-    trees = ifelse(fit_model, trees, tune()) ) %>%
+    # min_n = ifelse(fit_model, min_n, tune()),
+    # trees = ifelse(fit_model, trees, tune())
+    min_n = ifelse(fit_model == FALSE, tune(), min_n),
+    trees = ifelse(fit_model == FALSE, tune(), trees)
+    ) %>%
     parsnip::set_engine("randomForest") %>%
     parsnip::set_mode("regression")
 
@@ -211,6 +235,17 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
   if(fit_model == TRUE){
     model_rf_fit <- model_rf %>%
       parsnip::fit(formula, data = input_data)
+  }else if(fit_model == "bulk"){
+
+    recipe_rf <- recipes::recipe(formula, data = input_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target)
+
+    model_rf_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipe_rf) %>%
+      workflows::add_model(model_rf)
+
+    model_rf_fit <- list("fit" = model_rf_fit, "model"= model_rf)
+
   }else{
     model_rf_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipes::recipe(formula, data = input_data)) %>%
@@ -238,10 +273,10 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
 
   model_xgboost <-
     parsnip::boost_tree(
-      mtry = ifelse(fit_model, mtry, tune()),
-      trees = ifelse(fit_model, trees, tune()),
-      min_n = ifelse(fit_model, min_n, tune()),
-      learn_rate = ifelse(fit_model, learn_rate, tune())
+      mtry = mtry,
+      trees = trees,
+      min_n = min_n,
+      learn_rate = learn_rate
       ) %>%
     parsnip::set_mode("regression") %>%
     parsnip::set_engine("xgboost")
@@ -254,22 +289,34 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
     set.seed(1)
     model_xgboost_fit <- model_xgboost %>%
       parsnip::fit(formula, data = input_data)
-  }else{
-    # model_xgboost_fit <- workflows::workflow() %>%
-    #   workflows::add_recipe(recipes::recipe(formula, data = dplyr::select(training(input_data), - var_date) )) %>%
-    #   workflows::add_model(model_xgboost)
-    #
-    # model_xgboost_fit <- list("fit" = model_xgboost_fit, "model"= model_xgboost)
+  }else if(fit_model == "bulk"){
 
-    th2_recipe_custom <- recipes::recipe(formula, input_data) %>%
-      # feature_selection(feature_target = var_target) %>%
+    recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target)%>%
       step_rm(var_date)
 
     model_xgboost_fit <- workflows::workflow() %>%
-        workflows::add_recipe(th2_recipe_custom) %>%
-        workflows::add_model(model_xgboost)
+      workflows::add_recipe(recipe_xgboost) %>%
+      workflows::add_model(model_xgboost)
 
     model_xgboost_fit <- list("fit" = model_xgboost_fit, "model"= model_xgboost)
+
+  }else{
+    model_xgboost_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipes::recipe(formula, data = dplyr::select(input_data, - var_date) )) %>%
+      workflows::add_model(model_xgboost)
+
+    model_xgboost_fit <- list("fit" = model_xgboost_fit, "model"= model_xgboost)
+
+    # th2_recipe_custom <- recipes::recipe(formula, input_data) %>%
+    #   # feature_selection(feature_target = var_target) %>%
+    #   step_rm(var_date)
+    #
+    # model_xgboost_fit <- workflows::workflow() %>%
+    #     workflows::add_recipe(th2_recipe_custom) %>%
+    #     workflows::add_model(model_xgboost)
+
+    # model_xgboost_fit <- list("fit" = model_xgboost_fit, "model"= model_xgboost)
   }
 
   return(model_xgboost_fit)
@@ -291,7 +338,7 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
 #' @examples model_selection_train(input_data, c("arima", "prophet", "lr", "mars"), "value", "datetime")
 model_selection_train <- function (input_data, list_models, var_target, var_date, input_feature_data){
 
-  if (setequal(class(input_data), c("spec_tbl_df", "tbl_df", "tbl", "data.frame")) || class(input_data) == "data.frame"){
+  if (any(class(input_data) %in% c("tbl_df", "tbl", "data.frame")) || class(input_data) == "data.frame"){
     error_models <- NULL
 
     if (length(list_models) > 0 && is.character(list_models))

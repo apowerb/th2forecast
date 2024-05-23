@@ -77,17 +77,19 @@ feature_selection <- function(
     data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], window, mean, fill = NA)
     data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], window, sd, fill = NA)
 
-    st_features <- zoo::rollapplyr(
-      input_data[feature_target],
-      width = window,
-      FUN = th2_tsfeatures,
-      by.column = FALSE,
-      fill = NA
-      )
+    # st_features <- zoo::rollapplyr(
+    #   input_data[feature_target],
+    #   width = window,
+    #   FUN = th2_tsfeatures,
+    #   by.column = FALSE,
+    #   fill = NA
+    #   )
+    #
+    # data_features <- cbind(data_features, st_features)
 
-    data_features <- cbind(data_features, st_features)
+    # data_features <- data_features[complete.cases(data_features), ]
 
-    data_features <- data_features[complete.cases(data_features), ]
+    data_features[is.na(data_features)] <- 0
 
     return(data_features)
   }else {

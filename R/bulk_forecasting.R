@@ -15,41 +15,53 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   list_output_models <- list()
 
-  if (group_target == "c"){
+  if (group_target == "all_columns"){
     data_tbl <- input_data %>%
-      tidyr::pivot_longer(!date_var , names_to = "id")
+      tidyr::pivot_longer(!date_var , names_to = "id", values_to = target_var) %>%
+      rename(date = date_var)
     group_target <- "id"
-    target_var <- "value"
-
   }else{
 
     select_vars <- c(group_target, date_var, target_var)
 
     data_tbl <- input_data %>%
-      dplyr::select(all_of(select_vars))
+      dplyr::select(all_of(select_vars)) %>%
+      rename(id = group_target, date = date_var)
+    group_target <- "id"
     # data_tbl <- data_tbl %>%
     #   mutate(id_group = paste(store_nbr, family, sep = "_"))
   }
 
-  count <- table(data_tbl[[group_target]])
-  num_ids <- length(names(count[count > 1]))
+  data_tbl <-  data_tbl %>%
+    dplyr::group_by_at(vars(date_var, group_target)) %>%
+    dplyr::summarise_at(vars(target_var), sum)
+
+  count_data <- table(data_tbl[[group_target]])
+  column_value <- as.numeric(count_data[1])
+  num_ids <- length(names(count_data[count_data > 1]))
 
   train_size <- round((nrow(data_tbl)/ num_ids) * 0.8)
-  test_size <- (nrow(data_tbl)/ num_ids) - train_size
+  test_size <- column_value - train_size
 
   nested_data_tbl <- data_tbl %>%
     modeltime::extend_timeseries(
-      .id_var        = !!group_target,
-      .date_var      = !!date_var,
+      .id_var        = id,
+      .date_var      = date,
       .length_future = future_forecast
     ) %>%
     modeltime::nest_timeseries(
-      .id_var        = !!group_target,
+      .id_var        = id,
       .length_future = future_forecast
     ) %>%
     modeltime::split_nested_timeseries(
       .length_test = test_size
     )
+
+  for (i in 1:nrow(nested_data_tbl)) {
+    list_nestede_data <- nested_data_tbl[i,]$.actual_data
+    data_output_t <- preprocessing_data(list_nestede_data)[["dataset_clean"]]
+    nested_data_tbl[i,]$.actual_data[[1]] <- data_output_t
+  }
 
   nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
 
@@ -75,6 +87,15 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       training_model <- th2_mars_engine(nested_data, target_var, date_var, fit_model = "bulk")$fit
       label_model <- "model_mars"
 
+    }else if(model == "random_forest"){
+      training_model <- th2_random_forest_engine(nested_data, target_var, fit_model = "bulk")$fit
+      label_model <- "model_random_forest"
+
+    }else if(model == "xgboost"){
+      training_model <- th2_xgboost_engine(nested_data, date_var, target_var, fit_model = "bulk")$fit
+      print(training_model)
+      label_model <- "model_xgboost"
+
     } else {
       error_models <- c(NULL, model)
     }
@@ -85,6 +106,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
 
+
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
       metric                = "rmse",
@@ -93,15 +115,19 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     )
 
 
-  nested_modeltime_refit_tbl <- best_nested_modeltime_tbl %>%
+  nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_refit(
       control = control_nested_refit(verbose = TRUE)
     )
 
+
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
     .include_actual = FALSE) %>%
-    mutate(as_of = Sys.Date())
+    dplyr::mutate(as_of = Sys.Date()) %>%
+    dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
+    dplyr::mutate(end_date = max(input_data[[date_var]]))
+
 
   return(forecast_result)
 }
