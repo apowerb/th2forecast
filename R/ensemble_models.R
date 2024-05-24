@@ -64,7 +64,8 @@ th2_tune_model <- function(resample_data, model, tuning_param){
      )
 
   best_params <- cv_results %>%
-     tune::select_best('rmse', maximise = FALSE)
+    tune::select_best(metric = 'rmse')
+     # tune::select_best('rmse', maximise = FALSE)
 
   return(best_params)
 

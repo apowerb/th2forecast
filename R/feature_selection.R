@@ -77,6 +77,12 @@ feature_selection <- function(
     data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], window, mean, fill = NA)
     data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], window, sd, fill = NA)
 
+    use_holidays <- TRUE
+    if (use_holidays == TRUE){
+      holidays_list <- holidays_detection(input_data, model = "ml")
+      data_features["holidays"] <- holidays_list
+    }
+
     # st_features <- zoo::rollapplyr(
     #   input_data[feature_target],
     #   width = window,

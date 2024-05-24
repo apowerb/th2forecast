@@ -13,6 +13,7 @@ Suggests:
     rmarkdown
 Imports: 
     anomalize,
+    bizdays,
     caret,
     caTools,
     changepoint,

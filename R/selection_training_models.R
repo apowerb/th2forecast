@@ -71,11 +71,17 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
+    use_holidays <- TRUE
+    holidays_df <- NULL
+    if (use_holidays == TRUE){
+      holidays_df <- holidays_detection(input_data, model = "prophet")
+    }
+
     model_prophet <- modeltime::prophet_reg(
       changepoint_num = ifelse(fit_model == FALSE, tune(), changepoint_num),
       changepoint_range = ifelse(fit_model == FALSE, tune(), changepoint_range)
       ) %>%
-      parsnip::set_engine(engine = engine)
+      parsnip::set_engine(engine = engine, holidays = holidays_df)
 
     if(fit_model == TRUE){
       model_prophet_fit <- model_prophet %>%
@@ -273,10 +279,10 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
 
   model_xgboost <-
     parsnip::boost_tree(
-      mtry = mtry,
-      trees = trees,
-      min_n = min_n,
-      learn_rate = learn_rate
+      mtry = ifelse(fit_model == FALSE, tune(), mtry),
+      trees = ifelse(fit_model == FALSE, tune(), trees),
+      min_n = ifelse(fit_model == FALSE, tune(), min_n),
+      learn_rate = ifelse(fit_model == FALSE, tune(), learn_rate)
       ) %>%
     parsnip::set_mode("regression") %>%
     parsnip::set_engine("xgboost")
