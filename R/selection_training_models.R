@@ -216,8 +216,6 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 #'
 #' @return Un modèle Random Forest entraîné.
 #' @export
-#'
-#' @examples
 th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, fit_model = TRUE){
 
   model_rf <- parsnip::rand_forest(
@@ -267,8 +265,6 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 #'
 #' @return Un modèle XGBoost entraîné.
 #' @export
-#'
-#' @examples
 th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , trees = 15, min_n = 5, learn_rate = 0.1, fit_model = TRUE ){
 
   model_xgboost <-
@@ -335,7 +331,7 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
 #' @return Un tableau qui contient les modèles entraînés.
 #' @export
 #'
-#' @examples model_selection_train(input_data, c("arima", "prophet", "lr", "mars"), "value", "datetime")
+#' @examples  model_selection_train(input_data, c("arima", "prophet", "lr", "mars"), "value", "datetime")
 model_selection_train <- function (input_data, list_models, var_target, var_date, input_feature_data){
 
   if (any(class(input_data) %in% c("tbl_df", "tbl", "data.frame")) || class(input_data) == "data.frame"){

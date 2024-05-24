@@ -9,8 +9,6 @@
 #'
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
-#'
-#' @examples
 th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list ){
 
   list_output_models <- list()
