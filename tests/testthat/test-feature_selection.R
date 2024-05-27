@@ -1,7 +1,7 @@
 test_that("test feature_selection function", {
   # Test dataframe
   input_data <- data.frame(
-    date = as.Date('2000-01-01') + 0:9,
+    date = as.Date("2000-01-01") + 0:9,
     feature1 = rnorm(10, 0, 1),
     feature2 = rnorm(10, 0, 1),
     feature_target = rnorm(10, 0, 1)

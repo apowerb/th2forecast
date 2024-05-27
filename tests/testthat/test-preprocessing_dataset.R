@@ -3,7 +3,6 @@ library(naniar)
 library(janitor)
 
 test_that("test preprocessing_data function", {
-
   input_data <- m4_monthly %>% dplyr::filter(id == "M750")
 
   result <- preprocessing_data(input_data)
@@ -29,7 +28,6 @@ test_that("test preprocessing_data function", {
   # Check that the input_data is not empty
   input_data_empty <- data.frame()
   expect_warning(preprocessing_data(input_data_empty))
-
 })
 
 
@@ -98,7 +96,4 @@ test_that("outliers_detection function test", {
   expect_warning(outliers_detection(input_data_empty))
 
   expect_warning(outliers_detection(input_data, method_ls = "test_u"))
-
 })
-
-

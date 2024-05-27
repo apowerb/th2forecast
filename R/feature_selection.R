@@ -34,9 +34,7 @@ feature_selection <- function(
     use_holidays = TRUE,
     lags = 5,
     window = 5) {
-
   if (is.data.frame(input_data)) {
-
     if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty"))
     }
@@ -50,21 +48,21 @@ feature_selection <- function(
       list_features <- c(var_date_feature, list_features, feature_target)
       data_features <- input_data %>%
         dplyr::select(all_of(list_features))
-    }else {
+    } else {
       list_features <- c(var_date_feature, feature_target)
       data_features <- input_data %>%
         dplyr::select(all_of(list_features))
     }
 
-    if (use_holidays == TRUE){
+    if (use_holidays == TRUE) {
       holidays_list <- holidays_detection(input_data, model = "ml")
       data_features["holidays"] <- holidays_list
     }
 
-    data_features["month"]  <- lubridate::month(data_features[[var_date_feature]])
+    data_features["month"] <- lubridate::month(data_features[[var_date_feature]])
 
     if (inherits(data_features[[var_date_feature]], "POSIXct")) {
-      data_features["hour"]  <- lubridate::hour(data_features[[var_date_feature]])
+      data_features["hour"] <- lubridate::hour(data_features[[var_date_feature]])
     }
 
     data_features["dayofweek"] <- lubridate::wday(data_features[[var_date_feature]])
@@ -95,8 +93,7 @@ feature_selection <- function(
     data_features[is.na(data_features)] <- 0
 
     return(data_features)
-  }else {
+  } else {
     return(warning("The *input_date* variable is not a data.frame"))
   }
-
 }

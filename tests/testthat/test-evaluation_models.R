@@ -5,7 +5,7 @@ library(tidymodels)
 data <- m4_monthly %>% dplyr::filter(id == "M750")
 data <- time_series_split(data, assess = "3 months", cumulative = TRUE)
 
-#Prophet
+# Prophet
 model_prophet <- prophet_reg(seasonality_yearly = TRUE) %>%
   set_engine("prophet") %>%
   fit(value ~ date, training(data))
@@ -16,8 +16,8 @@ model_glment <- linear_reg(penalty = 0.01) %>%
   set_engine("glmnet") %>%
   fit(
     value ~ lubridate::wday(date, label = TRUE)
-    + lubridate::month(date, label = TRUE)
-    + as.numeric(date),
+      + lubridate::month(date, label = TRUE)
+      + as.numeric(date),
     training(data)
   )
 
@@ -51,5 +51,4 @@ test_that("test evaluation_models function", {
   # Check errors
   data_test_error <- data.frame()
   expect_error(model_evaluation(data_test_error, model_table))
-
 })
