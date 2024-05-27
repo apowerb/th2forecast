@@ -116,7 +116,7 @@ outliers_detection <- function(input_data, method_ls = "cpt"){
 #' @export
 #'
 #' @examples
-holidays_detection <- function(input_data, model , calendar = "calendar_france" , region = "metropole"){
+holidays_detection <- function(input_data, model, calendar = "calendar_france" , region = "metropole"){
 
   url <-  paste0("https://calendrier.api.gouv.fr/jours-feries/",region,".json")
 
@@ -147,7 +147,7 @@ holidays_detection <- function(input_data, model , calendar = "calendar_france" 
     holidays <- bizdays::is.bizday(input_data[[var_date_feature]]) %>%
       as.integer()
 
-    return(as.integer(holidays))
+    return(holidays)
 
   }else{
     values <- c()
@@ -160,7 +160,7 @@ holidays_detection <- function(input_data, model , calendar = "calendar_france" 
       holiday = values,
       ds = as.Date(names(list_holidays)),
       lower_window = 0,
-      upper_window = 1
+      upper_window = 0
     )
 
     return(dataframe_holidays)
