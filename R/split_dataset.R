@@ -7,9 +7,7 @@
 #'
 #' @return renvoie une liste avec 2 objets: 1. un dataframe avec l'ensemble de training et de test  2. un dataframe avec les 2 variables sélectionnées.
 #' @export
-#'
-#' @examples
-#' split_dataset(input_data, "dteday", "cnt"; assess="3 months")
+#' @examples split_dataset(input_data, "dteday", "cnt"; assess="3 months")
 split_dataset <- function(input_data, var_time, var_target, assess = "3 months" ){
 
   if (is.data.frame(input_data))

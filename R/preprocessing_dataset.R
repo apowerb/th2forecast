@@ -103,8 +103,6 @@ outliers_detection <- function(input_data, method_ls = "cpt"){
   }
 }
 
-
-
 #' Sélection des jours fériés/holidays
 #'
 #' @param input_data Dataframe
@@ -167,7 +165,6 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france" ,
   }
 
 }
-
 
 #' Prétraitement d'une Dataset
 #'
