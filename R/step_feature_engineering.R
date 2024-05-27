@@ -61,6 +61,7 @@ step_th2_feature_engineering_new <-
     )
   }
 
+
 #' @export
 prep.step_th2_feature_engineering <- function(x,
                                          training,
@@ -81,6 +82,7 @@ prep.step_th2_feature_engineering <- function(x,
     id = x$id
   )
 }
+
 
 #' @export
 bake.step_th2_feature_engineering <- function(object,
@@ -139,7 +141,7 @@ bake.step_th2_feature_engineering <- function(object,
 #' @export
 print.step_th2_feature_engineering <-
   function(x, width = max(20, options()$width - 30), ...) {
-    cat("Feature engineering for columns", sep = "")
+    title <- "Feature engineering for columns"
     recipes::print_step(x$columns, x$terms, x$trained, width = width, title = title)
     invisible(x)
   }

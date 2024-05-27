@@ -105,6 +105,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
 
+  print(nested_modeltime_tbl %>%
+          extract_nested_error_report())
 
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
@@ -116,7 +118,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_refit(
-      control = control_nested_refit(verbose = TRUE)
+      control = modeltime::control_nested_refit(verbose = TRUE)
     )
 
 
