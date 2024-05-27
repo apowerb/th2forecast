@@ -64,18 +64,23 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine="auto_arim
 #' @export
 #'
 #' @examples th2_prophet_engine(input_data, "value", "datetime", engine="prophet")
-th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet", changepoint_num = 25, changepoint_range = 0.8, fit_model = TRUE){
+th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet", changepoint_num = 25, changepoint_range = 0.8, use_holidays = TRUE, fit_model = TRUE){
   if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))){
     return(warning("Selected variables do not exist in the data."))
   }else
   {
     formula <- as.formula(paste(var_target, "~", var_date))
 
+    holidays_df <- NULL
+    if (use_holidays == TRUE){
+      holidays_df <- holidays_detection(input_data, model = "prophet")
+    }
+
     model_prophet <- modeltime::prophet_reg(
       changepoint_num = ifelse(fit_model == FALSE, tune(), changepoint_num),
       changepoint_range = ifelse(fit_model == FALSE, tune(), changepoint_range)
       ) %>%
-      parsnip::set_engine(engine = engine)
+      parsnip::set_engine(engine = engine, holidays = holidays_df)
 
     if(fit_model == TRUE){
       model_prophet_fit <- model_prophet %>%
@@ -216,7 +221,9 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 #'
 #' @return Un modèle Random Forest entraîné.
 #' @export
-th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, fit_model = TRUE){
+#'
+#' @examples
+th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, use_holidays = TRUE, fit_model = TRUE){
 
   model_rf <- parsnip::rand_forest(
     # min_n = ifelse(fit_model, min_n, tune()),
@@ -236,7 +243,7 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
   }else if(fit_model == "bulk"){
 
     recipe_rf <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target)
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays)
 
     model_rf_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_rf) %>%
@@ -265,14 +272,16 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 #'
 #' @return Un modèle XGBoost entraîné.
 #' @export
-th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , trees = 15, min_n = 5, learn_rate = 0.1, fit_model = TRUE ){
+#' @examples
+th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , trees = 15, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, fit_model = TRUE ){
+
 
   model_xgboost <-
     parsnip::boost_tree(
-      mtry = mtry,
-      trees = trees,
-      min_n = min_n,
-      learn_rate = learn_rate
+      mtry = ifelse(fit_model == FALSE, tune(), mtry),
+      trees = ifelse(fit_model == FALSE, tune(), trees),
+      min_n = ifelse(fit_model == FALSE, tune(), min_n),
+      learn_rate = ifelse(fit_model == FALSE, tune(), learn_rate)
       ) %>%
     parsnip::set_mode("regression") %>%
     parsnip::set_engine("xgboost")
@@ -288,7 +297,7 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
   }else if(fit_model == "bulk"){
 
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target)%>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays)%>%
       step_rm(var_date)
 
     model_xgboost_fit <- workflows::workflow() %>%

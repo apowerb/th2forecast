@@ -31,6 +31,7 @@ feature_selection <- function(
     input_data,
     feature_target,
     list_features = c(),
+    use_holidays = TRUE,
     lags = 5,
     window = 5) {
 
@@ -53,6 +54,11 @@ feature_selection <- function(
       list_features <- c(var_date_feature, feature_target)
       data_features <- input_data %>%
         dplyr::select(all_of(list_features))
+    }
+
+    if (use_holidays == TRUE){
+      holidays_list <- holidays_detection(input_data, model = "ml")
+      data_features["holidays"] <- holidays_list
     }
 
     data_features["month"]  <- lubridate::month(data_features[[var_date_feature]])

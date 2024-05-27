@@ -60,7 +60,8 @@ th2_tune_model <- function(resample_data, model, tuning_param){
      )
 
   best_params <- cv_results %>%
-     tune::select_best('rmse', maximise = FALSE)
+    tune::select_best(metric = 'rmse')
+     # tune::select_best('rmse', maximise = FALSE)
 
   return(best_params)
 
@@ -77,12 +78,13 @@ th2_tune_model <- function(resample_data, model, tuning_param){
 #'
 #' @return renvoie un ensemble de plusieurs modèles entraînés
 #' @export
-th2_ensemble_engine <- function(dataset_input, var_date, var_target, models, list_features = c(),  ensamble_type = "mean"){
+#' @examples
+th2_ensemble_engine <- function(dataset_input, var_date, var_target, models, list_features = c(),  ensamble_type = "mean", use_holidays = TRUE){
 
   list_output_models <- list()
   error_models <- NULL
 
-  data_features <- feature_selection(dataset_input, var_target, list_features)
+  data_features <- feature_selection(dataset_input, var_target, list_features, use_holidays = use_holidays)
   data_features <- data_features[complete.cases(data_features), ]
 
   dataset_split <- split_dataset(data_features, var_date, var_target)$traintest
@@ -105,7 +107,7 @@ th2_ensemble_engine <- function(dataset_input, var_date, var_target, models, lis
 
     } else if(model == "prophet"){
 
-      training_model <-  th2_prophet_engine(training(dataset_split), var_target, var_date, engine = "prophet", fit_model = FALSE)
+      training_model <-  th2_prophet_engine(training(dataset_split), var_target, var_date, engine = "prophet", use_holidays = use_holidays, fit_model = FALSE)
       formula <- as.formula(paste(var_target, "~", var_date))
       tuning_param <- list(changepoint_num = seq(10, 15, 25), changepoint_range = seq(0.6, 0.7, 0.8))
       label_model <- "model_prophet"

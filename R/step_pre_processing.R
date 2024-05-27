@@ -19,7 +19,7 @@ step_th2_pre_processing <-
            skip    = FALSE,
            trained = FALSE,
            columns = NULL,
-           id = rand_id("th2_pre_processing")) {
+           id = recipes::rand_id("th2_pre_processing")) {
     recipes::add_step(
       recipe,
       step_th2_pre_processing_new(

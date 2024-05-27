@@ -20,8 +20,9 @@ step_th2_feature_engineering <-
            skip    = FALSE,
            trained = FALSE,
            feature_target = "",
+           use_holidays = TRUE,
            columns = NULL,
-           id = rand_id("th2_feature_engineering")) {
+           id = recipes::rand_id("th2_feature_engineering")) {
     recipes::add_step(
       recipe,
       step_th2_feature_engineering_new(
@@ -30,19 +31,21 @@ step_th2_feature_engineering <-
         skip    = skip,
         trained = trained,
         feature_target = feature_target,
+        use_holidays = use_holidays,
         columns = columns,
         id = id
       )
     )
   }
 
-
+#' @export
 step_th2_feature_engineering_new <-
   function(terms,
            role,
            skip,
            trained,
            feature_target,
+           use_holidays,
            columns,
            id) {
     recipes::step(
@@ -52,6 +55,7 @@ step_th2_feature_engineering_new <-
       skip     = skip,
       trained  = trained,
       feature_target = feature_target,
+      use_holidays = use_holidays,
       columns  = columns,
       id = id
     )
@@ -72,6 +76,7 @@ prep.step_th2_feature_engineering <- function(x,
     skip    = x$skip,
     trained = TRUE,
     feature_target = x$feature_target,
+    use_holidays = x$use_holidays,
     columns = col_names,
     id = x$id
   )
@@ -82,8 +87,9 @@ bake.step_th2_feature_engineering <- function(object,
                                          new_data,
                                          ...) {
   target_col <- object$feature_target
+  use_holidays <- object$use_holidays
 
-  feat_len <- 10
+  feat_len <- 11
 
   new_cols <- rep(
     feat_len,
@@ -104,7 +110,7 @@ bake.step_th2_feature_engineering <- function(object,
     cols <- (strt):(strt + new_cols[i] - 1)
 
     tmp <- new_data %>%
-      feature_selection(feature_target = target_col) %>%
+      feature_selection(feature_target = target_col, use_holidays = use_holidays) %>%
       dplyr::select(-object$columns[i], -target_col) %>%
       dplyr::as_tibble()
 
