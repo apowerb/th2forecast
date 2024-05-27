@@ -205,9 +205,11 @@ preprocessing_data <- function(input_data){
     output_data <- outliers_detection(output_data, method_ls = "cpt")
 
     number_miss <- naniar::n_miss(output_data)
+
     percent_miss <- naniar::prop_miss(output_data)
 
     number_complet <- naniar::n_complete(output_data)
+
     percent_complet <- naniar::prop_complete(output_data)
 
     detail_missing <- naniar::miss_var_summary(output_data)
