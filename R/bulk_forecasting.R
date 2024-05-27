@@ -11,7 +11,7 @@
 #' @export
 #'
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list ){
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, use_holidays = TRUE ){
 
   list_output_models <- list()
 
@@ -76,7 +76,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       label_model <- "model_arima"
 
     } else if(model == "prophet"){
-      training_model <- th2_prophet_engine(nested_data, target_var, date_var, fit_model = "bulk")$fit
+      training_model <- th2_prophet_engine(nested_data, target_var, date_var, use_holidays = use_holidays, fit_model = "bulk")$fit
       label_model <- "model_prophet"
 
     } else  if(model == "lr"){
@@ -88,11 +88,11 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       label_model <- "model_mars"
 
     }else if(model == "random_forest"){
-      training_model <- th2_random_forest_engine(nested_data, target_var, fit_model = "bulk")$fit
+      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
       label_model <- "model_random_forest"
 
     }else if(model == "xgboost"){
-      training_model <- th2_xgboost_engine(nested_data, date_var, target_var, fit_model = "bulk")$fit
+      training_model <- th2_xgboost_engine(nested_data, date_var, target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
       print(training_model)
       label_model <- "model_xgboost"
 
