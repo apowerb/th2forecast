@@ -5,8 +5,6 @@
 #'
 #' @return renvoie une liste de sous-ensembles
 #' @export
-#'
-#' @examples
 th2_resamples <- function(dataset_input, var_date){
 
   dataset_date <- dataset_input
@@ -49,8 +47,6 @@ th2_resamples <- function(dataset_input, var_date){
 #'
 #' @return un modèle affiné
 #' @export
-#'
-#' @examples
 th2_tune_model <- function(resample_data, model, tuning_param){
 
   cv_results <- tune::tune_grid(
@@ -82,7 +78,6 @@ th2_tune_model <- function(resample_data, model, tuning_param){
 #'
 #' @return renvoie un ensemble de plusieurs modèles entraînés
 #' @export
-#'
 #' @examples
 th2_ensemble_engine <- function(dataset_input, var_date, var_target, models, list_features = c(),  ensamble_type = "mean", use_holidays = TRUE){
 

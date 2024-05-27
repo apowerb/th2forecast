@@ -103,8 +103,6 @@ outliers_detection <- function(input_data, method_ls = "cpt"){
   }
 }
 
-
-
 #' Sélection des jours fériés/holidays
 #'
 #' @param input_data Dataframe
@@ -168,7 +166,6 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france" ,
 
 }
 
-
 #' Prétraitement d'une Dataset
 #'
 #' Une fonction pour nettoyer les données (suppression des valeurs manquantes, détection des valeurs redondantes et analyse des anomalies).
@@ -177,12 +174,12 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france" ,
 #'
 #' @return la fonction renvoie un dataset propre
 #'
-#' @export
+#' @import naniar
+#' @import janitor
 #'
-#' @examples
-#' preprocessing_data(input_data)
+#' @export
+#' @examples preprocessing_data(input_data)
 preprocessing_data <- function(input_data){
-
   if (is.data.frame(input_data) || is.list(input_data))
   {
     if(is.list(input_data)){
@@ -204,17 +201,15 @@ preprocessing_data <- function(input_data){
 
     output_data <- outliers_detection(output_data, method_ls = "cpt")
 
-    number_miss <- naniar::n_miss(output_data)
-    percent_miss <- naniar::prop_miss(output_data)
+  output_data <- unique(input_data)
 
-    number_complet <- naniar::n_complete(output_data)
-    percent_complet <- naniar::prop_complete(output_data)
+  number_miss <- n_miss(output_data)
+  percent_miss <- prop_miss(output_data) #proportion of missing values
 
-    detail_missing <- naniar::miss_var_summary(output_data)
+  number_complet <- n_complete(output_data)
+  percent_complet <- prop_complete(output_data)
 
-    list("dataset_clean"=output_data, "numnber_missing" = number_miss)
+  detail_missing <- miss_var_summary(output_data)
 
-  }else{
-    return(warning("The *input_date* variable is not a data.frame ."))
-  }
+  list("dataset_clean"=output_data, "numnber_missing" = number_miss)
 }
