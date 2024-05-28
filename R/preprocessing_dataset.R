@@ -115,7 +115,7 @@ preprocessing_data <- function(input_data){
   {
     if(is.list(input_data)){
       input_data <- as.data.frame(input_data)
-      input_data <- as_tibble(input_data)
+      input_data <- tibble::as_tibble(input_data)
     }
     if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty."))

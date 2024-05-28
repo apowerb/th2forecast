@@ -61,6 +61,7 @@ step_th2_feature_engineering_new <-
     )
   }
 
+
 #' @export
 prep.step_th2_feature_engineering <- function(x,
                                               training,
@@ -82,14 +83,21 @@ prep.step_th2_feature_engineering <- function(x,
   )
 }
 
+
 #' @export
 bake.step_th2_feature_engineering <- function(object,
-                                              new_data,
-                                              ...) {
+                                         new_data,
+                                         ...) {
+  # print(dim(new_data))
+
   target_col <- object$feature_target
   use_holidays <- object$use_holidays
 
-  feat_len <- 11
+  feat_len <- (feature_selection(new_data, feature_target = target_col, use_holidays = use_holidays) %>% ncol()) - 2
+  # print("size")
+  # print(feat_len)
+
+  # feat_len <- 11
 
   new_cols <- rep(
     feat_len,
@@ -131,14 +139,14 @@ bake.step_th2_feature_engineering <- function(object,
   if (!tibble::is_tibble(new_data)) {
     new_data <- tibble::as_tibble(new_data)
   }
-
+  # print(dim(new_data))
   new_data
 }
 
 #' @export
 print.step_th2_feature_engineering <-
   function(x, width = max(20, options()$width - 30), ...) {
-    cat("Feature engineering for columns", sep = "")
+    title <- "Feature engineering for columns"
     recipes::print_step(x$columns, x$terms, x$trained, width = width, title = title)
     invisible(x)
   }
