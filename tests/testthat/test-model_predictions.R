@@ -5,7 +5,7 @@ library(tidymodels)
 data_row <- m4_monthly %>% dplyr::filter(id == "M750")
 data <- time_series_split(data_row, assess = "3 months", cumulative = TRUE)
 
-#Prophet
+# Prophet
 model_prophet <- prophet_reg(seasonality_yearly = TRUE) %>%
   set_engine("prophet") %>%
   fit(value ~ date, training(data))
@@ -15,8 +15,8 @@ model_glment <- linear_reg(penalty = 0.01) %>%
   set_engine("glmnet") %>%
   fit(
     value ~ lubridate::wday(date, label = TRUE)
-    + lubridate::month(date, label = TRUE)
-    + as.numeric(date),
+      + lubridate::month(date, label = TRUE)
+      + as.numeric(date),
     training(data)
   )
 

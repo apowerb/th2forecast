@@ -8,10 +8,8 @@
 #' @export
 #'
 #' @examples prediction_forecast(input_data, calib_tbl, h = "3 months")
-prediction_forecast <- function(input_data, model, h = "3 months"){
-
-  if (is.data.frame(input_data)){
-
+prediction_forecast <- function(input_data, model, h = "3 months") {
+  if (is.data.frame(input_data)) {
     prediction_forecast_tbl <- NULL
 
     model <- model %>%
@@ -21,7 +19,7 @@ prediction_forecast <- function(input_data, model, h = "3 months"){
       model_refit <- model %>%
         modeltime::modeltime_refit(data = input_data)
 
-      prediction_forecast_tbl <-  model_refit %>%
+      prediction_forecast_tbl <- model_refit %>%
         modeltime::modeltime_forecast(
           h = h,
           actual_data = input_data
@@ -29,8 +27,7 @@ prediction_forecast <- function(input_data, model, h = "3 months"){
     }
 
     return(prediction_forecast_tbl)
-
-  }else{
+  } else {
     return(warning("*input_data* is not a data.frame."))
   }
 }

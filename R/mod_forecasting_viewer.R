@@ -10,7 +10,8 @@ mod_forecasting_viewer_ui <- function(id) {
     tabPanel(
       title = "Forecasting Pipelines", icon = icon("database"),
   fluidPage(
-      DT::dataTableOutput(ns("pipelines_table"))
+      DT::dataTableOutput(ns("pipelines_table")),
+      uiOutput(ns("forecast_pipeline_boxes"))
     )
   ),
   tabPanel(
@@ -24,6 +25,7 @@ mod_forecasting_viewer_ui <- function(id) {
       column(width = 2, uiOutput(ns("run")))
       ),
     uiOutput(ns("graph_output"))
+
     ))
   )
 }
@@ -61,28 +63,83 @@ mod_forecasting_viewer_server <- function(id) {
     })
 
 
-    output$pipelines_table <-  DT::renderDataTable({
-      user_permissions <- th2blender::get_user_data_permissions(target_table = "th2_wf_permissions", object_type = "fc")
-      pipelines_metadata <- th2product::fetch_data_from_db(table = "th2_forecast_project")
+    # output$pipelines_table <-  DT::renderDataTable({
+    #   user_permissions <- th2blender::get_user_data_permissions(target_table = "th2_wf_permissions", object_type = "fc")
+    #   if (nrow(pipelines_metadata()) == 0) {
+    #     return(NULL)
+    #   }
+    #   pipelines_metadata <- user_permissions %>%
+    #     dplyr::rename(pipeline_uuid = OBJECT_ID) %>%
+    #     dplyr::select(pipeline_uuid) %>%
+    #     dplyr::inner_join(pipelines_metadata(), by = c("pipeline_uuid"))
+    #   if (nrow(pipelines_metadata) == 0) {
+    #     return(NULL)
+    #   }
+    #   DT::datatable(dplyr::select(pipelines_metadata,-id, -input_meta_connection, -output_meta_connection), selection = list(mode = "single"))
+    # })
 
-      if (nrow(pipelines_metadata) == 0) {
+    output$forecast_pipeline_boxes <- renderUI({
+
+      user_permissions <- th2blender::get_user_data_permissions(target_table = "th2_wf_permissions", object_type = "fc")
+
+      if (nrow(pipelines_metadata()) == 0) {
         return(NULL)
       }
       pipelines_metadata <- user_permissions %>%
         dplyr::rename(pipeline_uuid = OBJECT_ID) %>%
         dplyr::select(pipeline_uuid) %>%
-        dplyr::inner_join(pipelines_metadata, by = c("pipeline_uuid"))
+        dplyr::inner_join(pipelines_metadata(), by = c("pipeline_uuid"))
       if (nrow(pipelines_metadata) == 0) {
         return(NULL)
       }
-      pipelines_metadata
-      DT::datatable(dplyr::select(pipelines_metadata(),-id, -input_meta_connection, -output_meta_connection), selection = list(mode = "single"))
+      pipelines_list <- pipelines_metadata
+      print(pipelines_list)
+      temp <- seq_len(nrow(pipelines_metadata))
+      # print(list_of_workflows()$pipelines)
+
+      all_boxes <- fluidRow(lapply(temp, function(x) {
+        created_at_value <- as.numeric(pipelines_list[x, 'created_at'])
+        created_at_human_readable <- format(as.POSIXct(created_at_value, origin = "1970-01-01", tz = "UTC"), "%Y-%m-%d %H:%M:%S")
+        pipeline_content <- HTML(as.character(
+          glue::glue(
+            "<b>Name</b> : {pipelines_list[x, 'project_name']}<br>
+         <b>Input datasource type</b> : {pipelines_list[x, 'input_datasource_type']}<br>
+         <b>Output datasource type</b> : {pipelines_list[x, 'output_datasource_type']}<br>
+         <b>Groupe target</b> : {pipelines_list[x, 'group_target_var']}<br>
+         <b>Target</b> : {pipelines_list[x, 'target_var']}<br>
+         <b>Forecast duration</b> : {pipelines_list[x, 'forecast_duration']}<br>
+         <b>Input id</b> : {pipelines_list[x, 'input_id']}<br>
+         <b>Output id</b> : {pipelines_list[x, 'output_id']}<br>
+         <b>Created At</b> : {created_at_human_readable}"
+          )
+        ))
+
+        # print(workflows_list)
+        mod_fc_boxes_server(
+          id = pipelines_list[x, "pipeline_uuid"],
+          perm_table = "th2_wf_permissions",
+          box_uuid = pipelines_list[x, "pipeline_uuid"],
+          box_title = pipelines_list[x, "project_name"],
+          box_color = "info",
+          box_bg_color = "white",
+          box_icon = "timeline",
+          box_body = pipeline_content,
+          data = pipelines_list,
+          selected_info = selected_info,
+          index = x,
+          output_data_result = output_data_result,
+          parent_session = session
+        )
+
+        column(width = 4, mod_fc_boxes_ui(id = ns(pipelines_list[x, "pipeline_uuid"])))
+      }))
+      return(all_boxes)
     })
 
   observeEvent(input$pipelines_table_rows_selected, {
     selected_row <- NULL
     selected_row <- input$pipelines_table_rows_selected
-
+    print(selected_row)
     if (length(selected_row) > 0) {
       selected_info(pipelines_metadata()[selected_row, ])
 

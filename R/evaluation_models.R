@@ -11,7 +11,6 @@
 #'
 #' @examples model_evaluation(input_data, model_tbl)
 model_evaluation <- function(input_data, model_table) {
-
   calib_tbl <- model_table %>%
     modeltime::modeltime_calibrate(testing(input_data), quiet = FALSE)
 

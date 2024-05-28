@@ -16,8 +16,8 @@
 step_th2_feature_engineering <-
   function(recipe,
            ...,
-           role    = "predictor",
-           skip    = FALSE,
+           role = "predictor",
+           skip = FALSE,
            trained = FALSE,
            feature_target = "",
            use_holidays = TRUE,
@@ -27,8 +27,8 @@ step_th2_feature_engineering <-
       recipe,
       step_th2_feature_engineering_new(
         terms = recipes::ellipse_check(...),
-        role    = role,
-        skip    = skip,
+        role = role,
+        skip = skip,
         trained = trained,
         feature_target = feature_target,
         use_holidays = use_holidays,
@@ -50,13 +50,13 @@ step_th2_feature_engineering_new <-
            id) {
     recipes::step(
       subclass = "th2_feature_engineering",
-      terms    = terms,
-      role     = role,
-      skip     = skip,
-      trained  = trained,
+      terms = terms,
+      role = role,
+      skip = skip,
+      trained = trained,
       feature_target = feature_target,
       use_holidays = use_holidays,
-      columns  = columns,
+      columns = columns,
       id = id
     )
   }
@@ -64,17 +64,17 @@ step_th2_feature_engineering_new <-
 
 #' @export
 prep.step_th2_feature_engineering <- function(x,
-                                         training,
-                                         info = NULL,
-                                         ...) {
+                                              training,
+                                              info = NULL,
+                                              ...) {
   col_names <- recipes::recipes_eval_select(x$terms, data = training, info = info)
 
   recipes::check_type(training[, col_names], types = c("date", "datetime"))
 
   step_th2_feature_engineering_new(
-    terms   = x$terms,
-    role    = x$role,
-    skip    = x$skip,
+    terms = x$terms,
+    role = x$role,
+    skip = x$skip,
     trained = TRUE,
     feature_target = x$feature_target,
     use_holidays = x$use_holidays,
@@ -89,6 +89,7 @@ bake.step_th2_feature_engineering <- function(object,
                                          new_data,
                                          ...) {
   # print(dim(new_data))
+
   target_col <- object$feature_target
   use_holidays <- object$use_holidays
 
@@ -113,7 +114,6 @@ bake.step_th2_feature_engineering <- function(object,
 
   strt <- 1
   for (i in seq_along(object$columns)) {
-
     cols <- (strt):(strt + new_cols[i] - 1)
 
     tmp <- new_data %>%
@@ -150,4 +150,3 @@ print.step_th2_feature_engineering <-
     recipes::print_step(x$columns, x$terms, x$trained, width = width, title = title)
     invisible(x)
   }
-

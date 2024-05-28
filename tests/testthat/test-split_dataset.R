@@ -35,7 +35,7 @@ test_that("test split_dataset function", {
   expect_warning(split_dataset(0, "dteday", "cnt"))
 
   # Check that the input_data is not empty
-  input_data_empty = data.frame()
+  input_data_empty <- data.frame()
   expect_warning(split_dataset(input_data_empty, "dteday", "cnt"))
 
   # check that the dataframe is not smaller than 5
@@ -46,8 +46,4 @@ test_that("test split_dataset function", {
     stringsAsFactors = FALSE
   )
   expect_warning(split_dataset(input_data_few, "dteday", "cnt"))
-
-
-
-
 })

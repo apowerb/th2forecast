@@ -10,17 +10,15 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, use_holidays = TRUE ){
-
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, use_holidays = TRUE) {
   list_output_models <- list()
 
-  if (group_target == "all_columns"){
+  if (group_target == "all_columns") {
     data_tbl <- input_data %>%
-      tidyr::pivot_longer(!date_var , names_to = "id", values_to = target_var) %>%
+      tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
       rename(date = date_var)
     group_target <- "id"
-  }else{
-
+  } else {
     select_vars <- c(group_target, date_var, target_var)
 
     data_tbl <- input_data %>%
@@ -39,7 +37,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   column_value <- as.numeric(count_data[1])
   num_ids <- length(names(count_data[count_data > 1]))
 
-  train_size <- round((nrow(data_tbl)/ num_ids) * 0.8)
+  train_size <- round((nrow(data_tbl) / num_ids) * 0.8)
   test_size <- column_value - train_size
 
   nested_data_tbl <- data_tbl %>%
@@ -57,9 +55,9 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     )
 
   for (i in 1:nrow(nested_data_tbl)) {
-    list_nestede_data <- nested_data_tbl[i,]$.actual_data
+    list_nestede_data <- nested_data_tbl[i, ]$.actual_data
     data_output_t <- preprocessing_data(list_nestede_data)[["dataset_clean"]]
-    nested_data_tbl[i,]$.actual_data[[1]] <- data_output_t
+    nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
   }
 
   nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
@@ -85,22 +83,18 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     } else if(model == "mars"){
       training_model <- th2_mars_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_mars"
-
-    }else if(model == "random_forest"){
+    } else if (model == "random_forest") {
       training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
       label_model <- "model_random_forest"
-
     }else if(model == "xgboost"){
       training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
       print(training_model)
       label_model <- "model_xgboost"
-
     } else {
       error_models <- c(NULL, model)
     }
 
     list_output_models[[label_model]] <- training_model
-
   }
 
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
@@ -121,7 +115,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
-    .include_actual = FALSE) %>%
+      .include_actual = FALSE
+    ) %>%
     dplyr::mutate(as_of = Sys.Date()) %>%
     dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
     dplyr::mutate(end_date = max(input_data[[date_var]]))
@@ -129,4 +124,3 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   return(forecast_result)
 }
-
