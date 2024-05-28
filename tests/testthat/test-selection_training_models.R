@@ -3,7 +3,7 @@ data <- split_dataset(data, "date", "value")$traintest
 
 # Test for th2_arima_engine
 test_that("th2_arima_engine returns an ARIMA model", {
-  model_arima <- th2_arima_engine(data, "value", "date", engine="auto_arima")
+  model_arima <- th2_arima_engine(data, "value", "date", engine = "auto_arima")
   expect_is(model_arima, "model_fit")
 })
 
@@ -30,7 +30,8 @@ test_that("th2_mars_engine returns a MARS model", {
     "value",
     "date",
     engine = "earth",
-    mars_features = "month")
+    mars_features = "month"
+  )
   expect_is(model_mars, "workflow")
 
   expect_warning(th2_mars_engine(
@@ -38,8 +39,8 @@ test_that("th2_mars_engine returns a MARS model", {
     "valor",
     "date",
     engine = "earth",
-    mars_features = "month")
-    )
+    mars_features = "month"
+  ))
 })
 
 
@@ -59,11 +60,10 @@ test_that("th2_xgboost returns a workflow", {
 
 # Test for model_selection_train
 test_that("model_selection_train returns a modeltime table", {
-
   # Test outputs
   model_table <- model_selection_train(
     data, c("prophet", "lr", "mars"), "value", "date"
-    )
+  )
 
   # Test for classes of model_table
   expect_s3_class(model_table, c("mdl_time_tbl", "tbl_df", "tbl", "data.frame"))
@@ -71,28 +71,32 @@ test_that("model_selection_train returns a modeltime table", {
   # Test errors
   expect_warning(
     model_selection_train(
-      data, c("prophet", "lr", "mars"), "valores", "date")
+      data, c("prophet", "lr", "mars"), "valores", "date"
     )
+  )
 
   expect_warning(
     model_selection_train(
-      data, c(), "value", "date")
+      data, c(), "value", "date"
     )
+  )
 
   expect_warning(
     model_selection_train(
-      data, 123, "value", "date")
+      data, 123, "value", "date"
     )
+  )
 
   expect_warning(
     model_selection_train(
-      data, c("profeta", "lr", "marte"), "value", "date")
+      data, c("profeta", "lr", "marte"), "value", "date"
     )
+  )
 
   dataframe_test <- data.frame()
   expect_warning(
     model_selection_train(
-      dataframe_test, c("prophet", "lr", "mars"), "value", "date")
+      dataframe_test, c("prophet", "lr", "mars"), "value", "date"
     )
-
+  )
 })

@@ -9,21 +9,18 @@
 #' @export
 #'
 #' @examples
-anomaly_detection <- function(input_data, input_alpha = 0.05, max_anoms = 0.2){
-
-  if (is.data.frame(input_data))
-  {
-    if( nrow(input_data) == 0 || ncol(input_data) == 0  ){
+anomaly_detection <- function(input_data, input_alpha = 0.05, max_anoms = 0.2) {
+  if (is.data.frame(input_data)) {
+    if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty."))
     }
 
-    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct") )
+    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
     var_date_feature <- colnames(input_data[, date_variable])
 
     filter_targets <- colnames(input_data %>% dplyr::select(-all_of(var_date_feature)))
 
     for (variable in filter_targets) {
-
       col_clean <- input_data %>%
         anomalize::time_decompose(variable, merge = TRUE, message = FALSE) %>%
         anomalize::anomalize(remainder, alpha = input_alpha, max_anoms = max_anoms) %>%
@@ -33,10 +30,9 @@ anomaly_detection <- function(input_data, input_alpha = 0.05, max_anoms = 0.2){
     }
 
     return(input_data)
-  }else{
+  } else {
     return(warning("The *input_date* variable is not a data.frame ."))
   }
-
 }
 
 
@@ -50,37 +46,35 @@ anomaly_detection <- function(input_data, input_alpha = 0.05, max_anoms = 0.2){
 #' @export
 #'
 #' @examples
-outliers_detection <- function(input_data, method_ls = "cpt"){
-  if (is.data.frame(input_data))
-  {
-
-    if( nrow(input_data) == 0 || ncol(input_data) == 0  ){
+outliers_detection <- function(input_data, method_ls = "cpt") {
+  if (is.data.frame(input_data)) {
+    if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty."))
     }
 
-    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct") )
+    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
     var_date_feature <- colnames(input_data[, date_variable])
 
     filter_targets <- colnames(input_data %>% dplyr::select(-all_of(var_date_feature)))
 
     for (variable in filter_targets) {
-
       y <- ts(unlist(input_data[variable]))
 
-      if (method_ls == "tso")
-      {
-        resul_out <- tsoutliers::tso(y, xreg = NULL, cval = 3.5, delta = 0.7,
-                         # types = c("AO", "LS", "TC"),
-                         types = c("LS"),
-                         maxit = 1, maxit.iloop = 4, maxit.oloop = 4, cval.reduce = 0.14286,
-                         discard.method = c("en-masse", "bottom-up"), discard.cval = NULL,
-                         # discard.method = c("bottom-up"), discard.cval = NULL,
-                         tsmethod = c("auto.arima", "arima"),
-                         # tsmethod = c("auto.arima"),
-                         args.tsmethod = NULL, logfile = NULL, check.rank = FALSE)
+      if (method_ls == "tso") {
+        resul_out <- tsoutliers::tso(y,
+          xreg = NULL, cval = 3.5, delta = 0.7,
+          # types = c("AO", "LS", "TC"),
+          types = c("LS"),
+          maxit = 1, maxit.iloop = 4, maxit.oloop = 4, cval.reduce = 0.14286,
+          discard.method = c("en-masse", "bottom-up"), discard.cval = NULL,
+          # discard.method = c("bottom-up"), discard.cval = NULL,
+          tsmethod = c("auto.arima", "arima"),
+          # tsmethod = c("auto.arima"),
+          args.tsmethod = NULL, logfile = NULL, check.rank = FALSE
+        )
 
         input_data[variable] <- resul_out$yadj
-      }else if(method_ls == "cpt") {
+      } else if (method_ls == "cpt") {
         cpt <- changepoint::cpt.meanvar(y)
 
         indexes_cpt <- c(1, cpt@cpts, length(y))
@@ -93,78 +87,16 @@ outliers_detection <- function(input_data, method_ls = "cpt"){
         }
 
         input_data[variable] <- fixed_series
-      }else{
+      } else {
         return(warning("The selected *method* does not exist."))
       }
     }
     return(input_data)
-  }else{
+  } else {
     return(warning("The *input_date* variable is not a data.frame ."))
   }
 }
 
-#' Sélection des jours fériés/holidays
-#'
-#' @param input_data Dataframe
-#' @param model modèle qui requiert l'information
-#' @param calendar calendrier à utiliser
-#' @param region champ spécifique pour la France, possibilité de choisir une région
-#'
-#' @return liste des jours fériés
-#' @export
-#'
-#' @examples
-holidays_detection <- function(input_data, model, calendar = "calendar_france" , region = "metropole"){
-
-  url <-  paste0("https://calendrier.api.gouv.fr/jours-feries/",region,".json")
-
-  holidays_req <-
-    httr2::request(base_url = url) %>%
-    httr2::req_method("GET")
-
-  holidays_resp <- holidays_req %>%
-    httr2::req_perform(verbosity = 0)
-
-  list_holidays <- holidays_resp %>%
-    httr2::resp_body_json()
-
-
-  if ( model == "ml"){
-
-    holidays <- names(list_holidays)
-
-    bizdays::create.calendar(
-      name = "calendar_france", holidays = holidays, weekdays = c("sunday", "saturday")
-    )
-
-    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct") )
-    var_date_feature <- colnames(input_data[, date_variable])
-
-    bizdays::bizdays.options$set(default.calendar = calendar)
-
-    holidays <- bizdays::is.bizday(input_data[[var_date_feature]]) %>%
-      as.integer()
-
-    return(holidays)
-
-  }else{
-    values <- c()
-
-    for(i in list_holidays) {
-      values <- c(values, i)
-    }
-
-    dataframe_holidays <- tibble::data_frame(
-      holiday = values,
-      ds = as.Date(names(list_holidays)),
-      lower_window = 0,
-      upper_window = 0
-    )
-
-    return(dataframe_holidays)
-  }
-
-}
 
 #' Prétraitement d'une Dataset
 #'
@@ -179,27 +111,22 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france" ,
 #' @examples
 #' preprocessing_data(input_data)
 preprocessing_data <- function(input_data){
-
   if (is.data.frame(input_data) || is.list(input_data))
   {
     if(is.list(input_data)){
       input_data <- as.data.frame(input_data)
       input_data <- as_tibble(input_data)
     }
-
-    if( nrow(input_data) == 0 || ncol(input_data) == 0  ){
+    if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty."))
     }
-
     input_data <- janitor::clean_names(input_data)
     input_data <- na.omit(input_data)
     input_data <- janitor::remove_empty(input_data)
-
     output_data <- unique(input_data)
-
     output_data <- anomaly_detection(output_data, input_alpha = 0.05, max_anoms = 0.2)
-
     output_data <- outliers_detection(output_data, method_ls = "cpt")
+  } else {
 
     number_miss <- naniar::n_miss(output_data)
 

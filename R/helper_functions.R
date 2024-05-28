@@ -2,6 +2,6 @@
 #' @description
 #' say hello thaink2
 #' @export
-hello_th2 <- function(){
+hello_th2 <- function() {
   print("helloooo")
 }

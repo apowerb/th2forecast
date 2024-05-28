@@ -8,26 +8,19 @@ mod_th2_forecasting_ui <- function(id) {
     fluidRow(
 
       # Inputs
-      column(width = 2,  fileInput(ns("dataset"), "Upload your data file:", accept = c(".csv"))),
-
+      column(width = 2, fileInput(ns("dataset"), "Upload your data file:", accept = c(".csv"))),
       column(width = 2, uiOutput(ns("feature_target"))),
-
-      column(width = 2, selectInput(ns("models"), "Select Model", choices = c("ARIMA" = "arima", "Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest", "XGBoost" = "xgboost") , multiple = TRUE)),
-
+      column(width = 2, selectInput(ns("models"), "Select Model", choices = c("ARIMA" = "arima", "Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest", "XGBoost" = "xgboost"), multiple = TRUE)),
       column(width = 2, uiOutput(ns("conditional_features"))),
-
       column(width = 2, uiOutput(ns("cond_start_date"))),
-
       column(width = 2, uiOutput(ns("cond_end_date"))),
-
       column(width = 2, uiOutput(ns("cond_forecast_predic"))),
 
       # Buttons
-      column(width = 2, actionButton(inputId = ns("clean_data") , label = "Clean Data" , class = "btn-primary")),
+      column(width = 2, actionButton(inputId = ns("clean_data"), label = "Clean Data", class = "btn-primary")),
       # actionButton(inputId = ns("feature_engi") , label = "Feature engineering" , value = NULL),
       # actionButton(inputId = ns("train_model") , label = "Training" , value = NULL),
-      column(width = 2, actionButton(inputId = ns("forecasting") , label = "Forecasting" , class = "btn-primary")),
-
+      column(width = 2, actionButton(inputId = ns("forecasting"), label = "Forecasting", class = "btn-primary")),
     ),
 
     # Display interface
@@ -35,15 +28,13 @@ mod_th2_forecasting_ui <- function(id) {
       column(width = 12, uiOutput(ns("plot_forecast")))
     )
   )
-
 }
 
 
 #' mod_th2_forecasting_server
 #' @export
 
-mod_th2_forecasting_server<- function(id) {
-
+mod_th2_forecasting_server <- function(id) {
   models_trained <- reactiveVal(NULL)
   start_date <- reactiveVal(NULL)
   end_date <- reactiveVal(NULL)
@@ -64,9 +55,9 @@ mod_th2_forecasting_server<- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     # Function to recover csv file
-    input_csv  <- reactive({
+    input_csv <- reactive({
       if (is.null(input$dataset)) {
-        shinyalert("Warning", "You must select a data set.", type = "info" )
+        shinyalert("Warning", "You must select a data set.", type = "info")
         return("")
       }
       readr::read_csv(file = input$dataset$datapath)
@@ -74,7 +65,6 @@ mod_th2_forecasting_server<- function(id) {
 
     # Generation of inputs when loading datasets
     observeEvent(input$dataset, {
-
       # Read dataset
       data_input(input_csv())
 
@@ -111,38 +101,33 @@ mod_th2_forecasting_server<- function(id) {
 
       output$cond_forecast_predic <- renderUI({
         sliderInput(ns("forecast_predic"), "Forecast horizon:", min = min_horizon, max = max_horizon, value = value_horizon)
-
       })
 
       output$conditional_features <- renderUI({
-        if (any(input$models %in% c("xgboost", "random_forest")) && length(input$models) != 0  ) {
-            tagList(
-              selectInput(ns("features_variables"), "Features variables:", choices = list_features , multiple = TRUE),
-              actionButton(inputId = ns("feature_engineering") , label = "Feature engineering" , value = NULL),
-              hr()
-            )
-        }else if(is.null(input$models))
-        {
+        if (any(input$models %in% c("xgboost", "random_forest")) && length(input$models) != 0) {
+          tagList(
+            selectInput(ns("features_variables"), "Features variables:", choices = list_features, multiple = TRUE),
+            actionButton(inputId = ns("feature_engineering"), label = "Feature engineering", value = NULL),
+            hr()
+          )
+        } else if (is.null(input$models)) {
           ""
         }
       })
 
       # Clear graphic and variables
-      output$plot_forecast <- renderUI({return(NULL)})
-
-
+      output$plot_forecast <- renderUI({
+        return(NULL)
+      })
     })
 
-############################################################################################################
-    #Data Clean
+    ############################################################################################################
+    # Data Clean
     observeEvent(input$clean_data, {
-
       # Dataset validation
       if (is.null(input$dataset)) {
-        shinyalert("Warning", "You must select a data set.", type = "info" )
-      }
-      else
-      {
+        shinyalert("Warning", "You must select a data set.", type = "info")
+      } else {
         # Read dataset
         data <- input_csv()
 
@@ -178,31 +163,25 @@ mod_th2_forecasting_server<- function(id) {
 
 
         # Clear graphic and variables
-        output$plot_forecast <- renderUI({return(NULL)})
+        output$plot_forecast <- renderUI({
+          return(NULL)
+        })
 
         models_trained(NULL)
         # models_predictions(NULL)
         shinyalert("Processed data!", "The data was cleaned and the variables were selected.", type = "success")
       }
-
     })
 
     observeEvent(input$feature_engineering, {
-
       # Dataset and inputs validation
       if (is.null(input$dataset)) {
-        shinyalert("Warning", "You must select a data set.", type = "info" )
-      }
-      else if (length(input$models) == 0) {
-        shinyalert("Warning", "You must select at least one model.", type = "info" )
-      }
-      else if (length(input$features) == 0)
-      {
-        shinyalert("Warning", "You must select at least one target.", type = "info" )
-      }
-      else
-      {
-
+        shinyalert("Warning", "You must select a data set.", type = "info")
+      } else if (length(input$models) == 0) {
+        shinyalert("Warning", "You must select at least one model.", type = "info")
+      } else if (length(input$features) == 0) {
+        shinyalert("Warning", "You must select at least one target.", type = "info")
+      } else {
         # Input recovery
         feature_target <- input$features
         features_variables <- input$features_variables
@@ -218,9 +197,9 @@ mod_th2_forecasting_server<- function(id) {
         # {
 
         # Validation of dataset to use
-        if (nrow(data_clean()) == 0 || is.null(data_clean())){
+        if (nrow(data_clean()) == 0 || is.null(data_clean())) {
           data_features <- data_input()
-        }else{
+        } else {
           data_features <- data_clean()
         }
 
@@ -230,7 +209,9 @@ mod_th2_forecasting_server<- function(id) {
 
         data_feature_train(data_features)
 
-        output$plot_forecast <- renderUI({return(NULL)})
+        output$plot_forecast <- renderUI({
+          return(NULL)
+        })
 
         shinyalert("Processed data!", "Feature generation was correct.", type = "success")
         # }
@@ -238,31 +219,25 @@ mod_th2_forecasting_server<- function(id) {
     })
 
 
-##############################################################################################################
+    ##############################################################################################################
 
-    #Forecasting
+    # Forecasting
     observeEvent(input$forecasting, {
       # Dataset and inputs validation
       if (is.null(input$dataset)) {
-        shinyalert("Warning", "You must select a data set.", type = "info" )
-      }
-      else if (length(input$models) == 0) {
-        shinyalert("Warning", "You must select at least one model.", type = "info" )
-      }
-      else if (length(input$features) == 0)
-      {
-        shinyalert("Warning", "You must select at least one target.", type = "info" )
-      }
-      else
-      {
+        shinyalert("Warning", "You must select a data set.", type = "info")
+      } else if (length(input$models) == 0) {
+        shinyalert("Warning", "You must select at least one model.", type = "info")
+      } else if (length(input$features) == 0) {
+        shinyalert("Warning", "You must select at least one target.", type = "info")
+      } else {
         # Input recovery
         forecast_horizon <- input$forecast_predic
         list_models <- input$models
 
-        if(is.null(data_feature_train()) && (any(list_models %in% c("random_forest", "xgboost")))){
-          shinyalert("Warning", "You must do feature engineering.", type = "info" )
-        }else{
-
+        if (is.null(data_feature_train()) && (any(list_models %in% c("random_forest", "xgboost")))) {
+          shinyalert("Warning", "You must do feature engineering.", type = "info")
+        } else {
           # Graphic forecast
           output$plot_forecast <- renderUI({
             tagList(
@@ -273,20 +248,18 @@ mod_th2_forecasting_server<- function(id) {
           })
 
           # Validation for new training or to show predictions already made
-          if ( is.null(models_trained()) || forecast_horizon > first_horizon() ||
-               (is.null(models_trained()) || nrow(models_trained()) != length(list_models))
-               || start_date() != input$start_date
-               || end_date() != input$end_date
-               || var_target() != input$features
-               )
-          {
-
+          if (is.null(models_trained()) || forecast_horizon > first_horizon() ||
+            (is.null(models_trained()) || nrow(models_trained()) != length(list_models)) ||
+            start_date() != input$start_date ||
+            end_date() != input$end_date ||
+            var_target() != input$features
+          ) {
             # Validation of dataset to use
-            if ((nrow(data_clean()) == 0 || is.null(data_clean())) && (nrow(data_feature_train()) == 0 || is.null(data_feature_train()))){
+            if ((nrow(data_clean()) == 0 || is.null(data_clean())) && (nrow(data_feature_train()) == 0 || is.null(data_feature_train()))) {
               data_train(data_input())
-            }else if (nrow(data_feature_train()) > 0 && !is.null(data_feature_train())) {
+            } else if (nrow(data_feature_train()) > 0 && !is.null(data_feature_train())) {
               data_train(data_feature_train())
-            }else{
+            } else {
               data_train(data_clean())
             }
 
@@ -294,8 +267,9 @@ mod_th2_forecasting_server<- function(id) {
             forecast_horizon <- input$forecast_predic
 
             # Horizon forecast validation
-            if (forecast_horizon > first_horizon() )
-            {first_horizon(input$forecast_predic)}
+            if (forecast_horizon > first_horizon()) {
+              first_horizon(input$forecast_predic)
+            }
 
             # Sub dataset according to time period
             start_date(as.Date(input$start_date))
@@ -326,17 +300,15 @@ mod_th2_forecasting_server<- function(id) {
               )
 
             # Model prediction
-            models_predictions <- prediction_forecast(data_train(), models_evaluated, h=first_horizon())
+            models_predictions <- prediction_forecast(data_train(), models_evaluated, h = first_horizon())
 
-            if (inherits(data_train()[[var_date_feature()]][1], "Date"))
-            {
+            if (inherits(data_train()[[var_date_feature()]][1], "Date")) {
               limit_date <- sort(data_train()[[var_date_feature()]], decreasing = TRUE)[1] + forecast_horizon
-            }else if(inherits(data_train()[[var_date_feature()]][1], "POSIXct"))
-            {
+            } else if (inherits(data_train()[[var_date_feature()]][1], "POSIXct")) {
               limit_date <- sort(data_train()[[var_date_feature()]], decreasing = TRUE)[1] + hours(forecast_horizon)
             }
 
-            df_prediction_test_forecas(dplyr::bind_rows(df_models_evaluated, models_predictions[ nrow(data_train())+1 : nrow(data_train()), ]))
+            df_prediction_test_forecas(dplyr::bind_rows(df_models_evaluated, models_predictions[nrow(data_train()) + 1:nrow(data_train()), ]))
 
             plot_prediction_test_forecas <- df_prediction_test_forecas() %>%
               dplyr::filter(.index <= as.Date(limit_date))
@@ -350,35 +322,29 @@ mod_th2_forecasting_server<- function(id) {
 
             # Show forecast performance
             output$table_performance <- renderTable(table_performance)
-
-          }else{
-
+          } else {
             # Show forecast graph according to the prediction already made
             forecast_horizon <- input$forecast_predic
 
-            if (inherits(data_train()[[var_date_feature()]][1], "Date"))
-            {
+            if (inherits(data_train()[[var_date_feature()]][1], "Date")) {
               limit_date_show <- sort(data_train()[[var_date_feature()]], decreasing = TRUE)[1] + forecast_horizon
-            }else if(inherits(data_train()[[var_date_feature()]][1], "POSIXct"))
-            {
+            } else if (inherits(data_train()[[var_date_feature()]][1], "POSIXct")) {
               limit_date_show <- sort(data_train()[[var_date_feature()]], decreasing = TRUE)[1] + hours(forecast_horizon)
             }
 
             plot_prediction_test_forecas <- df_prediction_test_forecas() %>%
               dplyr::filter(.index <= as.Date(limit_date_show))
             plot_predictions <- plot_prediction_test_forecas %>%
-              modeltime::plot_modeltime_forecast( .legend_max_width = 15)
+              modeltime::plot_modeltime_forecast(.legend_max_width = 15)
 
 
             # Show forecast graphs
             output$plot_result_forecasting <- renderPlotly({
               plotly::ggplotly(plot_predictions)
             })
-
           }
         }
       }
-
     })
-  }
-  )}
+  })
+}

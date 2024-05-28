@@ -16,7 +16,6 @@ test_that("test th2_resamples function", {
 })
 
 test_that("test th2_tune_model function", {
-
   # Create a test data set
   data_test <- m750
 
@@ -52,7 +51,6 @@ test_that("test th2_tune_model function", {
 
 
 test_that("test th2_ensemble_engine function", {
-
   # Create a test data set
   data_test <- m750
 
@@ -70,6 +68,4 @@ test_that("test th2_ensemble_engine function", {
 
   # Checks that the function returns an object of the correct class
   expect_s3_class(res, c("modeltime_table", "tbl_df", "tbl", "data.frame"))
-
 })
-
