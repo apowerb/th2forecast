@@ -61,6 +61,15 @@ feature_selection <- function(
       data_features["holidays"] <- holidays_list
     }
 
+    # print(nrow(data_features))
+    # data_signature <- timetk::tk_get_timeseries_signature(data_features[[var_date_feature]]) %>%
+    #   janitor::remove_empty() %>%
+    #   janitor::remove_constant() %>%
+    #   dplyr::select(-index, -diff, -wday.lbl, -month.lbl)
+    #
+    # data_features <- cbind(data_features, data_signature)
+    # print(data_features)
+
     data_features["month"]  <- lubridate::month(data_features[[var_date_feature]])
 
     if (inherits(data_features[[var_date_feature]], "POSIXct")) {

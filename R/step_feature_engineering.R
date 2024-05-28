@@ -88,10 +88,15 @@ prep.step_th2_feature_engineering <- function(x,
 bake.step_th2_feature_engineering <- function(object,
                                          new_data,
                                          ...) {
+  # print(dim(new_data))
   target_col <- object$feature_target
   use_holidays <- object$use_holidays
 
-  feat_len <- 11
+  feat_len <- (feature_selection(new_data, feature_target = target_col, use_holidays = use_holidays) %>% ncol()) - 2
+  # print("size")
+  # print(feat_len)
+
+  # feat_len <- 11
 
   new_cols <- rep(
     feat_len,
@@ -134,7 +139,7 @@ bake.step_th2_feature_engineering <- function(object,
   if (!tibble::is_tibble(new_data)) {
     new_data <- tibble::as_tibble(new_data)
   }
-
+  # print(dim(new_data))
   new_data
 }
 

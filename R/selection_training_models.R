@@ -297,7 +297,7 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2 , tree
   }else if(fit_model == "bulk"){
 
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays)%>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays) %>%
       recipes::step_rm(var_date)
 
     model_xgboost_fit <- workflows::workflow() %>%

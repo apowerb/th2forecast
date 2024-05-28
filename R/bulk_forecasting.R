@@ -32,7 +32,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   }
 
   data_tbl <-  data_tbl %>%
-    dplyr::group_by_at(vars(date_var, group_target)) %>%
+    dplyr::group_by_at(vars("date", group_target)) %>%
     dplyr::summarise_at(vars(target_var), sum)
 
   count_data <- table(data_tbl[[group_target]])
@@ -71,19 +71,19 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     label_model <- ""
 
     if(model == "arima"){
-      training_model <- th2_arima_engine(nested_data, target_var, date_var, fit_model = "bulk")$fit
+      training_model <- th2_arima_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_arima"
 
     } else if(model == "prophet"){
-      training_model <- th2_prophet_engine(nested_data, target_var, date_var, use_holidays = use_holidays, fit_model = "bulk")$fit
+      training_model <- th2_prophet_engine(nested_data, target_var, "date", use_holidays = use_holidays, fit_model = "bulk")$fit
       label_model <- "model_prophet"
 
     } else  if(model == "lr"){
-      training_model <- th2_linear_engine(nested_data, target_var, date_var, fit_model = "bulk")$fit
+      training_model <- th2_linear_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_lm"
 
     } else if(model == "mars"){
-      training_model <- th2_mars_engine(nested_data, target_var, date_var, fit_model = "bulk")$fit
+      training_model <- th2_mars_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_mars"
 
     }else if(model == "random_forest"){
@@ -91,7 +91,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       label_model <- "model_random_forest"
 
     }else if(model == "xgboost"){
-      training_model <- th2_xgboost_engine(nested_data, date_var, target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
+      training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
       print(training_model)
       label_model <- "model_xgboost"
 
@@ -104,9 +104,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   }
 
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
-
-  print(nested_modeltime_tbl %>%
-          extract_nested_error_report())
 
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
