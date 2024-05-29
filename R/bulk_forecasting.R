@@ -96,6 +96,22 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
 
+  print(nested_modeltime_tbl %>%
+          extract_nested_error_report())
+
+  print(nested_modeltime_tbl %>%
+          modeltime::extract_nested_test_accuracy() %>%
+          modeltime::table_modeltime_accuracy(.interactive = F))
+
+  print(nested_modeltime_tbl %>%
+          modeltime::extract_nested_test_forecast() %>%
+          group_by(id) %>%
+          filter(id == "GROCERY I") %>%
+          modeltime::plot_modeltime_forecast(
+            .facet_ncol  = 1,
+            .interactive = FALSE
+          ))
+
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
       metric                = "rmse",
@@ -108,6 +124,15 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     modeltime::modeltime_nested_refit(
       control = modeltime::control_nested_refit(verbose = TRUE)
     )
+
+  print(nested_modeltime_refit_tbl %>%
+          modeltime::extract_nested_future_forecast() %>%
+          group_by(id) %>%
+          filter(id == "GROCERY I") %>%
+          modeltime::plot_modeltime_forecast(
+            .interactive = FALSE,
+            .facet_ncol  = 1
+          ))
 
 
   forecast_result <- nested_modeltime_refit_tbl %>%

@@ -255,7 +255,7 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 #' @return Un modèle XGBoost entraîné.
 #' @export
 #' @examples
-th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees = 15, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, fit_model = TRUE) {
+th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees = 200, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, fit_model = TRUE) {
   model_xgboost <-
     parsnip::boost_tree(
       mtry = ifelse(fit_model == FALSE, tune(), mtry),
