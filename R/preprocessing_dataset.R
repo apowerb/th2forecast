@@ -62,15 +62,15 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 
       if (method_ls == "tso") {
         resul_out <- tsoutliers::tso(y,
-          xreg = NULL, cval = 3.5, delta = 0.7,
-          # types = c("AO", "LS", "TC"),
-          types = c("LS"),
-          maxit = 1, maxit.iloop = 4, maxit.oloop = 4, cval.reduce = 0.14286,
-          discard.method = c("en-masse", "bottom-up"), discard.cval = NULL,
-          # discard.method = c("bottom-up"), discard.cval = NULL,
-          tsmethod = c("auto.arima", "arima"),
-          # tsmethod = c("auto.arima"),
-          args.tsmethod = NULL, logfile = NULL, check.rank = FALSE
+                                     xreg = NULL, cval = 3.5, delta = 0.7,
+                                     # types = c("AO", "LS", "TC"),
+                                     types = c("LS"),
+                                     maxit = 1, maxit.iloop = 4, maxit.oloop = 4, cval.reduce = 0.14286,
+                                     discard.method = c("en-masse", "bottom-up"), discard.cval = NULL,
+                                     # discard.method = c("bottom-up"), discard.cval = NULL,
+                                     tsmethod = c("auto.arima", "arima"),
+                                     # tsmethod = c("auto.arima"),
+                                     args.tsmethod = NULL, logfile = NULL, check.rank = FALSE
         )
 
         input_data[variable] <- resul_out$yadj
@@ -98,6 +98,64 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 }
 
 
+#' Sélection des jours fériés/holidays
+#'
+#' @param input_data Dataframe
+#' @param model modèle qui requiert l'information
+#' @param calendar calendrier à utiliser
+#' @param region champ spécifique pour la France, possibilité de choisir une région
+#'
+#' @return liste des jours fériés
+#' @export
+#'
+#' @examples
+holidays_detection <- function(input_data, model, calendar = "calendar_france" , region = "metropole") {
+  url <-  paste0("https://calendrier.api.gouv.fr/jours-feries/",region,".json")
+
+  holidays_req <- httr2::request(base_url = url) %>%
+    httr2::req_method("GET")
+
+  holidays_resp <- holidays_req %>%
+    httr2::req_perform(verbosity = 0)
+
+  list_holidays <- holidays_resp %>%
+    httr2::resp_body_json()
+
+  if ( model == "ml") {
+    holidays <- names(list_holidays)
+
+    bizdays::create.calendar(
+      name = "calendar_france", holidays = holidays, weekdays = c("sunday", "saturday")
+    )
+
+    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct") )
+    var_date_feature <- colnames(input_data[, date_variable])
+
+    bizdays::bizdays.options$set(default.calendar = calendar)
+
+    holidays <- bizdays::is.bizday(input_data[[var_date_feature]]) %>%
+      as.integer()
+
+    return(holidays)
+  } else {
+    values <- c()
+
+    for(i in list_holidays) {
+      values <- c(values, i)
+    }
+
+    dataframe_holidays <- tibble::data_frame(
+      holiday = values,
+      ds = as.Date(names(list_holidays)),
+      lower_window = 0,
+      upper_window = 0
+    )
+
+    return(dataframe_holidays)
+  }
+}
+
+
 #' Prétraitement d'une Dataset
 #'
 #' Une fonction pour nettoyer les données (suppression des valeurs manquantes, détection des valeurs redondantes et analyse des anomalies).
@@ -110,11 +168,12 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 #'
 #' @examples
 #' preprocessing_data(input_data)
-preprocessing_data <- function(input_data) {
-  if (is.data.frame(input_data) || is.list(input_data)) {
-    if (is.list(input_data)) {
+preprocessing_data <- function(input_data){
+  if (is.data.frame(input_data) || is.list(input_data))
+  {
+    if(is.list(input_data)){
       input_data <- as.data.frame(input_data)
-      input_data <- as_tibble(input_data)
+      input_data <- tibble::as_tibble(input_data)
     }
     if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty."))
@@ -122,6 +181,7 @@ preprocessing_data <- function(input_data) {
     input_data <- janitor::clean_names(input_data)
     input_data <- na.omit(input_data)
     input_data <- janitor::remove_empty(input_data)
+
     output_data <- unique(input_data)
     output_data <- anomaly_detection(output_data, input_alpha = 0.05, max_anoms = 0.2)
     output_data <- outliers_detection(output_data, method_ls = "cpt")
@@ -130,8 +190,10 @@ preprocessing_data <- function(input_data) {
     number_complet <- naniar::n_complete(output_data)
     percent_complet <- naniar::prop_complete(output_data)
     detail_missing <- naniar::miss_var_summary(output_data)
-    list("dataset_clean" = output_data, "numnber_missing" = number_miss)
-  } else {
+
+    list("dataset_clean"=output_data, "numnber_missing" = number_miss)
+
+  }else{
     return(warning("The *input_date* variable is not a data.frame ."))
   }
 }
