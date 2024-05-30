@@ -209,7 +209,7 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 #' @export
 #'
 #' @examples
-th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, use_holidays = TRUE, fit_model = TRUE) {
+th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, use_holidays = TRUE, fit_model = TRUE, all_data = "") {
   model_rf <- parsnip::rand_forest(
     # min_n = ifelse(fit_model, min_n, tune()),
     # trees = ifelse(fit_model, trees, tune())
@@ -226,8 +226,9 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
     model_rf_fit <- model_rf %>%
       parsnip::fit(formula, data = input_data)
   } else if (fit_model == "bulk") {
+
     recipe_rf <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays)
+      step_th2_feature_engineering(var_target, feature_target = var_target, use_holidays = use_holidays, all_data = all_data, id_name = NULL)
 
     model_rf_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_rf) %>%

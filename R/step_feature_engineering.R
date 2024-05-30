@@ -21,6 +21,8 @@ step_th2_feature_engineering <-
            trained = FALSE,
            feature_target = "",
            use_holidays = TRUE,
+           all_data = "",
+           id_name = "",
            columns = NULL,
            id = recipes::rand_id("th2_feature_engineering")) {
     recipes::add_step(
@@ -32,6 +34,8 @@ step_th2_feature_engineering <-
         trained = trained,
         feature_target = feature_target,
         use_holidays = use_holidays,
+        all_data = all_data,
+        id_name = id_name,
         columns = columns,
         id = id
       )
@@ -46,6 +50,8 @@ step_th2_feature_engineering_new <-
            trained,
            feature_target,
            use_holidays,
+           all_data,
+           id_name,
            columns,
            id) {
     recipes::step(
@@ -56,6 +62,8 @@ step_th2_feature_engineering_new <-
       trained = trained,
       feature_target = feature_target,
       use_holidays = use_holidays,
+      all_data = all_data,
+      id_name = id_name,
       columns = columns,
       id = id
     )
@@ -78,6 +86,8 @@ prep.step_th2_feature_engineering <- function(x,
     trained = TRUE,
     feature_target = x$feature_target,
     use_holidays = x$use_holidays,
+    all_data = x$all_data,
+    id_name = x$id_name,
     columns = col_names,
     id = x$id
   )
@@ -92,6 +102,15 @@ bake.step_th2_feature_engineering <- function(object,
 
   target_col <- object$feature_target
   use_holidays <- object$use_holidays
+
+  all_data <- object$all_data
+  print("all_data")
+  print(dim(all_data))
+
+  print("data")
+  print(dim(new_data))
+
+  print(object$id_name)
 
   feat_len <- (feature_selection(new_data, feature_target = target_col, use_holidays = use_holidays) %>% ncol()) - 2
   # print("size")

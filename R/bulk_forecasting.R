@@ -57,10 +57,12 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   for (i in 1:nrow(nested_data_tbl)) {
     list_nestede_data <- nested_data_tbl[i, ]$.actual_data
     data_output_t <- preprocessing_data(list_nestede_data)[["dataset_clean"]]
+    data_output_t["name_id"] <- nested_data_tbl[i, 1]
     nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
   }
 
-  nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
+  nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)[,1:3]
+  View(nested_data)
 
   for (model in models_list) {
     # tune -- for
@@ -81,7 +83,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       training_model <- th2_mars_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_mars"
     } else if (model == "random_forest") {
-      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
+      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = use_holidays, fit_model = "bulk", all_data = nested_data_tbl)$fit
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
       training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
@@ -97,20 +99,20 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
 
   print(nested_modeltime_tbl %>%
-          extract_nested_error_report())
+    extract_nested_error_report())
 
   print(nested_modeltime_tbl %>%
-          modeltime::extract_nested_test_accuracy() %>%
-          modeltime::table_modeltime_accuracy(.interactive = F))
+    modeltime::extract_nested_test_accuracy() %>%
+    modeltime::table_modeltime_accuracy(.interactive = F))
 
   print(nested_modeltime_tbl %>%
-          modeltime::extract_nested_test_forecast() %>%
-          group_by(id) %>%
-          filter(id == "GROCERY I") %>%
-          modeltime::plot_modeltime_forecast(
-            .facet_ncol  = 1,
-            .interactive = FALSE
-          ))
+    modeltime::extract_nested_test_forecast() %>%
+    group_by(id) %>%
+    # filter(id == "GROCERY I") %>%
+    modeltime::plot_modeltime_forecast(
+      .facet_ncol  = 1,
+      .interactive = FALSE
+    ))
 
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
@@ -126,13 +128,13 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     )
 
   print(nested_modeltime_refit_tbl %>%
-          modeltime::extract_nested_future_forecast() %>%
-          group_by(id) %>%
-          filter(id == "GROCERY I") %>%
-          modeltime::plot_modeltime_forecast(
-            .interactive = FALSE,
-            .facet_ncol  = 1
-          ))
+    modeltime::extract_nested_future_forecast() %>%
+    group_by(id) %>%
+    # filter(id == "GROCERY I") %>%
+    modeltime::plot_modeltime_forecast(
+      .interactive = FALSE,
+      .facet_ncol  = 1
+    ))
 
 
   forecast_result <- nested_modeltime_refit_tbl %>%
