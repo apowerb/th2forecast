@@ -29,7 +29,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     #   mutate(id_group = paste(store_nbr, family, sep = "_"))
   }
 
-  data_tbl <-  data_tbl %>%
+  data_tbl <- data_tbl %>%
     dplyr::group_by_at(vars("date", group_target)) %>%
     dplyr::summarise_at(vars(target_var), sum)
 
@@ -68,25 +68,22 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     training_model <- NULL
     label_model <- ""
 
-    if(model == "arima"){
+    if (model == "arima") {
       training_model <- th2_arima_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_arima"
-
-    } else if(model == "prophet"){
+    } else if (model == "prophet") {
       training_model <- th2_prophet_engine(nested_data, target_var, "date", use_holidays = use_holidays, fit_model = "bulk")$fit
       label_model <- "model_prophet"
-
-    } else  if(model == "lr"){
+    } else if (model == "lr") {
       training_model <- th2_linear_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_lm"
-
-    } else if(model == "mars"){
+    } else if (model == "mars") {
       training_model <- th2_mars_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_mars"
     } else if (model == "random_forest") {
       training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
       label_model <- "model_random_forest"
-    }else if(model == "xgboost"){
+    } else if (model == "xgboost") {
       training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
       print(training_model)
       label_model <- "model_xgboost"

@@ -86,8 +86,8 @@ prep.step_th2_feature_engineering <- function(x,
 
 #' @export
 bake.step_th2_feature_engineering <- function(object,
-                                         new_data,
-                                         ...) {
+                                              new_data,
+                                              ...) {
   # print(dim(new_data))
 
   target_col <- object$feature_target

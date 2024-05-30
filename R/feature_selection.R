@@ -68,7 +68,7 @@ feature_selection <- function(
     # data_features <- cbind(data_features, data_signature)
     # print(data_features)
 
-    data_features["month"]  <- lubridate::month(data_features[[var_date_feature]])
+    data_features["month"] <- lubridate::month(data_features[[var_date_feature]])
 
     if (inherits(data_features[[var_date_feature]], "POSIXct")) {
       data_features["hour"] <- lubridate::hour(data_features[[var_date_feature]])
