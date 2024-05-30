@@ -41,20 +41,30 @@ ui <- tagList(
     controlbar = bs4Dash::bs4DashControlbar(
       bs4Dash::controlbarMenu(
         id = "controlMenu",
-        bs4Dash::controlbarItem("User Settings", icon = "users-cog", uiOutput("controlBarUI"))
+        bs4Dash::controlbarItem("User Settings", icon = "users-cog",
+                                uiOutput("clusterUI"),
+                                uiOutput("controlBarUI"))
       )
-    ),
+    )
   )
 )
 
-if (file.exists("../R/initializer.R")) th2forecast:::init_forecast()
+if (file.exists("../R/initializer.R")) th2forecast:::init_envs()
 server <- function(input, output) {
+  if (file.exists("../R/initializer.R")) th2forecast:::init_envs_cluster(cluster = Sys.getenv("CURRENT_CLUSTER"))
   observe({
     tabName <- input$sidebarMenuID
 
     if (tabName == "forecsating_viz") {
       mod_forecasting_viewer_server("forecsating_viz")
     }
+  })
+
+  output$clusterUI <- renderUI({
+    th2blender::mod_cluster_manage_server("cluster")
+    fluidPage(
+      th2blender::mod_cluster_manage_ui("cluster")
+    )
   })
 
   output$controlBarUI <- renderUI({

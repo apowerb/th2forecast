@@ -29,25 +29,15 @@ output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL
 input_data_fetch <- function(prediction_data = NULL, db_conn = NULL, target_table = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL, as_of = NULL) {
   output_data_filtred <- prediction_data %>% dplyr::filter(as_of == !!as_of)
 
-
-
-
-
-  start_date <- dplyr::first(output_data_filtred$start_date)
-  end_date <- dplyr::first(output_data_filtred$end_date)
+  start_date <- as.Date(dplyr::first(output_data_filtred$start_date))
+  end_date <- as.Date(dplyr::first(output_data_filtred$end_date))
 
   query_statement_input <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var}
                                        FROM {target_table}")
 
   query_res_input <- DBI::dbSendQuery(db_conn, statement = query_statement_input)
   historical_data <- DBI::dbFetch(query_res_input)
-
-
-  historical_data[[date_var]] <- as.Date(historical_data[[date_var]])
-
-  historical_data_filtred <- historical_data %>% dplyr::filter(historical_data[[date_var]] >= start_date & historical_data[[date_var]] <= end_date)
-
-
+  historical_data_filtred <- historical_data %>% filter(between(as.Date(historical_data[[date_var]]), start_date, end_date))
   DBI::dbDisconnect(db_conn)
   return(historical_data_filtred)
 }

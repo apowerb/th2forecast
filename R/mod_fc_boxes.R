@@ -27,8 +27,7 @@ mod_fc_boxes_server <-
            selected_info = NULL,
            output_data_result = NULL,
            index = 0,
-           parent_session = NULL
-           ) {
+           parent_session = NULL) {
     moduleServer(id, function(input, output, session) {
       ns <- session$ns
 
@@ -93,22 +92,26 @@ mod_fc_boxes_server <-
 
       observeEvent(input$box_open, {
         selected_info(data[index, ])
-        output_connection <- th2product::decrypt_column(selected_info()['output_meta_connection'])
+        output_connection <- th2product::decrypt_column(selected_info()["output_meta_connection"])
 
         decrypted_output_connection <- jsonlite::fromJSON(output_connection)
-        db_conn <- db_conn_function(dbms = "postgresql",
-                                    user = decrypted_output_connection$username,
-                                    password = decrypted_output_connection$password,
-                                    port = decrypted_output_connection$port ,
-                                    host = decrypted_output_connection$host,
-                                    db_name = decrypted_output_connection$database)
+        db_conn <- db_conn_function(
+          dbms = "postgresql",
+          user = decrypted_output_connection$username,
+          password = decrypted_output_connection$password,
+          port = decrypted_output_connection$port,
+          host = decrypted_output_connection$host,
+          db_name = decrypted_output_connection$database
+        )
 
-        output_data_result(output_data_fetch(db_conn = db_conn,
-                                             target_table = decrypted_output_connection$target_table,
-                                             schema = decrypted_output_connection$schema,
-                                             target_var = selected_info()$target_var,
-                                             group_target_var = selected_info()$group_target_var,
-                                             date_var = selected_info()$date_var))
+        output_data_result(output_data_fetch(
+          db_conn = db_conn,
+          target_table = decrypted_output_connection$target_table,
+          schema = decrypted_output_connection$schema,
+          target_var = selected_info()$target_var,
+          group_target_var = selected_info()$group_target_var,
+          date_var = selected_info()$date_var
+        ))
 
         updateTabsetPanel(session = parent_session, "forecastViz_tabbox", selected = "Forecasting Viewer")
       })

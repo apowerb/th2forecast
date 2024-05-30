@@ -62,15 +62,15 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 
       if (method_ls == "tso") {
         resul_out <- tsoutliers::tso(y,
-                                     xreg = NULL, cval = 3.5, delta = 0.7,
-                                     # types = c("AO", "LS", "TC"),
-                                     types = c("LS"),
-                                     maxit = 1, maxit.iloop = 4, maxit.oloop = 4, cval.reduce = 0.14286,
-                                     discard.method = c("en-masse", "bottom-up"), discard.cval = NULL,
-                                     # discard.method = c("bottom-up"), discard.cval = NULL,
-                                     tsmethod = c("auto.arima", "arima"),
-                                     # tsmethod = c("auto.arima"),
-                                     args.tsmethod = NULL, logfile = NULL, check.rank = FALSE
+          xreg = NULL, cval = 3.5, delta = 0.7,
+          # types = c("AO", "LS", "TC"),
+          types = c("LS"),
+          maxit = 1, maxit.iloop = 4, maxit.oloop = 4, cval.reduce = 0.14286,
+          discard.method = c("en-masse", "bottom-up"), discard.cval = NULL,
+          # discard.method = c("bottom-up"), discard.cval = NULL,
+          tsmethod = c("auto.arima", "arima"),
+          # tsmethod = c("auto.arima"),
+          args.tsmethod = NULL, logfile = NULL, check.rank = FALSE
         )
 
         input_data[variable] <- resul_out$yadj
@@ -109,8 +109,8 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 #' @export
 #'
 #' @examples
-holidays_detection <- function(input_data, model, calendar = "calendar_france" , region = "metropole") {
-  url <-  paste0("https://calendrier.api.gouv.fr/jours-feries/",region,".json")
+holidays_detection <- function(input_data, model, calendar = "calendar_france", region = "metropole") {
+  url <- paste0("https://calendrier.api.gouv.fr/jours-feries/", region, ".json")
 
   holidays_req <- httr2::request(base_url = url) %>%
     httr2::req_method("GET")
@@ -121,14 +121,14 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france" ,
   list_holidays <- holidays_resp %>%
     httr2::resp_body_json()
 
-  if ( model == "ml") {
+  if (model == "ml") {
     holidays <- names(list_holidays)
 
     bizdays::create.calendar(
       name = "calendar_france", holidays = holidays, weekdays = c("sunday", "saturday")
     )
 
-    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct") )
+    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
     var_date_feature <- colnames(input_data[, date_variable])
 
     bizdays::bizdays.options$set(default.calendar = calendar)
@@ -140,7 +140,7 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france" ,
   } else {
     values <- c()
 
-    for(i in list_holidays) {
+    for (i in list_holidays) {
       values <- c(values, i)
     }
 
@@ -168,10 +168,9 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france" ,
 #'
 #' @examples
 #' preprocessing_data(input_data)
-preprocessing_data <- function(input_data){
-  if (is.data.frame(input_data) || is.list(input_data))
-  {
-    if(is.list(input_data)){
+preprocessing_data <- function(input_data) {
+  if (is.data.frame(input_data) || is.list(input_data)) {
+    if (is.list(input_data)) {
       input_data <- as.data.frame(input_data)
       input_data <- tibble::as_tibble(input_data)
     }
@@ -191,9 +190,8 @@ preprocessing_data <- function(input_data){
     percent_complet <- naniar::prop_complete(output_data)
     detail_missing <- naniar::miss_var_summary(output_data)
 
-    list("dataset_clean"=output_data, "numnber_missing" = number_miss)
-
-  }else{
+    list("dataset_clean" = output_data, "numnber_missing" = number_miss)
+  } else {
     return(warning("The *input_date* variable is not a data.frame ."))
   }
 }
