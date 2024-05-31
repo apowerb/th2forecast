@@ -13,16 +13,23 @@ db_conn_function <- function(dbms = NULL, server = NULL, user = NULL, password =
 # ===================== output data function ( prediction data)==================
 output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL) {
   # Récupérer les données de prédiction
-  query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,as_of, start_date, end_date
+  tryCatch({
+    query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,as_of, start_date, end_date
                                         FROM {schema}.{target_table}")
 
-  query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
-  prediction_data <- DBI::dbFetch(query_res_output)
+    query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
+    prediction_data <- DBI::dbFetch(query_res_output)
 
-  prediction_data$as_of <- as.Date(prediction_data$as_of)
+    prediction_data$as_of <- as.Date(prediction_data$as_of)
 
-  DBI::dbDisconnect(db_conn)
-  return(prediction_data)
+    DBI::dbDisconnect(db_conn)
+    return(prediction_data)
+  }, error = function (error) {
+    DBI::dbDisconnect(db_conn)
+    shinyalert("error when return output data !", type = "error")
+    return(NULL)
+  })
+
 }
 
 # ======================input data function ( historical data filtred) ==================
