@@ -54,45 +54,17 @@ mod_forecasting_viewer_server <- function(id) {
           join th2_wf_permissions  tb2 on tb1.pipeline_uuid = tb2.object_id
           join data_connection_params tb_in on tb1.input_id = tb_in.table_id
           join data_connection_params tb_out on tb1.output_id = tb_out.table_id
-          where tb2.permitted_users = '{user}'"
+          where tb2.permitted_users = '{user}' and tb2.object_type = 'fc'"
       )
 
       pipelines_metadata <- th2product::fetch_data_from_db_by_sql(sql)
       pipelines_metadata
     })
 
-
-    # output$pipelines_table <-  DT::renderDataTable({
-    #   user_permissions <- th2blender::get_user_data_permissions(target_table = "th2_wf_permissions", object_type = "fc")
-    #   if (nrow(pipelines_metadata()) == 0) {
-    #     return(NULL)
-    #   }
-    #   pipelines_metadata <- user_permissions %>%
-    #     dplyr::rename(pipeline_uuid = OBJECT_ID) %>%
-    #     dplyr::select(pipeline_uuid) %>%
-    #     dplyr::inner_join(pipelines_metadata(), by = c("pipeline_uuid"))
-    #   if (nrow(pipelines_metadata) == 0) {
-    #     return(NULL)
-    #   }
-    #   DT::datatable(dplyr::select(pipelines_metadata,-id, -input_meta_connection, -output_meta_connection), selection = list(mode = "single"))
-    # })
-
     output$forecast_pipeline_boxes <- renderUI({
-      user_permissions <- th2blender::get_user_data_permissions(target_table = "th2_wf_permissions", object_type = "fc")
-
-      if (nrow(pipelines_metadata()) == 0) {
-        return(NULL)
-      }
-      pipelines_metadata <- user_permissions %>%
-        dplyr::rename(pipeline_uuid = OBJECT_ID) %>%
-        dplyr::select(pipeline_uuid) %>%
-        dplyr::inner_join(pipelines_metadata(), by = c("pipeline_uuid"))
-      if (nrow(pipelines_metadata) == 0) {
-        return(NULL)
-      }
-      pipelines_list <- pipelines_metadata
+      pipelines_list <- pipelines_metadata()
       print(pipelines_list)
-      temp <- seq_len(nrow(pipelines_metadata))
+      temp <- seq_len(nrow(pipelines_list))
       # print(list_of_workflows()$pipelines)
 
       all_boxes <- fluidRow(lapply(temp, function(x) {
