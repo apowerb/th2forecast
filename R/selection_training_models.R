@@ -226,9 +226,8 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
     model_rf_fit <- model_rf %>%
       parsnip::fit(formula, data = input_data)
   } else if (fit_model == "bulk") {
-
     recipe_rf <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_feature_engineering(var_target, feature_target = var_target, use_holidays = use_holidays, all_data = all_data, id_name = NULL)
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, all_data = all_data)
 
     model_rf_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_rf) %>%
@@ -256,7 +255,7 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 #' @return Un modèle XGBoost entraîné.
 #' @export
 #' @examples
-th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees = 200, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, fit_model = TRUE) {
+th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees = 200, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, fit_model = TRUE, all_data = "") {
   model_xgboost <-
     parsnip::boost_tree(
       mtry = ifelse(fit_model == FALSE, tune(), mtry),
@@ -277,7 +276,7 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
       parsnip::fit(formula, data = input_data)
   } else if (fit_model == "bulk") {
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, all_data = all_data) %>%
       recipes::step_rm(var_date)
     model_xgboost_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_xgboost) %>%

@@ -57,12 +57,17 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   for (i in 1:nrow(nested_data_tbl)) {
     list_nestede_data <- nested_data_tbl[i, ]$.actual_data
     data_output_t <- preprocessing_data(list_nestede_data)[["dataset_clean"]]
+
     data_output_t["name_id"] <- nested_data_tbl[i, 1]
     nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
+
+    future_data <- nested_data_tbl[i, ]$.future_data[[1]]
+    future_data["name_id"] <- nested_data_tbl[i, 1]
+
+    nested_data_tbl[i, ]$.future_data[[1]] <- future_data
   }
 
-  nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)[,1:3]
-  View(nested_data)
+  nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
 
   for (model in models_list) {
     # tune -- for
@@ -86,7 +91,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = use_holidays, fit_model = "bulk", all_data = nested_data_tbl)$fit
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
-      training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
+      training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", all_data = nested_data_tbl)$fit
       print(training_model)
       label_model <- "model_xgboost"
     } else {
@@ -110,7 +115,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     group_by(id) %>%
     # filter(id == "GROCERY I") %>%
     modeltime::plot_modeltime_forecast(
-      .facet_ncol  = 1,
+      .facet_ncol  = 4,
       .interactive = FALSE
     ))
 
@@ -133,7 +138,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     # filter(id == "GROCERY I") %>%
     modeltime::plot_modeltime_forecast(
       .interactive = FALSE,
-      .facet_ncol  = 1
+      .facet_ncol  = 4
     ))
 
 
