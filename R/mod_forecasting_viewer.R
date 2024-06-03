@@ -117,25 +117,32 @@ mod_forecasting_viewer_server <- function(id) {
 
         decrypted_output_connection <- jsonlite::fromJSON(output_connection)
 
-        db_conn <- db_conn_function(
-          dbms = "postgresql",
-          user = decrypted_output_connection$username,
-          password = decrypted_output_connection$password,
-          port = decrypted_output_connection$port,
-          host = decrypted_output_connection$host,
-          db_name = decrypted_output_connection$database
+        tryCatch(
+          {
+            db_conn <- db_conn_function(
+              dbms = "postgresql",
+              user = decrypted_output_connection$username,
+              password = decrypted_output_connection$password,
+              port = decrypted_output_connection$port,
+              host = decrypted_output_connection$host,
+              db_name = decrypted_output_connection$database
+            )
+
+            output_data_result(output_data_fetch(
+              db_conn = db_conn,
+              target_table = decrypted_output_connection$target_table,
+              schema = decrypted_output_connection$schema,
+              target_var = selected_info()$target_var,
+              group_target_var = selected_info()$group_target_var,
+              date_var = selected_info()$date_var
+            ))
+
+            updateTabsetPanel(session, "forecastViz_tabbox", selected = "Forecasting Viewer")
+          },
+          error = function(err) {
+            shinyalert::shinyalert("Error loading output data. Please check the output configuration.", type = "error")
+          }
         )
-
-        output_data_result(output_data_fetch(
-          db_conn = db_conn,
-          target_table = decrypted_output_connection$target_table,
-          schema = decrypted_output_connection$schema,
-          target_var = selected_info()$target_var,
-          group_target_var = selected_info()$group_target_var,
-          date_var = selected_info()$date_var
-        ))
-
-        updateTabsetPanel(session, "forecastViz_tabbox", selected = "Forecasting Viewer")
       }
     })
 
@@ -143,6 +150,7 @@ mod_forecasting_viewer_server <- function(id) {
 
     output$as_of <- renderUI({
       req(output_data_result())
+      req(selected_info())
       execution_dates <- base::unique(output_data_result()$as_of)
       selectInput(inputId = ns("as_of"), label = "As_Of", choices = c("", format(execution_dates, "%Y-%m-%d")))
     })
@@ -154,24 +162,31 @@ mod_forecasting_viewer_server <- function(id) {
       decrypted_input_connection <- jsonlite::fromJSON(input_connection)
       print(decrypted_input_connection)
 
-      db_conn <- db_conn_function(
-        dbms = "postgresql",
-        user = decrypted_input_connection$username,
-        password = decrypted_input_connection$password,
-        port = decrypted_input_connection$port,
-        host = decrypted_input_connection$host,
-        db_name = decrypted_input_connection$database
-      )
+      tryCatch(
+        {
+          db_conn <- db_conn_function(
+            dbms = "postgresql",
+            user = decrypted_input_connection$username,
+            password = decrypted_input_connection$password,
+            port = decrypted_input_connection$port,
+            host = decrypted_input_connection$host,
+            db_name = decrypted_input_connection$database
+          )
 
-      input_data_result(input_data_fetch(
-        prediction_data = output_data_result(),
-        db_conn = db_conn,
-        target_table = decrypted_input_connection$target_table,
-        target_var = selected_info()$target_var,
-        group_target_var = selected_info()$group_target_var,
-        date_var = selected_info()$date_var,
-        as_of = input$as_of
-      ))
+          input_data_result(input_data_fetch(
+            prediction_data = output_data_result(),
+            db_conn = db_conn,
+            target_table = decrypted_input_connection$target_table,
+            target_var = selected_info()$target_var,
+            group_target_var = selected_info()$group_target_var,
+            date_var = selected_info()$date_var,
+            as_of = input$as_of
+          ))
+        },
+        error = function(err) {
+          shinyalert::shinyalert("Error loading input data. Please check the input configuration.", type = "error")
+        }
+      )
     })
 
 

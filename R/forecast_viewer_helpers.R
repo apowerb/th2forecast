@@ -13,40 +13,54 @@ db_conn_function <- function(dbms = NULL, server = NULL, user = NULL, password =
 # ===================== output data function ( prediction data)==================
 output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL) {
   # Récupérer les données de prédiction
-  tryCatch({
-    query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,as_of, start_date, end_date
+  tryCatch(
+    {
+      query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,as_of, start_date, end_date
                                         FROM {schema}.{target_table}")
 
-    query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
-    prediction_data <- DBI::dbFetch(query_res_output)
+      query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
+      prediction_data <- DBI::dbFetch(query_res_output)
 
-    prediction_data$as_of <- as.Date(prediction_data$as_of)
+      prediction_data$as_of <- as.Date(prediction_data$as_of)
 
-    DBI::dbDisconnect(db_conn)
-    return(prediction_data)
-  }, error = function (error) {
-    DBI::dbDisconnect(db_conn)
-    shinyalert("error when return output data !", type = "error")
-    return(NULL)
-  })
+      DBI::dbDisconnect(db_conn)
 
+      return(prediction_data)
+    },
+    error = function(error) {
+      print(error)
+      DBI::dbDisconnect(db_conn)
+      shinyalert::shinyalert("Error returning output data. Please check the output datasource configuration.", type = "error")
+      return(NULL)
+    }
+  )
 }
 
 # ======================input data function ( historical data filtred) ==================
 input_data_fetch <- function(prediction_data = NULL, db_conn = NULL, target_table = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL, as_of = NULL) {
-  output_data_filtred <- prediction_data %>% dplyr::filter(as_of == !!as_of)
+  tryCatch(
+    {
+      output_data_filtred <- prediction_data %>% dplyr::filter(as_of == !!as_of)
 
-  start_date <- as.Date(dplyr::first(output_data_filtred$start_date))
-  end_date <- as.Date(dplyr::first(output_data_filtred$end_date))
+      start_date <- as.Date(dplyr::first(output_data_filtred$start_date))
+      end_date <- as.Date(dplyr::first(output_data_filtred$end_date))
 
-  query_statement_input <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var}
+      query_statement_input <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var}
                                        FROM {target_table}")
 
-  query_res_input <- DBI::dbSendQuery(db_conn, statement = query_statement_input)
-  historical_data <- DBI::dbFetch(query_res_input)
-  historical_data_filtred <- historical_data %>% filter(between(as.Date(historical_data[[date_var]]), start_date, end_date))
-  DBI::dbDisconnect(db_conn)
-  return(historical_data_filtred)
+      query_res_input <- DBI::dbSendQuery(db_conn, statement = query_statement_input)
+      historical_data <- DBI::dbFetch(query_res_input)
+      historical_data_filtred <- historical_data %>% filter(between(as.Date(historical_data[[date_var]]), start_date, end_date))
+      DBI::dbDisconnect(db_conn)
+      return(historical_data_filtred)
+    },
+    error = function(error) {
+      DBI::dbDisconnect(db_conn)
+
+      shinyalert::shinyalert("Error returning input data. Please check the input datasource configuration.", type = "error")
+      return(NULL)
+    }
+  )
 }
 
 
