@@ -7,6 +7,7 @@ mod_forecasting_viewer_ui <- function(id) {
 
   bs4Dash::tabBox(
     id = ns("forecastViz_tabbox"), width = 12, selected = "Forecasting Pipelines",
+    column(width = 12, uiOutput(ns("infos_and_help"))),
     tabPanel(
       title = "Forecasting Pipelines", icon = icon("database"),
       fluidPage(
@@ -42,6 +43,17 @@ mod_forecasting_viewer_server <- function(id) {
     pipelines_metadata <- reactiveVal()
     input_data_result <- reactiveVal()
     output_data_result <- reactiveVal()
+
+   # help and infos
+    output$infos_and_help <- renderUI({
+      fluidRow(
+        column(width = 10, uiOutput(ns("void_object"))),
+        column(width = 1, th2utils::mod_th2_infos_and_help_ui(ns("info_forecasting")))
+      )
+    })
+    rmd_help_file <- system.file("infos_and_help/th2_forecasting.md", package = "th2utils")
+    th2utils::mod_th2_infos_and_help_server(id = "info_forecasting", rmd_help_file = rmd_help_file)
+
 
     ## =============connect to Db and return pipelines metadata ======
     pipelines_metadata <- reactiveVal({
