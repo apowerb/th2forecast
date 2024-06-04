@@ -44,7 +44,7 @@ mod_forecasting_viewer_server <- function(id) {
     input_data_result <- reactiveVal()
     output_data_result <- reactiveVal()
 
-
+   # help and infos
     output$infos_and_help <- renderUI({
       fluidRow(
         column(width = 10, uiOutput(ns("void_object"))),
