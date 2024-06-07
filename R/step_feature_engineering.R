@@ -24,6 +24,7 @@ step_th2_feature_engineering <-
            all_data = "",
            id_name = "",
            columns = NULL,
+           lags = FALSE,
            id = recipes::rand_id("th2_feature_engineering")) {
     recipes::add_step(
       recipe,
@@ -37,6 +38,7 @@ step_th2_feature_engineering <-
         all_data = all_data,
         id_name = id_name,
         columns = columns,
+        lags = lags,
         id = id
       )
     )
@@ -53,6 +55,7 @@ step_th2_feature_engineering_new <-
            all_data,
            id_name,
            columns,
+           lags,
            id) {
     recipes::step(
       subclass = "th2_feature_engineering",
@@ -65,6 +68,7 @@ step_th2_feature_engineering_new <-
       all_data = all_data,
       id_name = id_name,
       columns = columns,
+      lags = lags,
       id = id
     )
   }
@@ -112,6 +116,7 @@ prep.step_th2_feature_engineering <- function(x,
     all_data = x$all_data,
     id_name = training_n[1],
     columns = col_names,
+    lags = x$lags,
     id = x$id
   )
 }
@@ -148,7 +153,7 @@ bake.step_th2_feature_engineering <- function(object,
   # print(object$id_name)
 
   # feat_len <- (feature_selection(new_data, feature_target = target_col, use_holidays = use_holidays, all_data = all_data, id_name = object$id_name, lags = 5) %>% ncol()) - 2
-  feat_len <- ((timetk::tk_get_timeseries_signature(lubridate::ymd("2016-01-01")) %>% ncol()) - 1 + 0) - 2
+  feat_len <- ((timetk::tk_get_timeseries_signature(lubridate::ymd("2016-01-01")) %>% ncol()) - 1 + object$lags) - 2
   # print(feat_len)
   # print("size")
   # print(feat_len)
@@ -173,7 +178,7 @@ bake.step_th2_feature_engineering <- function(object,
     cols <- (strt):(strt + new_cols[i] - 1)
 
     tmp <- new_data %>%
-      feature_selection(feature_target = target_col, use_holidays = use_holidays, all_data = all_data, id_name = training_n, lags = FALSE) %>%
+      feature_selection(feature_target = target_col, use_holidays = use_holidays, all_data = all_data, id_name = training_n, lags = object$lags) %>%
       dplyr::select(-object$columns[i], -target_col) %>%
       dplyr::as_tibble()
 

@@ -209,7 +209,7 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 #' @export
 #'
 #' @examples
-th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, use_holidays = TRUE, fit_model = TRUE, all_data = "") {
+th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, use_holidays = TRUE, fit_model = TRUE, all_data = "", lags = FALSE) {
   model_rf <- parsnip::rand_forest(
     # min_n = ifelse(fit_model, min_n, tune()),
     # trees = ifelse(fit_model, trees, tune())
@@ -227,7 +227,7 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
       parsnip::fit(formula, data = input_data)
   } else if (fit_model == "bulk") {
     recipe_rf <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, all_data = all_data)
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, all_data = all_data, lags = lags)
 
     model_rf_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_rf) %>%
@@ -255,7 +255,7 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 #' @return Un modèle XGBoost entraîné.
 #' @export
 #' @examples
-th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees = 200, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, fit_model = TRUE, all_data = "") {
+th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees = 200, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, fit_model = TRUE, all_data = "", lags = FALSE) {
   model_xgboost <-
     parsnip::boost_tree(
       mtry = ifelse(fit_model == FALSE, tune(), mtry),
@@ -276,7 +276,7 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
       parsnip::fit(formula, data = input_data)
   } else if (fit_model == "bulk") {
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, all_data = all_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, all_data = all_data, lags = lags) %>%
       recipes::step_rm(var_date)
     model_xgboost_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_xgboost) %>%
