@@ -10,10 +10,30 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, use_holidays = TRUE, lags = FALSE) {
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, external_data = NULL, exogenous_var = NULL, use_holidays = TRUE, lags = FALSE) {
   list_output_models <- list()
 
   group_target_output <- group_target
+  if( "arimax" %in% models_list && ( is.null(external_data) || is.null(exogenous_var))){
+    return(warning("It is necessary to define the external data for training an ARIMAX model."))
+  }else{
+    max_date_input <- max(input_data[[date_var]])
+    max_date_exter <- max(external_data[[date_var]])
+
+    if (max_date_input >= max_date_exter ){
+      return(warning("The dates of the external data must be greater than the training data."))
+    }else{
+      future_data <- external_data %>%
+        filter(external_data[[date_var]] > max_date_input) %>%
+        nrow()
+      if( future_data < future_forecast){
+        future_forecast <- future_data
+      }else{
+        external_data <- external_data[1:(nrow(input_data)+future_forecast), ]
+      }
+    }
+  }
+
   if (group_target == "all_columns") {
     data_tbl <- input_data %>%
       tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
@@ -95,8 +115,10 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
       training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", all_data = nested_data_tbl, lags = lags)$fit
-      print(training_model)
       label_model <- "model_xgboost"
+    } else if (model == "arimax") {
+      training_model <- th2_arimax_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", external_data = external_data, exogenous_var = exogenous_var)$fit
+      label_model <- "arimax"
     } else {
       error_models <- c(NULL, model)
     }
@@ -105,6 +127,14 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   }
 
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
+
+  print(nested_modeltime_tbl %>%
+          modeltime::extract_nested_test_forecast() %>%
+          group_by(id) %>%
+          modeltime::plot_modeltime_forecast(
+            .facet_ncol  = 1,
+            .interactive = FALSE
+          ))
 
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
@@ -118,6 +148,21 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     modeltime::modeltime_nested_refit(
       control = modeltime::control_nested_refit(verbose = TRUE)
     )
+
+  print(nested_modeltime_refit_tbl %>%
+          extract_nested_error_report())
+
+  print(nested_modeltime_refit_tbl %>%
+          modeltime::extract_nested_test_accuracy() %>%
+          modeltime::table_modeltime_accuracy(.interactive = F))
+
+  print(nested_modeltime_refit_tbl %>%
+          modeltime::extract_nested_future_forecast() %>%
+          group_by(id) %>%
+          modeltime::plot_modeltime_forecast(
+            .facet_ncol  = 1,
+            .interactive = FALSE
+          ))
 
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
