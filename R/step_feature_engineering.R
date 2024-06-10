@@ -21,7 +21,10 @@ step_th2_feature_engineering <-
            trained = FALSE,
            feature_target = "",
            use_holidays = TRUE,
+           all_data = "",
+           id_name = "",
            columns = NULL,
+           lags = FALSE,
            id = recipes::rand_id("th2_feature_engineering")) {
     recipes::add_step(
       recipe,
@@ -32,7 +35,10 @@ step_th2_feature_engineering <-
         trained = trained,
         feature_target = feature_target,
         use_holidays = use_holidays,
+        all_data = all_data,
+        id_name = id_name,
         columns = columns,
+        lags = lags,
         id = id
       )
     )
@@ -46,7 +52,10 @@ step_th2_feature_engineering_new <-
            trained,
            feature_target,
            use_holidays,
+           all_data,
+           id_name,
            columns,
+           lags,
            id) {
     recipes::step(
       subclass = "th2_feature_engineering",
@@ -56,18 +65,44 @@ step_th2_feature_engineering_new <-
       trained = trained,
       feature_target = feature_target,
       use_holidays = use_holidays,
+      all_data = all_data,
+      id_name = id_name,
       columns = columns,
+      lags = lags,
       id = id
     )
   }
 
 
+#' My S3 Method for step_th2_feature_engineering
+#'
+#' Description of what this S3 method does.
+#'
+#' @param x An object of class myclass.
+#' @param ... Additional arguments.
 #' @export
+#' @exportS3Method recipes::prep
+#' @importFrom recipes prep
 prep.step_th2_feature_engineering <- function(x,
                                               training,
                                               info = NULL,
                                               ...) {
+  # print(x$terms)
+  # print("name_id" %in% colnames(training))
+  # print(training_n)
+
+  if ("name_id" %in% colnames(training)) {
+    training_n <- as.character(training[[2]][1])
+    training <- training %>%
+      dplyr::select(-name_id)
+  }
+
+  # training <- as_tibble(cbind(training, training_n))
+
+  # print(training)
+
   col_names <- recipes::recipes_eval_select(x$terms, data = training, info = info)
+  # print(col_names)
 
   recipes::check_type(training[, col_names], types = c("date", "datetime"))
 
@@ -78,22 +113,48 @@ prep.step_th2_feature_engineering <- function(x,
     trained = TRUE,
     feature_target = x$feature_target,
     use_holidays = x$use_holidays,
+    all_data = x$all_data,
+    id_name = training_n[1],
     columns = col_names,
+    lags = x$lags,
     id = x$id
   )
 }
 
 
+#' My S3 Method for step_th2_feature_engineering
+#'
+#' Description of what this S3 method does.
+#'
+#' @param x An object of class myclass.
+#' @param ... Additional arguments.
 #' @export
+#' @exportS3Method recipes::bake
+#' @importFrom recipes bake
 bake.step_th2_feature_engineering <- function(object,
                                               new_data,
                                               ...) {
   # print(dim(new_data))
+  # print("llego a bake")
+  # print(new_data)
+
+  training_n <- ""
+  if ("name_id" %in% colnames(new_data)) {
+    training_n <- as.character(new_data[[2]][1])
+    new_data <- new_data %>%
+      dplyr::select(-name_id)
+  }
 
   target_col <- object$feature_target
   use_holidays <- object$use_holidays
 
-  feat_len <- (feature_selection(new_data, feature_target = target_col, use_holidays = use_holidays) %>% ncol()) - 2
+  all_data <- object$all_data
+
+  # print(object$id_name)
+
+  # feat_len <- (feature_selection(new_data, feature_target = target_col, use_holidays = use_holidays, all_data = all_data, id_name = object$id_name, lags = 5) %>% ncol()) - 2
+  feat_len <- ((timetk::tk_get_timeseries_signature(lubridate::ymd("2016-01-01")) %>% ncol()) - 1 + object$lags) - 2
+  # print(feat_len)
   # print("size")
   # print(feat_len)
 
@@ -117,7 +178,7 @@ bake.step_th2_feature_engineering <- function(object,
     cols <- (strt):(strt + new_cols[i] - 1)
 
     tmp <- new_data %>%
-      feature_selection(feature_target = target_col, use_holidays = use_holidays) %>%
+      feature_selection(feature_target = target_col, use_holidays = use_holidays, all_data = all_data, id_name = training_n, lags = object$lags) %>%
       dplyr::select(-object$columns[i], -target_col) %>%
       dplyr::as_tibble()
 

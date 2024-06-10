@@ -10,7 +10,7 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, use_holidays = TRUE) {
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, use_holidays = TRUE, lags = FALSE) {
   list_output_models <- list()
 
   if (group_target == "all_columns") {
@@ -57,10 +57,19 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   for (i in 1:nrow(nested_data_tbl)) {
     list_nestede_data <- nested_data_tbl[i, ]$.actual_data
     data_output_t <- preprocessing_data(list_nestede_data)[["dataset_clean"]]
+
+    data_output_t["name_id"] <- nested_data_tbl[i, 1]
     nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
+
+    future_data <- nested_data_tbl[i, ]$.future_data[[1]]
+    future_data["name_id"] <- nested_data_tbl[i, 1]
+
+    nested_data_tbl[i, ]$.future_data[[1]] <- future_data
   }
 
   nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
+
+  target_var <- tolower(target_var)
 
   for (model in models_list) {
     # tune -- for
@@ -81,10 +90,10 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       training_model <- th2_mars_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_mars"
     } else if (model == "random_forest") {
-      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
+      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = use_holidays, fit_model = "bulk", all_data = nested_data_tbl, lags = lags)$fit
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
-      training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk")$fit
+      training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", all_data = nested_data_tbl, lags = lags)$fit
       print(training_model)
       label_model <- "model_xgboost"
     } else {
@@ -108,7 +117,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     modeltime::modeltime_nested_refit(
       control = modeltime::control_nested_refit(verbose = TRUE)
     )
-
 
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
