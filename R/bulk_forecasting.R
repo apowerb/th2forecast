@@ -13,6 +13,7 @@
 th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, use_holidays = TRUE, lags = FALSE) {
   list_output_models <- list()
 
+  group_target_output <- group_target
   if (group_target == "all_columns") {
     data_tbl <- input_data %>%
       tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
@@ -124,7 +125,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     ) %>%
     dplyr::mutate(as_of = Sys.Date()) %>%
     dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
-    dplyr::mutate(end_date = max(input_data[[date_var]]))
+    dplyr::mutate(end_date = max(input_data[[date_var]]))%>%
+    rename(!!group_target_output := id)
 
 
   return(forecast_result)
