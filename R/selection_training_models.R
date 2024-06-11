@@ -318,7 +318,7 @@ th2_arimax_engine <- function(input_data, var_date, var_target, external_data = 
    }
   expl_var <- substr(expl_var, 1, nchar(expl_var)-1)
 
-  formula <- as.formula(paste(var_target, "~ date"))
+  formula <- as.formula(paste(var_target, "~ ."))
 
   set.seed(1234)
   model_arimax <- modeltime::arima_reg() %>%

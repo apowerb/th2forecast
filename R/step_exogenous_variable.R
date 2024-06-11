@@ -133,6 +133,7 @@ prep.step_th2_exogenous_variable <- function(x,
 bake.step_th2_exogenous_variable <- function(object,
                                               new_data,
                                               ...) {
+  print("entroooooooooooooooooooo exo var")
   # browser()
   # print(new_data)
   # print(object$exogenous_var)

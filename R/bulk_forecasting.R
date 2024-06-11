@@ -13,27 +13,28 @@
 th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, external_data = NULL, exogenous_var = NULL, use_holidays = TRUE, lags = FALSE) {
   list_output_models <- list()
 
-  group_target_output <- group_target
-  if( "arimax" %in% models_list && ( is.null(external_data) || is.null(exogenous_var))){
-    return(warning("It is necessary to define the external data for training an ARIMAX model."))
-  }else{
-    max_date_input <- max(input_data[[date_var]])
-    max_date_exter <- max(external_data[[date_var]])
-
-    if (max_date_input >= max_date_exter ){
-      return(warning("The dates of the external data must be greater than the training data."))
+  if( "arimax" %in% models_list){
+    if (is.null(external_data) || is.null(exogenous_var)) {
+      return(warning("It is necessary to define the external data for training an ARIMAX model."))
     }else{
-      future_data <- external_data %>%
-        filter(external_data[[date_var]] > max_date_input) %>%
-        nrow()
-      if( future_data < future_forecast){
-        future_forecast <- future_data
+      max_date_input <- max(input_data[[date_var]])
+      max_date_exter <- max(external_data[[date_var]])
+
+      if (max_date_input >= max_date_exter ){
+        return(warning("The dates of the external data must be greater than the training data."))
       }else{
-        external_data <- external_data[1:(nrow(input_data)+future_forecast), ]
+        future_data <- external_data %>%
+          filter(external_data[[date_var]] > max_date_input) %>%
+          nrow()
+        if( future_data < future_forecast){
+          future_forecast <- future_data
+        }else{
+          external_data <- external_data[1:(nrow(input_data)+future_forecast), ]
+        }
       }
     }
   }
-
+  group_target_output <- group_target
   if (group_target == "all_columns") {
     data_tbl <- input_data %>%
       tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
@@ -83,9 +84,21 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
 
     future_data <- nested_data_tbl[i, ]$.future_data[[1]]
-    future_data["name_id"] <- nested_data_tbl[i, 1]
 
+    future_data["name_id"] <- nested_data_tbl[i, 1]
     nested_data_tbl[i, ]$.future_data[[1]] <- future_data
+
+    if ("arimax" %in% models_list){
+      min_date <- min(nested_data[["date"]])
+      max_date <- max(nested_data[["date"]])
+
+      exogen_data <- external_data %>%
+        filter(date >= min_date & date <= max_date) %>%
+        select(exogenous_var)
+
+      nested_data <- dplyr::bind_cols(nested_data, exogen_data)
+    }
+
   }
 
   nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
@@ -117,6 +130,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", all_data = nested_data_tbl, lags = lags)$fit
       label_model <- "model_xgboost"
     } else if (model == "arimax") {
+
       training_model <- th2_arimax_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", external_data = external_data, exogenous_var = exogenous_var)$fit
       label_model <- "arimax"
     } else {
@@ -125,7 +139,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
     list_output_models[[label_model]] <- training_model
   }
-
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
 
   print(nested_modeltime_tbl %>%
@@ -170,9 +183,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     ) %>%
     dplyr::mutate(as_of = Sys.Date()) %>%
     dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
-    dplyr::mutate(end_date = max(input_data[[date_var]]))%>%
+    dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
     rename(!!group_target_output := id)
-
 
   return(forecast_result)
 }
