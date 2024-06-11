@@ -227,10 +227,11 @@ mod_forecasting_viewer_server <- function(id) {
 
 
     output$run <- renderUI({
+      # button_theme <- th2utils::add_button_theme()
       req(input_data_result())
       req(output_data_result())
       req(input$kpi_value, input$model)
-      actionButton(inputId = ns("run"), label = "Run", style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
+      actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
     })
 
     data_to_visualize <- eventReactive(input$run, {
