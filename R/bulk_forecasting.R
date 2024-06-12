@@ -17,14 +17,14 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   if (group_target == "all_columns") {
     data_tbl <- input_data %>%
       tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
-      rename(date = date_var)
+      rename(date := !!date_var)
     group_target <- "id"
   } else {
     select_vars <- c(group_target, date_var, target_var)
 
     data_tbl <- input_data %>%
       dplyr::select(all_of(select_vars)) %>%
-      rename(id = group_target, date = date_var)
+      rename(id := !!group_target, date := !!date_var)
     group_target <- "id"
     # data_tbl <- data_tbl %>%
     #   mutate(id_group = paste(store_nbr, family, sep = "_"))

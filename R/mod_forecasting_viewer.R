@@ -75,7 +75,6 @@ mod_forecasting_viewer_server <- function(id) {
 
     output$forecast_pipeline_boxes <- renderUI({
       pipelines_list <- pipelines_metadata()
-      print(pipelines_list)
       temp <- seq_len(nrow(pipelines_list))
       # print(list_of_workflows()$pipelines)
 
@@ -121,7 +120,7 @@ mod_forecasting_viewer_server <- function(id) {
     observeEvent(input$pipelines_table_rows_selected, {
       selected_row <- NULL
       selected_row <- input$pipelines_table_rows_selected
-      print(selected_row)
+
       if (length(selected_row) > 0) {
         selected_info(pipelines_metadata()[selected_row, ])
 
@@ -164,15 +163,12 @@ mod_forecasting_viewer_server <- function(id) {
       req(output_data_result())
       req(selected_info())
       execution_dates <- base::unique(output_data_result()$as_of)
-      selectInput(inputId = ns("as_of"), label = "As_Of", choices = c("", format(execution_dates, "%Y-%m-%d")))
+      selectInput(inputId = ns("as_of"), label = "As of", choices = c("", format(execution_dates, "%Y-%m-%d")))
     })
 
     observeEvent(input$as_of, {
       input_connection <- th2product::decrypt_column(selected_info()["input_meta_connection"])
-      print(input_connection)
-
       decrypted_input_connection <- jsonlite::fromJSON(input_connection)
-      print(decrypted_input_connection)
 
       tryCatch(
         {
@@ -231,7 +227,7 @@ mod_forecasting_viewer_server <- function(id) {
       req(input_data_result())
       req(output_data_result())
       req(input$kpi_value, input$model)
-      actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = "color: #ffffff; background-color: #007bff; border-color: #007bff;")
+      actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = "margin-top: 28px; color: #ffffff; background-color: #007bff; border-color: #007bff;")
     })
 
     data_to_visualize <- eventReactive(input$run, {
@@ -241,41 +237,45 @@ mod_forecasting_viewer_server <- function(id) {
         model = input$model,
         kpi_value = input$kpi_value
       )
-
       historical_data_filtred_result <- historical_data_filtred(
         historical_data = input_data_result(),
         group_target_var = selected_info()$group_target_var,
         kpi_value = input$kpi_value
       )
 
+      if(is.null(input$agg_type) || input$agg_type == "" ){
+        shinyalert("Oops!", "It is necessary to select a type of aggregation.", type = "warning")
+        renderText("No data available for selected filters.")
+      }else{
 
-      if (input$agg_type == "sum") {
-        prediction_data_aggregated <- prediction_data_filtred_result %>%
-          dplyr::group_by_at(vars(selected_info()$date_var)) %>%
-          dplyr::summarise(across(where(is.numeric), sum))
+        if (input$agg_type == "sum") {
+          prediction_data_aggregated <- prediction_data_filtred_result %>%
+            dplyr::group_by_at(vars(selected_info()$date_var)) %>%
+            dplyr::summarise(across(where(is.numeric), sum))
 
-        historical_data_aggregated <- historical_data_filtred_result %>%
-          dplyr::group_by_at(vars(selected_info()$date_var)) %>%
-          dplyr::summarise_at(vars(selected_info()$target_var), sum)
-      }
-
-
-      # Ajustement du nombre de lignes de historical_data_aggregated
-      prediction_rows <- nrow(prediction_data_aggregated)
-      historical_rows <- prediction_rows * 3
-
-      if (nrow(historical_data_aggregated) >= historical_rows) {
-        historical_data_aggregated <- tail(historical_data_aggregated, historical_rows)
-      } else {
-        # Si historical_data_aggregated contient moins de lignes que nécessaire
-        historical_data_aggregated <- historical_data_aggregated
-      }
+          historical_data_aggregated <- historical_data_filtred_result %>%
+            dplyr::group_by_at(vars(selected_info()$date_var)) %>%
+            dplyr::summarise_at(vars(selected_info()$target_var), sum)
+        }
 
 
-      if (!is.null(historical_data_aggregated) && !is.null(prediction_data_aggregated)) {
-        create_time_series_plot(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var)
-      } else {
-        renderText("Aucune donnée disponible pour les filtres sélectionnés.")
+        # Ajustement du nombre de lignes de historical_data_aggregated
+        prediction_rows <- nrow(prediction_data_aggregated)
+        historical_rows <- prediction_rows * 3
+
+        if (nrow(historical_data_aggregated) >= historical_rows) {
+          historical_data_aggregated <- tail(historical_data_aggregated, historical_rows)
+        } else {
+          # Si historical_data_aggregated contient moins de lignes que nécessaire
+          historical_data_aggregated <- historical_data_aggregated
+        }
+
+
+        if (!is.null(historical_data_aggregated) && !is.null(prediction_data_aggregated)) {
+          create_time_series_plot(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var)
+        } else {
+          renderText("No data available for selected filters.")
+        }
       }
     })
 
