@@ -89,18 +89,30 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     nested_data_tbl[i, ]$.future_data[[1]] <- future_data
 
     if ("arimax" %in% models_list){
-      min_date <- min(nested_data[["date"]])
-      max_date <- max(nested_data[["date"]])
+      list_nestede_data <- as.data.frame(list_nestede_data)
+      list_nestede_data <- tibble::as_tibble(input_data)
+      min_date <- min(list_nestede_data[[date_var]])
+      max_date <- max(list_nestede_data[[date_var]])
 
       exogen_data <- external_data %>%
-        filter(date >= min_date & date <= max_date) %>%
+        filter(external_data[[date_var]] >= min_date & external_data[[date_var]] <= max_date) %>%
         select(exogenous_var)
 
-      nested_data <- dplyr::bind_cols(nested_data, exogen_data)
+      data_output_t[exogenous_var] <- exogen_data
+      nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
+
+      min_date_f <- min(future_data[[date_var]])
+      max_date_f <- max(future_data[[date_var]])
+
+      future_exogen_data <- external_data %>%
+        filter(external_data[[date_var]] >= min_date_f & external_data[[date_var]] <= max_date_f) %>%
+        select(exogenous_var)
+
+      future_data[exogenous_var] <- future_exogen_data
+      nested_data_tbl[i, ]$.future_data[[1]] <- future_data
     }
 
   }
-
   nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
 
   target_var <- tolower(target_var)
@@ -130,7 +142,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", all_data = nested_data_tbl, lags = lags)$fit
       label_model <- "model_xgboost"
     } else if (model == "arimax") {
-
       training_model <- th2_arimax_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", external_data = external_data, exogenous_var = exogenous_var)$fit
       label_model <- "arimax"
     } else {
@@ -172,6 +183,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   print(nested_modeltime_refit_tbl %>%
           modeltime::extract_nested_future_forecast() %>%
           group_by(id) %>%
+          filter(id == "meantemp") %>%
           modeltime::plot_modeltime_forecast(
             .facet_ncol  = 1,
             .interactive = FALSE

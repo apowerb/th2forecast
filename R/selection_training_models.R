@@ -308,8 +308,6 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
 #' @export
 th2_arimax_engine <- function(input_data, var_date, var_target, external_data = NULL, exogenous_var = NULL, engine = "auto_arima", use_holidays = TRUE, fit_model = TRUE){
 
-  # dataset_train <- rbind(train_data, test_data)
-
   list_features <- c(var_date, exogenous_var)
 
   expl_var <- ""
@@ -326,48 +324,16 @@ th2_arimax_engine <- function(input_data, var_date, var_target, external_data = 
 
   if (fit_model == TRUE) {
     model_arimax_fit <- model_arimax %>%
-      parsnip::fit(formula, data = train_data)
-
-    models_tbl <- modeltime::modeltime_table(
-      model_arimax_fit
-    )
-
-    calibration_tbl <- models_tbl %>%
-      modeltime::modeltime_calibrate(new_data = test_data)
-
-    print(calibration_tbl %>%
-            modeltime_forecast(
-              new_data    = test_data,
-              actual_data = dataset_train
-            ) %>%
-            plot_modeltime_forecast(
-              .interactive      = FALSE
-            ))
-
-    refit_tbl <- calibration_tbl %>%
-      modeltime_refit(data = dataset_train)
-
-
-    forecast <- refit_tbl %>%
-      modeltime_forecast( actual_data = dataset_train, new_data = external_data)
-
-    print(forecast %>%
-            plot_modeltime_forecast(
-              .interactive      = FALSE
-            ))
-
-    return(forecast)
-
+      parsnip::fit(formula, data = input_data)
   }else if (fit_model == "bulk") {
-    recipe_arimax <- recipes::recipe(formula, data = input_data) %>%
-      step_th2_exogenous_variable(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, external_data = external_data,  exogenous_var = exogenous_var)
+    recipe_arimax <- recipes::recipe(formula, data = dplyr::select(input_data, -name_id))
+    # %>% step_th2_exogenous_variable(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, external_data = external_data,  exogenous_var = exogenous_var)
 
     model_arimax_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_arimax) %>%
       workflows::add_model(model_arimax)
-
-    model_xgboost_fit <- list("fit" = model_arimax_fit, "model" = model_arimax)
   }
+  model_xgboost_fit <- list("fit" = model_arimax_fit, "model" = model_arimax)
 }
 
 

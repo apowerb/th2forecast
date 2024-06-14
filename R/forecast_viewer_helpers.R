@@ -15,13 +15,13 @@ output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL
   # Récupérer les données de prédiction
   tryCatch(
     {
-      query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,as_of, start_date, end_date
+      query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,execution_date, start_date, end_date
                                         FROM {schema}.{target_table}")
 
       query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
       prediction_data <- DBI::dbFetch(query_res_output)
 
-      prediction_data$as_of <- as.Date(prediction_data$as_of)
+      prediction_data$execution_date <- as.POSIXct(prediction_data$execution_date)
 
       DBI::dbDisconnect(db_conn)
 
