@@ -227,7 +227,7 @@ mod_forecasting_viewer_server <- function(id) {
       req(input_data_result())
       req(output_data_result())
       req(input$kpi_value, input$model)
-      actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = "margin-top: 28px; color: #ffffff; background-color: #007bff; border-color: #007bff;")
+      actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = "margin-top: 28px; color: #ffffff; background-color: #013DFF; border-color: #013DFF;")
     })
 
     data_to_visualize <- eventReactive(input$run, {
