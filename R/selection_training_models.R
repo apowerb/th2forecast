@@ -305,6 +305,38 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
 }
 
 
+#' @export
+th2_arimax_engine <- function(input_data, var_date, var_target, external_data = NULL, exogenous_var = NULL, engine = "auto_arima", use_holidays = TRUE, fit_model = TRUE){
+
+  list_features <- c(var_date, exogenous_var)
+
+  expl_var <- ""
+  for (i in 1:length(list_features)) {
+    expl_var <- paste(expl_var, paste(list_features[i], "+"))
+   }
+  expl_var <- substr(expl_var, 1, nchar(expl_var)-1)
+
+  formula <- as.formula(paste(var_target, "~ ."))
+
+  set.seed(1234)
+  model_arimax <- modeltime::arima_reg() %>%
+    parsnip::set_engine(engine = engine)
+
+  if (fit_model == TRUE) {
+    model_arimax_fit <- model_arimax %>%
+      parsnip::fit(formula, data = input_data)
+  }else if (fit_model == "bulk") {
+    recipe_arimax <- recipes::recipe(formula, data = dplyr::select(input_data, -name_id))
+    # %>% step_th2_exogenous_variable(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, external_data = external_data,  exogenous_var = exogenous_var)
+
+    model_arimax_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipe_arimax) %>%
+      workflows::add_model(model_arimax)
+  }
+  model_xgboost_fit <- list("fit" = model_arimax_fit, "model" = model_arimax)
+}
+
+
 # ======Selection and train models
 #' Sélection et préparation des modèles
 #'

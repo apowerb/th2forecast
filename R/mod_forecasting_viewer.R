@@ -162,8 +162,8 @@ mod_forecasting_viewer_server <- function(id) {
     output$as_of <- renderUI({
       req(output_data_result())
       req(selected_info())
-      execution_dates <- base::unique(output_data_result()$as_of)
-      selectInput(inputId = ns("as_of"), label = "As of", choices = c("", format(execution_dates, "%Y-%m-%d")))
+      execution_dates <- base::unique(output_data_result()$execution_date)
+      selectInput(inputId = ns("as_of"), label = "As Of", choices = c("", format(execution_dates, "%Y-%m-%d %H:%M:%S")))
     })
 
     observeEvent(input$as_of, {
@@ -227,7 +227,7 @@ mod_forecasting_viewer_server <- function(id) {
       req(input_data_result())
       req(output_data_result())
       req(input$kpi_value, input$model)
-      actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = "margin-top: 28px; color: #ffffff; background-color: #007bff; border-color: #007bff;")
+      actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = "margin-top: 28px; color: #ffffff; background-color: #013DFF; border-color: #013DFF;")
     })
 
     data_to_visualize <- eventReactive(input$run, {
@@ -248,10 +248,11 @@ mod_forecasting_viewer_server <- function(id) {
         renderText("No data available for selected filters.")
       }else{
 
-        if (input$agg_type == "sum") {
-          prediction_data_aggregated <- prediction_data_filtred_result %>%
-            dplyr::group_by_at(vars(selected_info()$date_var)) %>%
-            dplyr::summarise(across(where(is.numeric), sum))
+      if (input$agg_type == "sum") {
+        prediction_data_aggregated <- prediction_data_filtred_result %>%
+          dplyr::filter(execution_date == input$as_of)
+          # dplyr::group_by_at(vars(selected_info()$date_var, execution_date)) %>%
+          # dplyr::summarise(across(where(is.numeric), sum))
 
           historical_data_aggregated <- historical_data_filtred_result %>%
             dplyr::group_by_at(vars(selected_info()$date_var)) %>%
