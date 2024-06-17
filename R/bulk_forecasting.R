@@ -152,14 +152,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   }
   nested_modeltime_tbl <- do.call(modeltime::modeltime_nested_fit, c(list(nested_data = nested_data_tbl), list_output_models))
 
-  print(nested_modeltime_tbl %>%
-          modeltime::extract_nested_test_forecast() %>%
-          group_by(id) %>%
-          modeltime::plot_modeltime_forecast(
-            .facet_ncol  = 1,
-            .interactive = FALSE
-          ))
-
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
       metric                = "rmse",
