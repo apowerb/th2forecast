@@ -173,22 +173,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       control = modeltime::control_nested_refit(verbose = TRUE)
     )
 
-  print(nested_modeltime_refit_tbl %>%
-          extract_nested_error_report())
-
-  print(nested_modeltime_refit_tbl %>%
-          modeltime::extract_nested_test_accuracy() %>%
-          modeltime::table_modeltime_accuracy(.interactive = F))
-
-  print(nested_modeltime_refit_tbl %>%
-          modeltime::extract_nested_future_forecast() %>%
-          group_by(id) %>%
-          filter(id == "meantemp") %>%
-          modeltime::plot_modeltime_forecast(
-            .facet_ncol  = 1,
-            .interactive = FALSE
-          ))
-
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
       .include_actual = FALSE
