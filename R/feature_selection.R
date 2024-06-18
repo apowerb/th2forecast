@@ -164,7 +164,7 @@ feature_selection <- function(
 
         data_features <- cbind(data_features, lag_data_features[, 3:ncol(lag_data_features)]) %>%
           tail(dim_input_data) %>%
-          as_tibble()
+          dplyr::as_tibble()
       }
     }
 

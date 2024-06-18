@@ -144,7 +144,7 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
       values <- c(values, i)
     }
 
-    dataframe_holidays <- tibble::data_frame(
+    dataframe_holidays <- tibble::tibble(
       holiday = values,
       ds = as.Date(names(list_holidays)),
       lower_window = 0,
