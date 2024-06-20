@@ -22,9 +22,13 @@ model_evaluation <- function(input_data, model_table) {
 
 
 #' @export
-th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, group_value = NULL ){
+th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, group_value = NULL, target_var = NULL ){
 
-  list_models <- unique(forecasting_data$.model_desc)
+  test_data <- test_data[order(test_data[["_date"]]), ]
+
+  forecasting_data <- forecasting_data[order(forecasting_data[["_date"]]), ]
+
+  list_models <- unique(forecasting_data$`_model_desc`)
 
   if (!is.null(group_value)) {
     forecasting_data <- forecasting_data %>%
@@ -39,24 +43,23 @@ th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, g
     rmse = numeric()
   )
 
+  y = as.double(unlist(test_data[[target_var]]))
+
   for(model in list_models){
+    y_hat = as.double( forecasting_data %>%
+                         dplyr::filter(forecasting_data$`_model_desc` == model) %>%
+                         dplyr::pull(!!target_var))
+
     add_model <- tibble(
       id = group_value,
       .model_desc = model,
-      .type = "Validation",
-      mae = yardstick::mae_vec(as.double(unlist(test_data)) ,  as.double( forecasting_data %>%
-                                                                            dplyr::filter(forecasting_data$.model_desc == model) %>%
-                                                                            dplyr::pull(.value))),
-      rsq = yardstick::rmse_vec(as.double(unlist(test_data)) ,  as.double( forecasting_data %>%
-                                                                             dplyr::filter(forecasting_data$.model_desc == model) %>%
-                                                                             dplyr::pull(.value)))
+      .type = "Test",
+      mae = yardstick::mae_vec( y, y_hat),
+      rsq = yardstick::rmse_vec( y, y_hat)
     )
 
     df_accuracy_test <- rbind(df_accuracy_test, add_model)
   }
 
-  print(df_accuracy_test)
-
-
-
+  return(df_accuracy_test)
 }

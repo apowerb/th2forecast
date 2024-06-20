@@ -20,6 +20,10 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     test_data <- input_data %>%
       dplyr::filter(input_data[[date_var]] >= as.Date(train_split))
 
+    test_data <- test_data %>%
+      dplyr::group_by(test_data[[date_var]]) %>%
+      dplyr::summarise(count = n())
+
     future_forecast <- nrow(test_data)
   }
 
