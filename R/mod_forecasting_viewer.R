@@ -23,9 +23,11 @@ mod_forecasting_viewer_ui <- function(id) {
           column(width = 2, uiOutput(ns("kpi_value"))),
           column(width = 2, uiOutput(ns("model"))),
           column(width = 2, uiOutput(ns("aggregation"))),
-          column(width = 2, uiOutput(ns("run")))
+          column(width = 1, uiOutput(ns("run"))),
+          column(width = 1, uiOutput(ns("accuracy")))
         ),
-        uiOutput(ns("graph_output"))
+        uiOutput(ns("graph_output")),
+        uiOutput(ns("accuracy_output"))
       )
     )
   )
@@ -230,6 +232,14 @@ mod_forecasting_viewer_server <- function(id) {
       actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = "margin-top: 28px; color: #ffffff; background-color: #013DFF; border-color: #013DFF;")
     })
 
+    output$accuracy <- renderUI({
+      # button_theme <- th2utils::add_button_theme()
+      req(input_data_result())
+      req(output_data_result())
+      req(input$kpi_value, input$model)
+      actionButton(inputId = ns("accuracy"), label = "Accuracy", icon = icon("search"), style = "margin-top: 28px; color: #ffffff; background-color: #013DFF; border-color: #013DFF;")
+    })
+
     data_to_visualize <- eventReactive(input$run, {
       prediction_data_filtred_result <- prediction_data_filtred(
         prediction_data = output_data_result(),
@@ -280,9 +290,38 @@ mod_forecasting_viewer_server <- function(id) {
       }
     })
 
+    accuracy_to_visualize <- eventReactive(input$accuracy, {
+      prediction_data_filtred_result <- output_data_result() %>%
+        dplyr::filter(output_data_result()[[selected_info()$group_target_var]] == input$kpi_value)
+
+      historical_data_filtred_result <- historical_data_filtred(
+        historical_data = input_data_result(),
+        group_target_var = selected_info()$group_target_var,
+        kpi_value = input$kpi_value
+      )
+      historical_data_filtred_result <- historical_data_filtred_result %>%
+        dplyr::filter( historical_data_filtred_result[[selected_info()$date_var]] >= min(prediction_data_filtred_result[[selected_info()$date_var]]))
+
+      if (input$agg_type == "sum") {
+        historical_data_aggregated <- historical_data_filtred_result %>%
+          dplyr::group_by_at(vars(selected_info()$date_var)) %>%
+          dplyr::summarise_at(vars(selected_info()$target_var), sum)
+      }
+
+      benchmarking_models_test <- th2_benchmarking(historical_data_aggregated, prediction_data_filtred_result, group_target = NULL, group_value = NULL, target_var = selected_info()$target_var )
+
+      showModal(modalDialog(
+        title = "Benchmark",
+        renderTable(benchmarking_models_test)
+      ))
+    })
+
     # ====================== Graph output
     output$graph_output <- renderUI({
       data_to_visualize()
+    })
+    output$accuracy_output <- renderUI({
+      accuracy_to_visualize()
     })
   })
 }

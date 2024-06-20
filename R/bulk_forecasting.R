@@ -10,14 +10,28 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, external_data = NULL, exogenous_var = NULL, use_holidays = TRUE, lags = FALSE) {
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = TRUE, lags = FALSE) {
   list_output_models <- list()
+
+  if( !is.null(train_split) ){
+    train_data <- input_data %>%
+      dplyr::filter(input_data[[date_var]] < as.Date(train_split))
+
+    test_data <- input_data %>%
+      dplyr::filter(input_data[[date_var]] >= as.Date(train_split))
+
+    test_data <- test_data %>%
+      dplyr::group_by(test_data[[date_var]]) %>%
+      dplyr::summarise(count = n())
+
+    future_forecast <- nrow(test_data)
+  }
 
   if( "arimax" %in% models_list){
     if (is.null(external_data) || is.null(exogenous_var)) {
       return(warning("It is necessary to define the external data for training an ARIMAX model."))
     }else{
-      max_date_input <- max(input_data[[date_var]])
+      max_date_input <- max(train_data[[date_var]])
       max_date_exter <- max(external_data[[date_var]])
 
       if (max_date_input >= max_date_exter ){
@@ -29,21 +43,21 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
         if( future_data < future_forecast){
           future_forecast <- future_data
         }else{
-          external_data <- external_data[1:(nrow(input_data)+future_forecast), ]
+          external_data <- external_data[1:(nrow(train_data)+future_forecast), ]
         }
       }
     }
   }
   group_target_output <- group_target
   if (group_target == "all_columns") {
-    data_tbl <- input_data %>%
+    data_tbl <- train_data %>%
       tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
       rename(date := !!date_var)
     group_target <- "id"
   } else {
     select_vars <- c(group_target, date_var, target_var)
 
-    data_tbl <- input_data %>%
+    data_tbl <- train_data %>%
       dplyr::select(all_of(select_vars)) %>%
       rename(id := !!group_target, date := !!date_var)
     group_target <- "id"
@@ -90,7 +104,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
     if ("arimax" %in% models_list){
       list_nestede_data <- as.data.frame(list_nestede_data)
-      list_nestede_data <- tibble::as_tibble(input_data)
+      list_nestede_data <- tibble::as_tibble(train_data)
       min_date <- min(list_nestede_data[[date_var]])
       max_date <- max(list_nestede_data[[date_var]])
 
@@ -165,14 +179,20 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       control = modeltime::control_nested_refit(verbose = TRUE)
     )
 
+  accuracy_test <- best_nested_modeltime_tbl %>%
+    modeltime::extract_nested_test_accuracy() %>%
+    dplyr::select(id, .model_id, .model_desc, .type, mae, rsq)
+
+  print(accuracy_test)
+
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
       .include_actual = FALSE
     ) %>%
     dplyr::mutate(as_of = Sys.Date()) %>%
-    dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
-    dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
-    rename(!!group_target_output := id)
+    dplyr::mutate(start_date = min(train_data[[date_var]])) %>%
+    dplyr::mutate(end_date = max(train_data[[date_var]])) %>%
+    dplyr::rename(!!group_target_output := id)
 
   return(forecast_result)
 }
