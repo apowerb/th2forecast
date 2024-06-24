@@ -37,7 +37,7 @@ feature_selection <- function(
     input_data,
     feature_target,
     list_features = c(),
-    use_holidays = TRUE,
+    use_holidays = NULL,
     lags = 5,
     window = 5,
     all_data = "",
@@ -71,8 +71,8 @@ feature_selection <- function(
       data_features <- var_temp %>% rbind(data_features)
     }
 
-    if (use_holidays == TRUE) {
-      holidays_list <- holidays_detection(data_features, model = "ml")
+    if (!is.null(use_holidays)) {
+      holidays_list <- holidays_detection(data_features, model = "ml", calendar = use_holidays)
       data_features["holidays"] <- holidays_list
     }
 

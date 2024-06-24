@@ -69,8 +69,8 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
     formula <- as.formula(paste(var_target, "~", var_date))
 
     holidays_df <- NULL
-    if (use_holidays == TRUE) {
-      holidays_df <- holidays_detection(input_data, model = "prophet")
+    if (!is.null(use_holidays) && use_holidays != "in_data" ) {
+      holidays_df <- holidays_detection(input_data, model = "prophet", calendar = use_holidays)
     }
 
     model_prophet <- modeltime::prophet_reg(

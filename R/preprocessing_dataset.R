@@ -125,34 +125,6 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
 
     list_holidays <- holidays_resp %>%
       httr2::resp_body_json()
-  }else if(calendar == "in_column"){
-    calendar <- "FR"
-    list_holidays_years <- list()
-
-    # max_date <- lubridate::year(max(input_data[[var_date_feature]]))
-    mim_date <- lubridate::year(min(input_data[[var_date_feature]]))
-
-    list_years <- c(as.integer(mim_date) : (lubridate::year(lubridate::now()) + 5))
-
-    for (year in list_years) {
-      url <- paste0("https://date.nager.at/api/v3/PublicHolidays/",year,"/", calendar)
-      holidays_req <- httr2::request(base_url = url) %>%
-        httr2::req_method("GET")
-
-      holidays_resp <- holidays_req %>%
-        httr2::req_perform(verbosity = 0)
-
-      list_holidays <- holidays_resp %>%
-        httr2::resp_body_json()
-
-      list_holidays_years <- c(list_holidays_years, list_holidays)
-    }
-    list_holidays <- list()
-
-    for (day in list_holidays_years) {
-      list_holidays[day$date] <- day$name
-    }
-
   }else{
     tryCatch(
       {
@@ -160,7 +132,7 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
 
         mim_date <- lubridate::year(min(input_data[[var_date_feature]]))
 
-        list_years <- c(as.integer(mim_date) : (lubridate::year(lubridate::now()) + 5))
+        list_years <- c(as.integer(mim_date) : (lubridate::year(lubridate::now()) + 1))
 
         for (year in list_years) {
           url <- paste0("https://date.nager.at/api/v3/PublicHolidays/",year,"/", calendar)
