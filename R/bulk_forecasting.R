@@ -49,7 +49,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     }
   }
 
-  browser()
   db_conn <- NULL
   if (!is.null(use_holidays)) {
     db_conn <- th2product::connect_to_database(
@@ -231,8 +230,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   accuracy_test <- best_nested_modeltime_tbl %>%
     modeltime::extract_nested_test_accuracy() %>%
     dplyr::select(id, .model_id, .model_desc, .type, mae, rsq)
-
-  print(accuracy_test)
 
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
