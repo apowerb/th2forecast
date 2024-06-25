@@ -41,7 +41,8 @@ feature_selection <- function(
     lags = 5,
     window = 5,
     all_data = "",
-    id_name = "") {
+    id_name = "",
+    db_conn = NULL) {
   if (is.data.frame(input_data)) {
     if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty"))
@@ -72,7 +73,7 @@ feature_selection <- function(
     }
 
     if (!is.null(use_holidays)) {
-      holidays_list <- holidays_detection(data_features, model = "ml", calendar = use_holidays)
+      holidays_list <- holidays_detection(data_features, model = "ml", calendar = use_holidays, db_conn = db_conn)
       data_features["holidays"] <- holidays_list
     }
 

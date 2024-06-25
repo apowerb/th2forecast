@@ -25,6 +25,7 @@ step_th2_feature_engineering <-
            id_name = "",
            columns = NULL,
            lags = FALSE,
+           db_conn = NULL,
            id = recipes::rand_id("th2_feature_engineering")) {
     recipes::add_step(
       recipe,
@@ -39,6 +40,7 @@ step_th2_feature_engineering <-
         id_name = id_name,
         columns = columns,
         lags = lags,
+        db_conn = db_conn,
         id = id
       )
     )
@@ -56,6 +58,7 @@ step_th2_feature_engineering_new <-
            id_name,
            columns,
            lags,
+           db_conn,
            id) {
     recipes::step(
       subclass = "th2_feature_engineering",
@@ -69,6 +72,7 @@ step_th2_feature_engineering_new <-
       id_name = id_name,
       columns = columns,
       lags = lags,
+      db_conn = db_conn,
       id = id
     )
   }
@@ -90,7 +94,6 @@ prep.step_th2_feature_engineering <- function(x,
   # print(x$terms)
   # print("name_id" %in% colnames(training))
   # print(training_n)
-  # browser()
   if ("name_id" %in% colnames(training)) {
     training_n <- as.character(training$name_id[1])
     training <- training %>%
@@ -126,6 +129,7 @@ prep.step_th2_feature_engineering <- function(x,
     id_name = training_n[1],
     columns = col_names,
     lags = x$lags,
+    db_conn = x$db_conn,
     id = x$id
   )
 }
@@ -146,7 +150,6 @@ bake.step_th2_feature_engineering <- function(object,
   # print(dim(new_data))
   # print("llego a bake")
   # print(new_data)
-  # browser()
   training_n <- ""
   if ("name_id" %in% colnames(new_data)) {
     training_n <- as.character(new_data$name_id[1])
@@ -201,7 +204,7 @@ bake.step_th2_feature_engineering <- function(object,
     cols <- (strt):(strt + new_cols[i] - 1)
 
     tmp <- new_data %>%
-      feature_selection(feature_target = target_col, use_holidays = use_holidays, all_data = all_data, id_name = training_n, lags = object$lags) %>%
+      feature_selection(feature_target = target_col, use_holidays = use_holidays, all_data = all_data, id_name = training_n, lags = object$lags, db_conn = object$db_conn) %>%
       dplyr::select(-object$columns[i], -target_col) %>%
       dplyr::as_tibble()
 

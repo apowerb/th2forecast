@@ -10,7 +10,7 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = TRUE, country_column = NULL, lags = FALSE) {
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = TRUE, country_column = NULL, lags = FALSE, path_driver = NULL) {
   list_output_models <- list()
 
   if( !is.null(train_split) ){
@@ -48,6 +48,15 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       }
     }
   }
+
+  browser()
+  db_conn <- NULL
+  if (!is.null(use_holidays)) {
+    db_conn <- th2product::connect_to_database(
+      path_driver = path_driver
+    )
+  }
+
   group_target_output <- group_target
   if (group_target == "all_columns") {
     data_tbl <- train_data %>%
@@ -167,7 +176,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       training_model <- th2_arima_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_arima"
     } else if (model == "prophet") {
-      training_model <- th2_prophet_engine(nested_data, target_var, "date", use_holidays = use_holidays, fit_model = "bulk")$fit
+      training_model <- th2_prophet_engine(nested_data, target_var, "date", use_holidays = use_holidays, fit_model = "bulk", db_conn = db_conn)$fit
       label_model <- "model_prophet"
     } else if (model == "lr") {
       training_model <- th2_linear_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
@@ -183,7 +192,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
         res_bh <- use_holidays
       }
 
-      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, fit_model = "bulk", all_data = nested_data_tbl, lags = lags)$fit
+      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
 
@@ -193,7 +202,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
         res_bh <- use_holidays
       }
 
-      training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = res_bh, fit_model = "bulk", all_data = nested_data_tbl, lags = lags)$fit
+      training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = res_bh, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
       label_model <- "model_xgboost"
     } else if (model == "arimax") {
       training_model <- th2_arimax_engine(nested_data, "date", target_var, use_holidays = use_holidays, fit_model = "bulk", external_data = external_data, exogenous_var = exogenous_var)$fit
@@ -233,6 +242,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     dplyr::mutate(start_date = min(train_data[[date_var]])) %>%
     dplyr::mutate(end_date = max(train_data[[date_var]])) %>%
     dplyr::rename(!!group_target_output := id)
+
+  DBI::dbDisconnect(db_conn)
 
   return(forecast_result)
 }
