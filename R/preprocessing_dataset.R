@@ -196,6 +196,40 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
 }
 
 
+#' @export
+meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius") {
+
+  date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
+  var_date_feature <- colnames(input_data[, date_variable])
+
+  min_date <- min(input_data[[var_date_feature]])
+  max_date <- max(input_data[[var_date_feature]])
+
+  if(min_date > as.Date(lubridate::now()) ){
+      meteo_result <- openmeteo::climate_forecast(
+        region,
+        min_date,
+        max_date,
+        daily = "temperature_2m_max",
+        model = "MPI_ESM1_2_XR",
+        response_units = list(temperature_unit = temperature_unit)
+      )
+  }else{
+    meteo_result <- openmeteo::weather_history(
+      region,
+      start = min_date,
+      end = max_date,
+      daily = "temperature_2m_max",
+      response_units = list(temperature_unit = temperature_unit)
+    )
+  }
+
+  meteo_result
+
+}
+
+
+
 #' Prétraitement d'une Dataset
 #'
 #' Une fonction pour nettoyer les données (suppression des valeurs manquantes, détection des valeurs redondantes et analyse des anomalies).
