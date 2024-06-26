@@ -10,7 +10,7 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = TRUE, country_column = NULL, lags = FALSE, path_driver = NULL) {
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL) {
   list_output_models <- list()
 
   if( !is.null(train_split) ){
@@ -25,6 +25,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       dplyr::summarise(count = n())
 
     future_forecast <- nrow(test_data)
+  }else{
+    train_data <- input_data
   }
 
   if( "arimax" %in% models_list){
@@ -236,11 +238,11 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       .include_actual = FALSE
     ) %>%
     dplyr::mutate(as_of = Sys.Date()) %>%
-    dplyr::mutate(start_date = min(train_data[[date_var]])) %>%
-    dplyr::mutate(end_date = max(train_data[[date_var]])) %>%
+    dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
+    dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
     dplyr::rename(!!group_target_output := id)
 
-  DBI::dbDisconnect(db_conn)
+  if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
 
   return(forecast_result)
 }
