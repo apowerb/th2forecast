@@ -109,32 +109,72 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 #' @export
 #'
 #' @examples
-holidays_detection <- function(input_data, model, calendar = "calendar_france", region = "metropole") {
-  url <- paste0("https://calendrier.api.gouv.fr/jours-feries/", region, ".json")
+holidays_detection <- function(input_data, model, calendar = "calendar_france", region = "metropole", db_conn = NULL) {
 
-  holidays_req <- httr2::request(base_url = url) %>%
-    httr2::req_method("GET")
+  date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
+  var_date_feature <- colnames(input_data[, date_variable])
 
-  holidays_resp <- holidays_req %>%
-    httr2::req_perform(verbosity = 0)
+  if(calendar == "calendar_france"){
+    url <- paste0("https://calendrier.api.gouv.fr/jours-feries/", region, ".json")
 
-  list_holidays <- holidays_resp %>%
-    httr2::resp_body_json()
+    holidays_req <- httr2::request(base_url = url) %>%
+      httr2::req_method("GET")
+
+    holidays_resp <- holidays_req %>%
+      httr2::req_perform(verbosity = 0)
+
+    list_holidays <- holidays_resp %>%
+      httr2::resp_body_json()
+  }else{
+    tryCatch(
+      {
+        # list_holidays_years <- list()
+        #
+        # mim_date <- lubridate::year(min(input_data[[var_date_feature]]))
+        #
+        # list_years <- c(as.integer(mim_date) : (lubridate::year(lubridate::now()) + 1))
+
+        # for (year in list_years) {
+        #   url <- paste0("https://date.nager.at/api/v3/PublicHolidays/",year,"/", calendar)
+        #   holidays_req <- httr2::request(base_url = url) %>%
+        #     httr2::req_method("GET")
+        #
+        #   holidays_resp <- holidays_req %>%
+        #     httr2::req_perform(verbosity = 0)
+        #
+        #   list_holidays <- holidays_resp %>%
+        #     httr2::resp_body_json()
+        #
+        #   list_holidays_years <- c(list_holidays_years, list_holidays)
+        # }
+        calendar_country_bh <- calendars_businness_days(db_conn = db_conn, country_code = calendar)
+        list_holidays <- list()
+
+        for (i in 1:nrow(calendar_country_bh)) {
+          list_holidays[calendar_country_bh[i, '_date']] <- calendar_country_bh[i, '_name']
+        }
+
+      },
+      error = function(error) {
+        print(error)
+        print("Error returning output business holidays. Please check the input datasource configuration.")
+        return(NULL)
+      }
+    )
+
+  }
 
   if (model == "ml") {
     holidays <- names(list_holidays)
 
     bizdays::create.calendar(
-      name = "calendar_france", holidays = holidays, weekdays = c("sunday", "saturday")
+      name = calendar, holidays = holidays, weekdays = c("sunday", "saturday")
     )
-
-    date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
-    var_date_feature <- colnames(input_data[, date_variable])
 
     bizdays::bizdays.options$set(default.calendar = calendar)
 
-    holidays <- bizdays::is.bizday(input_data[[var_date_feature]]) %>%
-      as.integer()
+    holidays <- !(bizdays::is.bizday(input_data[[var_date_feature]]))
+    holidays <- holidays %>% as.integer()
 
     return(holidays)
   } else {

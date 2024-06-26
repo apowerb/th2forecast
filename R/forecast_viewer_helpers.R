@@ -128,3 +128,23 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 
   time_series_plot
 }
+
+# ===================== output data function ( prediction data)==================
+calendars_businness_days <- function(db_conn = NULL, country_code = NULL) {
+  tryCatch(
+    {
+      query_statement_output <- glue::glue("SELECT * FROM public.holidays_country_years where countrycode = '{country_code}'")
+
+      query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
+      calendar_bh_country <- DBI::dbFetch(query_res_output)
+
+      return(calendar_bh_country)
+    },
+    error = function(error) {
+      print(error)
+      DBI::dbDisconnect(db_conn)
+      shinyalert::shinyalert("Error returning output data. Please check the conexion.", type = "error")
+      return(NULL)
+    }
+  )
+}
