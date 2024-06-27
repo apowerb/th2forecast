@@ -22,7 +22,7 @@ model_evaluation <- function(input_data, model_table) {
 
 
 #' @export
-th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, group_value = NULL, target_var = NULL ){
+th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, group_value = NULL, target_var = NULL, as_of = NULL ){
 
   test_data <- test_data[order(test_data[["_date"]]), ]
 
@@ -47,7 +47,7 @@ th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, g
 
   for(model in list_models){
     y_hat = as.double( forecasting_data %>%
-                         dplyr::filter(forecasting_data$`_model_desc` == model) %>%
+                         dplyr::filter(forecasting_data$`_model_desc` == model & forecasting_data$execution_date == as_of) %>%
                          dplyr::pull(!!target_var))
 
     add_model <- tibble(

@@ -308,7 +308,7 @@ mod_forecasting_viewer_server <- function(id) {
           dplyr::summarise_at(vars(selected_info()$target_var), sum)
       }
 
-      benchmarking_models_test <- th2_benchmarking(historical_data_aggregated, prediction_data_filtred_result, group_target = NULL, group_value = NULL, target_var = selected_info()$target_var )
+      benchmarking_models_test <- th2_benchmarking(historical_data_aggregated, prediction_data_filtred_result, group_target = NULL, group_value = NULL, target_var = selected_info()$target_var, as_of = input$as_of )
 
       showModal(modalDialog(
         title = "Benchmark",

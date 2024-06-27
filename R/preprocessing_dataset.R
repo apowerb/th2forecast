@@ -205,8 +205,10 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
   min_date <- min(input_data[[var_date_feature]])
   max_date <- max(input_data[[var_date_feature]])
 
+  df_meteo <- data.frame()
+
   if(min_date > as.Date(lubridate::now()) ){
-      meteo_result <- openmeteo::climate_forecast(
+    temp_result <- openmeteo::climate_forecast(
         region,
         min_date,
         max_date,
@@ -214,17 +216,36 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
         model = "MPI_ESM1_2_XR",
         response_units = list(temperature_unit = temperature_unit)
       )
+
+    precipitation_result <- openmeteo::climate_forecast(
+      region,
+      min_date,
+      max_date,
+      daily = "precipitation_sum",
+      model = "MPI_ESM1_2_XR",
+      response_units = list(precipitation_unit = "mm")
+    )
   }else{
-    meteo_result <- openmeteo::weather_history(
+    temp_result <- openmeteo::weather_history(
       region,
       start = min_date,
       end = max_date,
       daily = "temperature_2m_max",
       response_units = list(temperature_unit = temperature_unit)
     )
+
+    precipitation_result <- openmeteo::weather_history(
+      region,
+      start = min_date,
+      end = max_date,
+      daily = "precipitation_sum",
+      response_units = list(precipitation_unit = "mm")
+    )
   }
 
-  meteo_result
+  df_meteo <- cbind(temp_result, precipitation_result[2])
+
+  return(df_meteo)
 
 }
 
