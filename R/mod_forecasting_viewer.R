@@ -24,6 +24,7 @@ mod_forecasting_viewer_ui <- function(id) {
           column(width = 2, uiOutput(ns("model"))),
           column(width = 2, uiOutput(ns("aggregation"))),
           column(width = 1, uiOutput(ns("run"))),
+          column(width = 1, uiOutput(ns("weekly_run"))),
           column(width = 1, uiOutput(ns("accuracy")))
         ),
         uiOutput(ns("graph_output")),
@@ -40,6 +41,8 @@ mod_forecasting_viewer_ui <- function(id) {
 mod_forecasting_viewer_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+
 
     selected_info <- reactiveVal()
     pipelines_metadata <- reactiveVal()
@@ -225,7 +228,6 @@ mod_forecasting_viewer_server <- function(id) {
 
 
     output$run <- renderUI({
-      # button_theme <- th2utils::add_button_theme()
       req(input_data_result())
       req(output_data_result())
       req(input$kpi_value, input$model)
@@ -233,7 +235,6 @@ mod_forecasting_viewer_server <- function(id) {
     })
 
     output$accuracy <- renderUI({
-      # button_theme <- th2utils::add_button_theme()
       req(input_data_result())
       req(output_data_result())
       req(input$kpi_value, input$model)
@@ -261,8 +262,6 @@ mod_forecasting_viewer_server <- function(id) {
       if (input$agg_type == "sum") {
         prediction_data_aggregated <- prediction_data_filtred_result %>%
           dplyr::filter(execution_date == input$as_of)
-          # dplyr::group_by_at(vars(selected_info()$date_var, execution_date)) %>%
-          # dplyr::summarise(across(where(is.numeric), sum))
 
           historical_data_aggregated <- historical_data_filtred_result %>%
             dplyr::group_by_at(vars(selected_info()$date_var)) %>%
@@ -316,9 +315,92 @@ mod_forecasting_viewer_server <- function(id) {
       ))
     })
 
+    #==============Weekly Run ================
+
+    output$weekly_run <- renderUI({
+      req(input_data_result())
+      req(output_data_result())
+      req(input$kpi_value, input$model)
+      actionButton(inputId = ns("weekly_run"), label = "Weekly Run", icon = icon("play"), style = "margin-top: 28px; color: #ffffff; background-color: #013DFF; border-color: #013DFF;")
+    })
+
+
+    weekly_data_to_visualize <- eventReactive(input$weekly_run, {
+      prediction_data_filtred_result <- prediction_data_filtred(
+        prediction_data = output_data_result(),
+        group_target_var = selected_info()$group_target_var,
+        model = input$model,
+        kpi_value = input$kpi_value
+      )
+      historical_data_filtred_result <- historical_data_filtred(
+        historical_data = input_data_result(),
+        group_target_var = selected_info()$group_target_var,
+        kpi_value = input$kpi_value
+      )
+
+      if(is.null(input$agg_type) || input$agg_type == "" ){
+        shinyalert("Oops!", "It is necessary to select a type of aggregation.", type = "warning")
+        renderText("No data available for selected filters.")
+      }else{
+
+        if (input$agg_type == "sum") {
+          prediction_data_aggregated <- prediction_data_filtred_result %>%
+            dplyr::filter(execution_date == input$as_of)
+
+          historical_data_aggregated <- historical_data_filtred_result %>%
+            dplyr::group_by_at(vars(selected_info()$date_var)) %>%
+            dplyr::summarise_at(vars(selected_info()$target_var), sum)
+        }
+
+
+        # Ajustement du nombre de lignes de historical_data_aggregated
+        prediction_rows <- nrow(prediction_data_aggregated)
+        historical_rows <- prediction_rows * 3
+
+        if (nrow(historical_data_aggregated) >= historical_rows) {
+          historical_data_aggregated <- tail(historical_data_aggregated, historical_rows)
+        } else {
+          # Si historical_data_aggregated contient moins de lignes que nécessaire
+          historical_data_aggregated <- historical_data_aggregated
+        }
+
+
+        if (!is.null(historical_data_aggregated) && !is.null(prediction_data_aggregated)) {
+          create_weekly_bar_chart(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var)
+        } else {
+          renderText("No data available for selected filters.")
+        }
+      }
+    })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     # ====================== Graph output
     output$graph_output <- renderUI({
-      data_to_visualize()
+      # data_to_visualize()
+      weekly_data_to_visualize()
     })
     output$accuracy_output <- renderUI({
       accuracy_to_visualize()
