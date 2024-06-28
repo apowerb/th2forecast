@@ -134,7 +134,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
     prediction_data[[x_var]] <- as.Date(prediction_data[[x_var]])
 
     combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c(".hist", ".pred"))
-    View(combined_data)
 
     weekly_data <- combined_data %>%
       dplyr::mutate(week = lubridate::floor_date(as.Date(get(x_var)), unit = "week")) %>%
@@ -144,8 +143,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
                       `_conf_lo` = mean(`_conf_lo`, na.rm = TRUE),
                       `_conf_hi` = mean(`_conf_hi`, na.rm = TRUE))
 
-
-   View(weekly_data)
 
    weekly_bar_chart <- weekly_data %>%
      echarts4r::e_charts_('week') %>%
@@ -158,20 +155,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 
    weekly_bar_chart
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ===================== output data function ( prediction data)==================

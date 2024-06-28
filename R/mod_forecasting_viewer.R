@@ -27,7 +27,7 @@ mod_forecasting_viewer_ui <- function(id) {
           column(width = 1, uiOutput(ns("weekly_run"))),
           column(width = 1, uiOutput(ns("accuracy")))
         ),
-        uiOutput(ns("graph_output")),
+        uiOutput(ns("series_plot_output")),
         uiOutput(ns("accuracy_output"))
       )
     )
@@ -374,34 +374,13 @@ mod_forecasting_viewer_server <- function(id) {
     })
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     # ====================== Graph output
-    output$graph_output <- renderUI({
-      # data_to_visualize()
-      weekly_data_to_visualize()
+    output$series_plot_output <- renderUI({
+      data_to_visualize()
+      # weekly_data_to_visualize()
     })
+
+
     output$accuracy_output <- renderUI({
       accuracy_to_visualize()
     })
