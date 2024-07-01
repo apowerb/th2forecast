@@ -48,8 +48,7 @@ feature_selection <- function(
     if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty"))
     }
-
-    browser()
+    # browser()
     lag_g <<- lags
     target_g <<- feature_target
 
@@ -79,7 +78,7 @@ feature_selection <- function(
       data_features["holidays"] <- holidays_list
     }
 
-    if (use_meteo == TRUE) {
+    if (use_meteo == TRUE && !is.null(use_meteo)) {
       meteo_list <- meteo_feature(data_features, region = use_holidays)
       meteo_list <- meteo_list[meteo_list$date %in% data_features[[var_date_feature]], ]
       data_features["temperature"] <- meteo_list$daily_temperature_2m_max

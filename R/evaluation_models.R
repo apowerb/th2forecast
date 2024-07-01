@@ -63,3 +63,89 @@ th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, g
 
   return(df_accuracy_test)
 }
+
+
+th2_rolling_forecast_stablizer<- function(data, months_test = 3, previsions = 3){
+
+  max_date <- max(data[["X_date"]])
+
+  size_data <- (31 * months_test) + (previsions * 7)
+
+  date_filter <- max_date - size_data
+
+  data <- data %>%
+    filter(X_date >= date_filter)
+
+  year_data <- unique(lubridate::year(data$X_date))
+
+  months_list <- unique(lubridate::month(data$X_date))
+
+  start_date <- as.Date(paste0(year_data,"-",months_list[2],"-01"), format = "%Y-%m-%d")
+  end_date <- as.Date(paste0(year_data,"-",months_list[2+months_test],"-01"), format = "%Y-%m-%d")
+
+  data <- data %>%
+    dplyr::filter(X_date >= start_date & X_date < end_date )
+
+  num_days = 0
+  list_forecast <- list()
+  last_date <- ""
+  for (i in c(1:previsions)) {
+
+    num_days = num_days + 7
+
+    data_prevision <- data %>% dplyr::filter(X_date >= data$X_date[1] %m+% months(1) &  X_date <= data$X_date[1] %m+% months(2) + num_days )
+
+    output_forecast <- th2_bulk_forecasting( data_prevision, "family", "sales", "X_date", 30, c("prophet"))
+    # print(output_forecast)
+
+    list_forecast[i] <- output_forecast %>%
+      dplyr::select(`.index`, `.value`) %>%
+      list()
+
+    last_date <- data$X_date[1] %m+% months(2) + num_days
+  }
+
+  data <- data %>%
+    dplyr::group_by_at(vars("X_date")) %>%
+    dplyr::summarise_at(vars("sales"), sum) %>%
+    dplyr::filter(X_date <= as.Date(last_date))
+
+  time_series_plot <- plotly::plot_ly() %>%
+    plotly::add_trace(
+      data = data, type = "scatter", mode = "lines",
+      x = ~ get("X_date"), y = ~ get("sales"), name = "Historical Values", color = I("blue")
+    ) %>%
+    plotly::add_trace(
+      data = list_forecast[[1]], type = "scatter", mode = "lines",
+      x = ~ get(".index"), y = ~ get(".value"), name = "1", color = I("red")
+    ) %>%
+    plotly::add_trace(
+      data = list_forecast[[2]], type = "scatter", mode = "lines",
+      x = ~ get(".index"), y = ~ get(".value"), name = "2", color = I("green")
+    ) %>%
+    plotly::add_trace(
+      data = list_forecast[[3]], type = "scatter", mode = "lines",
+      x = ~ get(".index"), y = ~ get(".value"), name = "3",  color = I("orange")
+    ) %>%
+    plotly::layout(
+      title = "Time Series Test",
+      xaxis = list(title = "Date"),
+      yaxis = list(title = "Value"),
+      showlegend = TRUE
+    )
+
+  # time_series_plot <- data %>%
+  #   echarts4r::e_charts_("X_date") %>%
+  #   echarts4r::e_line_("sales") #%>%
+  #   # echarts4r::e_line_(paste0(y_var, ".pred"), name = "Prediction Values", color = "orange") %>%
+  #   # echarts4r::e_line_('_conf_lo', name = "Lower Confidence", lineStyle = list(type = "dashed"), color = "green")%>%
+  #   # echarts4r::e_line_('_conf_hi', name = "High Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
+  #   # echarts4r::e_x_axis(name = "Date") %>%
+  #   # echarts4r::e_y_axis(name = "Value") %>%
+  #   # echarts4r::e_tooltip(trigger = "axis") %>%
+  #   # echarts4r::e_legend(show = TRUE)
+  # print(time_series_plot)
+
+  time_series_plot
+
+}

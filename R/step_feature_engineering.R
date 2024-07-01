@@ -155,7 +155,6 @@ bake.step_th2_feature_engineering <- function(object,
   # print(dim(new_data))
   # print("llego a bake")
   # print(new_data)
-  browser()
   training_n <- ""
   if ("name_id" %in% colnames(new_data)) {
     training_n <- as.character(new_data$name_id[1])
@@ -179,7 +178,7 @@ bake.step_th2_feature_engineering <- function(object,
     feat_len <- feat_len - 1
   }
 
-  if(object$use_meteo == TRUE) feat_len <- feat_len + 2
+  if(object$use_meteo == TRUE && !is.null(object$use_meteo)) feat_len <- feat_len + 2
 
   target_col <- object$feature_target
 

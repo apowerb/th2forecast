@@ -207,9 +207,12 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
 
   df_meteo <- data.frame()
 
+  co_ordinate <- openmeteo::geocode(region)
+  co_ordinate <- c(co_ordinate$latitude, co_ordinate$longitude)
+
   if(min_date > as.Date(lubridate::now()) ){
     temp_result <- openmeteo::climate_forecast(
-        region,
+        co_ordinate,
         min_date,
         max_date,
         daily = "temperature_2m_max",
@@ -218,7 +221,7 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
       )
 
     precipitation_result <- openmeteo::climate_forecast(
-      region,
+      co_ordinate,
       min_date,
       max_date,
       daily = "precipitation_sum",
@@ -227,7 +230,7 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
     )
   }else{
     temp_result <- openmeteo::weather_history(
-      region,
+      co_ordinate,
       start = min_date,
       end = max_date,
       daily = "temperature_2m_max",
@@ -235,7 +238,7 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
     )
 
     precipitation_result <- openmeteo::weather_history(
-      region,
+      co_ordinate,
       start = min_date,
       end = max_date,
       daily = "precipitation_sum",

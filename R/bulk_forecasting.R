@@ -233,6 +233,15 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     modeltime::extract_nested_test_accuracy() %>%
     dplyr::select(id, .model_id, .model_desc, .type, mae, rsq)
 
+  print(nested_modeltime_refit_tbl %>%
+          modeltime::extract_nested_future_forecast() %>%
+          group_by(id) %>%
+          # filter(id == "GROCERY I") %>%
+          modeltime::plot_modeltime_forecast(
+            .interactive = FALSE,
+            .facet_ncol  = 1
+          ))
+
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
       .include_actual = FALSE
@@ -243,6 +252,21 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     dplyr::rename(!!group_target_output := id)
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
+
+  if (all(input_data[[target_var]] == as.integer(input_data[[target_var]]))){
+    forecast_result$.value <- round(forecast_result$.value)
+    forecast_result$.conf_lo <- round(forecast_result$.conf_lo)
+    forecast_result$.conf_hi <- round(forecast_result$.conf_hi)
+  }
+
+  # print(forecast_result %>%
+  #         group_by(family) %>%
+  #         # filter(family == "GROCERY I") %>%
+  #         modeltime::plot_modeltime_forecast(
+  #           .interactive = FALSE,
+  #           .facet_ncol  = 1
+  #         ))
+
 
   return(forecast_result)
 }
