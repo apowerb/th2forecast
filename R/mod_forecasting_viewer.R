@@ -9,14 +9,20 @@ mod_forecasting_viewer_ui <- function(id) {
     id = ns("forecastViz_tabbox"), width = 12, selected = "Forecasting Pipelines",
     column(width = 12, uiOutput(ns("infos_and_help"))),
     tabPanel(
-      title = "Forecasting Pipelines", icon = icon("database"),
+      title = shiny::tags$div(shiny::icon("database"),"Forecasting Pipelines",
+                              `data-bs-toggle` = "tooltip",
+                              `data-bs-placement` = "top",
+                              title = "Manage forecasting pipelines"),
       fluidPage(
         DT::dataTableOutput(ns("pipelines_table")),
         uiOutput(ns("forecast_pipeline_boxes"))
       )
     ),
     tabPanel(
-      title = "Forecasting Viewer", icon = icon("chart-line"),
+      title = shiny::tags$div(shiny::icon("chart-line"),"Forecasting Viewer",
+                              `data-bs-toggle` = "tooltip",
+                              `data-bs-placement` = "top",
+                              title = "Explore forecasting results"),
       fluidPage(
         fluidRow(
           column(width = 2, uiOutput(ns("as_of"))),

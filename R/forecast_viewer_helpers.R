@@ -135,7 +135,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 
     combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c(".hist", ".pred"))
 
-    View(combined_data)
 
     combined_data <- combined_data %>%
       mutate(week = lubridate::ceiling_date(as.Date(get(x_var)), unit = "week", week_start = 1))
@@ -169,8 +168,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
                   `_conf_lo` = min(`_conf_lo`, na.rm = TRUE),
                   `_conf_hi` = min(`_conf_hi`, na.rm = TRUE))
     }
-    View(weekly_data)
-
 
    weekly_bar_chart <- weekly_data %>%
      echarts4r::e_charts_('week') %>%
