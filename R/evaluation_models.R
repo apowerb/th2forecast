@@ -65,7 +65,8 @@ th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, g
 }
 
 
-th2_rolling_forecast_stablizer<- function(data, months_test = 3, previsions = 3){
+#' @export
+th2_rolling_forecast_stablizer<- function(data, model,months_test = 3, previsions = 3){
 
   max_date <- max(data[["X_date"]])
 
@@ -89,21 +90,38 @@ th2_rolling_forecast_stablizer<- function(data, months_test = 3, previsions = 3)
   num_days = 0
   list_forecast <- list()
   last_date <- ""
+
+  accuracy_df <- data.frame()
+
   for (i in c(1:previsions)) {
 
-    num_days = num_days + 7
+    # num_days = num_days + 7
+    # cat("\nForecast for dates between", as.character(data$X_date[1] %m+% months(1)), " and ", as.character(data$X_date[1] %m+% months(2) + num_days), "\n")
 
-    data_prevision <- data %>% dplyr::filter(X_date >= data$X_date[1] %m+% months(1) &  X_date <= data$X_date[1] %m+% months(2) + num_days )
+    data_prevision <- data %>% dplyr::filter(X_date >= data$X_date[1] %m+% months(1) &  X_date < data$X_date[1] %m+% months(2) + num_days )
 
-    output_forecast <- th2_bulk_forecasting( data_prevision, "family", "sales", "X_date", 30, c("prophet"))
+    output_forecast <- th2_bulk_forecasting( data_prevision, "family", "sales", "X_date", 30, c(model))
     # print(output_forecast)
+    accuracy_df <- rbind(
+      accuracy_df,
+      as.data.frame(output_forecast$accuracy[1]) %>%
+        dplyr::mutate(period = paste0(as.character(data$X_date[1] %m+% months(1)), " - ", as.character(data$X_date[1] %m+% months(2) + num_days)) )
+      )
 
     list_forecast[i] <- output_forecast %>%
       dplyr::select(`.index`, `.value`) %>%
       list()
 
     last_date <- data$X_date[1] %m+% months(2) + num_days
+    num_days = num_days + 7
+
   }
+
+  accuracy_df <- accuracy_df %>%
+    dplyr::mutate(mae = round(mae, 2)) %>%
+    dplyr::mutate(rmse = round(rmse, 2)) %>%
+    dplyr::mutate(rsq = round(rsq, 2)) %>%
+    dplyr::select(- c(`.model_id`, `.type`))
 
   data <- data %>%
     dplyr::group_by_at(vars("X_date")) %>%
@@ -113,39 +131,30 @@ th2_rolling_forecast_stablizer<- function(data, months_test = 3, previsions = 3)
   time_series_plot <- plotly::plot_ly() %>%
     plotly::add_trace(
       data = data, type = "scatter", mode = "lines",
-      x = ~ get("X_date"), y = ~ get("sales"), name = "Historical Values", color = I("blue")
+      x = ~ get("X_date"), y = ~ get("sales"), name = "Historical Values", color = I("#2C3E50")
     ) %>%
     plotly::add_trace(
       data = list_forecast[[1]], type = "scatter", mode = "lines",
-      x = ~ get(".index"), y = ~ get(".value"), name = "1", color = I("red")
+      x = ~ get(".index"), y = ~ get(".value"), name = paste(model, "1"), color = I("#B0226B")
     ) %>%
     plotly::add_trace(
       data = list_forecast[[2]], type = "scatter", mode = "lines",
-      x = ~ get(".index"), y = ~ get(".value"), name = "2", color = I("green")
+      x = ~ get(".index"), y = ~ get(".value"), name = paste(model, "2"), color = I("#6DB539")
     ) %>%
     plotly::add_trace(
       data = list_forecast[[3]], type = "scatter", mode = "lines",
-      x = ~ get(".index"), y = ~ get(".value"), name = "3",  color = I("orange")
+      x = ~ get(".index"), y = ~ get(".value"), name = paste(model, "3"),  color = I("#7AC6EA")
     ) %>%
     plotly::layout(
+      autosize = FALSE,
+      width = 950,
       title = "Time Series Test",
       xaxis = list(title = "Date"),
       yaxis = list(title = "Value"),
       showlegend = TRUE
     )
 
-  # time_series_plot <- data %>%
-  #   echarts4r::e_charts_("X_date") %>%
-  #   echarts4r::e_line_("sales") #%>%
-  #   # echarts4r::e_line_(paste0(y_var, ".pred"), name = "Prediction Values", color = "orange") %>%
-  #   # echarts4r::e_line_('_conf_lo', name = "Lower Confidence", lineStyle = list(type = "dashed"), color = "green")%>%
-  #   # echarts4r::e_line_('_conf_hi', name = "High Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
-  #   # echarts4r::e_x_axis(name = "Date") %>%
-  #   # echarts4r::e_y_axis(name = "Value") %>%
-  #   # echarts4r::e_tooltip(trigger = "axis") %>%
-  #   # echarts4r::e_legend(show = TRUE)
-  # print(time_series_plot)
 
-  time_series_plot
+  return(list(time_series_plot = time_series_plot, accuracy_df = accuracy_df))
 
 }

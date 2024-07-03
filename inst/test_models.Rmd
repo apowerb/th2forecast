@@ -1,0 +1,163 @@
+---
+title: "Model Stability Test"
+author: "Harold Villafuerte"
+date: "`r Sys.Date()`"
+output: html_document
+params: 
+  data: NA
+  kpi: NA
+  models: NA
+  column_kpi: NA
+---
+
+# Comparison of model stability
+
+------------------------------------------------------------------------
+
+The following report shows the stability of the various models when running a short-term forecast. For each test, the last three full months have been taken into account, and the second month within these was taken for training and forecasting.
+
+For all models, a 7-day increment is made in each iteration, so as to observe the behavior of the model when it receives new information. At the end, we will be able to compare the results of each iteration.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+library(th2forecast)
+
+table_accuracy <-- data.frame()
+
+data_filter <- params$data %>%
+  dplyr::filter(params$data[[params$column_kpi]] == params$kpi)
+
+```
+
+```{r, results='asis', echo=FALSE, warning=FALSE, message=FALSE}
+for (model in params$models) {
+
+  cat(" \n\n")
+  cat(paste0("## ", gsub("_", " ", sub("^.", toupper(substr(model, 1, 1)), model)), "\n\n"))
+
+  cat(paste0( gsub("_", " ", sub("^.", toupper(substr(model, 1, 1)), model)), " model evaluation metrics with incremental days per iteration:" , "\n\n"))
+  
+  result_test <- th2forecast::th2_rolling_forecast_stablizer(data_filter, model)
+  
+  if (model != params$models[length(params$models)]){
+    table_acc <- DT::datatable(result_test$accuracy_df)
+    print(htmltools::tagList(table_acc))
+    # cat(tests$accuracy_df %>%
+    #   knitr::kable("pipe") %>%
+    #   kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive")))
+    
+    
+    cat("### Results:\n\n")
+    cat("comparison of results\n\n")
+    
+    # cat(tests$time_series_plot)
+    plot_test <- result_test$time_series_plot
+    print(htmltools::tagList(plot_test))
+    cat("_______\n\n")
+    cat("------------------------------------------------------------------------ \n\n")
+  }
+  table_accuracy <- rbind(table_accuracy, result_test$accuracy_df)
+  
+}
+```
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(th2forecast)
+
+# reult_forecast_arima <- th2forecast::th2_rolling_forecast_stablizer(data_filter, "arima")
+result_test$accuracy_df %>%
+  DT::datatable()
+```
+
+### Results:
+
+comparison of results
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+result_test$time_series_plot
+```
+
+## Comparison {.tabset}
+### MAE 
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+mae_accuracy <- table_accuracy %>% 
+  dplyr::select(period, .model_desc, mae) %>%
+  pivot_wider(names_from = .model_desc, values_from = mae)
+
+weekly_bar_chart <- mae_accuracy %>%
+    echarts4r::e_charts(period)
+  
+if("ARIMA" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(ARIMA, stack = "grp") }
+if("PROPHET" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(PROPHET, stack = "grp2") }
+if("LR" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(LR, stack = "grp3") }
+if("EARTH" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(EARTH, stack = "grp4") }
+if("RANDOMFOREST" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(RANDOMFOREST, stack = "grp5") }
+if("XGBOOST" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(XGBOOST, stack = "grp6") }
+
+weekly_bar_chart <- weekly_bar_chart %>%
+    echarts4r::e_x_axis(name = "Period") %>%
+    echarts4r::e_y_axis(name = "Value") %>%
+    echarts4r::e_tooltip(trigger = "axis") %>%
+    echarts4r::e_legend(show = TRUE)
+
+weekly_bar_chart
+
+```
+
+### RMSE
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+rmse_accuracy <- table_accuracy %>%
+  dplyr::select(period, .model_desc, rmse) %>%
+  pivot_wider(names_from = .model_desc, values_from = rmse)
+
+weekly_bar_chart <- rmse_accuracy %>%
+    echarts4r::e_charts(period)
+
+if("ARIMA" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(ARIMA, stack = "grp") }
+if("PROPHET" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(PROPHET, stack = "grp2") }
+if("LR" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(LR, stack = "grp3") }
+if("EARTH" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(EARTH, stack = "grp4") }
+if("RANDOMFOREST" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(RANDOMFOREST, stack = "grp5") }
+if("XGBOOST" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(XGBOOST, stack = "grp6") }
+
+weekly_bar_chart <- weekly_bar_chart %>%
+    echarts4r::e_x_axis(name = "Period") %>%
+    echarts4r::e_y_axis(name = "Value") %>%
+    echarts4r::e_tooltip(trigger = "axis") %>%
+    echarts4r::e_legend(show = TRUE)
+
+weekly_bar_chart
+
+```
+
+### RSQ
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+rsq_accuracy <- table_accuracy %>%
+  dplyr::select(period, .model_desc, rsq) %>%
+  pivot_wider(names_from = .model_desc, values_from = rsq)
+
+weekly_bar_chart <- rsq_accuracy %>%
+    echarts4r::e_charts(period)
+
+if("ARIMA" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(ARIMA, stack = "grp") }
+if("PROPHET" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(PROPHET, stack = "grp2") }
+if("LR" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(LR, stack = "grp3") }
+if("EARTH" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(EARTH, stack = "grp4") }
+if("RANDOMFOREST" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(RANDOMFOREST, stack = "grp5") }
+if("XGBOOST" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(XGBOOST, stack = "grp6") }
+
+weekly_bar_chart <- weekly_bar_chart %>%
+    echarts4r::e_x_axis(name = "Period") %>%
+    echarts4r::e_y_axis(name = "Value") %>%
+    echarts4r::e_tooltip(trigger = "axis") %>%
+    echarts4r::e_legend(show = TRUE)
+
+weekly_bar_chart
+
+```
+

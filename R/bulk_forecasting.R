@@ -193,7 +193,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
         res_bh <- use_holidays
       }
 
-      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, use_meteo = use_meteo(), fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
+      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
 
@@ -231,16 +231,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   accuracy_test <- best_nested_modeltime_tbl %>%
     modeltime::extract_nested_test_accuracy() %>%
-    dplyr::select(id, .model_id, .model_desc, .type, mae, rsq)
-
-  print(nested_modeltime_refit_tbl %>%
-          modeltime::extract_nested_future_forecast() %>%
-          group_by(id) %>%
-          # filter(id == "GROCERY I") %>%
-          modeltime::plot_modeltime_forecast(
-            .interactive = FALSE,
-            .facet_ncol  = 1
-          ))
+    dplyr::select(id, .model_id, .model_desc, .type, mae, rmse, rsq)
 
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
@@ -251,6 +242,9 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
     dplyr::rename(!!group_target_output := id)
 
+  forecast_result <- forecast_result %>%
+    dplyr::mutate(accuracy = list(accuracy_test))
+
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
 
   if (all(input_data[[target_var]] == as.integer(input_data[[target_var]]))){
@@ -258,15 +252,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     forecast_result$.conf_lo <- round(forecast_result$.conf_lo)
     forecast_result$.conf_hi <- round(forecast_result$.conf_hi)
   }
-
-  # print(forecast_result %>%
-  #         group_by(family) %>%
-  #         # filter(family == "GROCERY I") %>%
-  #         modeltime::plot_modeltime_forecast(
-  #           .interactive = FALSE,
-  #           .facet_ncol  = 1
-  #         ))
-
 
   return(forecast_result)
 }
