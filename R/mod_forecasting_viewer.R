@@ -9,19 +9,26 @@ mod_forecasting_viewer_ui <- function(id) {
     id = ns("forecastViz_tabbox"), width = 12, selected = "Forecasting Pipelines",
     column(width = 12, uiOutput(ns("infos_and_help"))),
     tabPanel(
-      title = "Forecasting Pipelines", icon = icon("database"),
+      title = shiny::tags$div(shiny::icon("database"),"Forecasting Pipelines",
+                              `data-bs-toggle` = "tooltip",
+                              `data-bs-placement` = "top",
+                              title = "Manage forecasting pipelines"),
       fluidPage(
         DT::dataTableOutput(ns("pipelines_table")),
         uiOutput(ns("forecast_pipeline_boxes"))
       )
     ),
     tabPanel(
-      title = "Forecasting Viewer", icon = icon("chart-line"),
+      title = shiny::tags$div(shiny::icon("chart-line"),"Forecasting Viewer",
+                              `data-bs-toggle` = "tooltip",
+                              `data-bs-placement` = "top",
+                              title = "Explore forecasting results"),
       fluidPage(
         fluidRow(
           column(width = 2, uiOutput(ns("as_of"))),
           column(width = 2, uiOutput(ns("kpi_value"))),
           column(width = 2, uiOutput(ns("model"))),
+          column(width = 2, uiOutput(ns("aggregate_by"))),
           column(width = 2, uiOutput(ns("aggregation"))),
           column(width = 1, uiOutput(ns("run"))),
           column(width = 1, uiOutput(ns("accuracy")))
@@ -40,6 +47,8 @@ mod_forecasting_viewer_ui <- function(id) {
 mod_forecasting_viewer_server <- function(id) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+
 
     selected_info <- reactiveVal()
     pipelines_metadata <- reactiveVal()
@@ -78,7 +87,6 @@ mod_forecasting_viewer_server <- function(id) {
     output$forecast_pipeline_boxes <- renderUI({
       pipelines_list <- pipelines_metadata()
       temp <- seq_len(nrow(pipelines_list))
-      # print(list_of_workflows()$pipelines)
 
       all_boxes <- fluidRow(lapply(temp, function(x) {
         created_at_value <- as.numeric(pipelines_list[x, "created_at"])
@@ -217,15 +225,24 @@ mod_forecasting_viewer_server <- function(id) {
       selectInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
     })
 
-    output$aggregation <- renderUI({
+
+    output$aggregate_by <- renderUI({
       req(input$as_of)
-      selectInput(inputId = ns("agg_type"), "Aggregation", choices = c("", "Sum" = "sum"))
+      selectInput(inputId = ns("agg_by"), "Aggregate by", choices = c("days", "weeks"))
     })
 
-
+    output$aggregation <- renderUI({
+      req(input$as_of)
+      req(input$agg_by)
+      if(input$agg_by == "weeks"){
+      selectInput(inputId = ns("agg_type"), "Aggregation",choices = c("Sum" = "sum", "Mean" = "mean", "Max" = "max", "Min" = "min"))
+      }
+      else{
+        NULL
+      }
+    })
 
     output$run <- renderUI({
-      # button_theme <- th2utils::add_button_theme()
       req(input_data_result())
       req(output_data_result())
       req(input$kpi_value, input$model)
@@ -233,7 +250,6 @@ mod_forecasting_viewer_server <- function(id) {
     })
 
     output$accuracy <- renderUI({
-      # button_theme <- th2utils::add_button_theme()
       req(input_data_result())
       req(output_data_result())
       req(input$kpi_value, input$model)
@@ -253,21 +269,13 @@ mod_forecasting_viewer_server <- function(id) {
         kpi_value = input$kpi_value
       )
 
-      if(is.null(input$agg_type) || input$agg_type == "" ){
-        shinyalert("Oops!", "It is necessary to select a type of aggregation.", type = "warning")
-        renderText("No data available for selected filters.")
-      }else{
-
-      if (input$agg_type == "sum") {
         prediction_data_aggregated <- prediction_data_filtred_result %>%
           dplyr::filter(execution_date == input$as_of)
-          # dplyr::group_by_at(vars(selected_info()$date_var, execution_date)) %>%
-          # dplyr::summarise(across(where(is.numeric), sum))
 
           historical_data_aggregated <- historical_data_filtred_result %>%
             dplyr::group_by_at(vars(selected_info()$date_var)) %>%
             dplyr::summarise_at(vars(selected_info()$target_var), sum)
-        }
+
 
 
         # Ajustement du nombre de lignes de historical_data_aggregated
@@ -283,12 +291,18 @@ mod_forecasting_viewer_server <- function(id) {
 
 
         if (!is.null(historical_data_aggregated) && !is.null(prediction_data_aggregated)) {
-          create_time_series_plot(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var)
-        } else {
+            if(input$agg_by == "days" ){
+              create_time_series_plot(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var)
+           }else{
+              create_weekly_bar_chart(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var, agg_type = input$agg_type)
+          }
+        }else {
           renderText("No data available for selected filters.")
         }
-      }
     })
+
+
+#=================== Accuracy
 
     accuracy_to_visualize <- eventReactive(input$accuracy, {
       prediction_data_filtred_result <- output_data_result() %>%
@@ -316,10 +330,11 @@ mod_forecasting_viewer_server <- function(id) {
       ))
     })
 
-    # ====================== Graph output
+    # ====================== Graphs output
     output$graph_output <- renderUI({
       data_to_visualize()
     })
+    # ====================== Accuracy output
     output$accuracy_output <- renderUI({
       accuracy_to_visualize()
     })
