@@ -186,7 +186,7 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 calendars_businness_days <- function(db_conn = NULL, country_code = NULL) {
   tryCatch(
     {
-      query_statement_output <- glue::glue("SELECT * FROM public.holidays_country_years where countrycode = '{country_code}'")
+      query_statement_output <- glue::glue("SELECT * FROM public.holidays_country_years where country = '{country_code}'")
 
       query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
       calendar_bh_country <- DBI::dbFetch(query_res_output)

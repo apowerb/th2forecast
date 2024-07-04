@@ -21,6 +21,7 @@ step_th2_feature_engineering <-
            trained = FALSE,
            feature_target = "",
            use_holidays = NULL,
+           use_meteo = NULL,
            all_data = "",
            id_name = "",
            columns = NULL,
@@ -36,6 +37,7 @@ step_th2_feature_engineering <-
         trained = trained,
         feature_target = feature_target,
         use_holidays = use_holidays,
+        use_meteo = use_meteo,
         all_data = all_data,
         id_name = id_name,
         columns = columns,
@@ -54,6 +56,7 @@ step_th2_feature_engineering_new <-
            trained,
            feature_target,
            use_holidays,
+           use_meteo,
            all_data,
            id_name,
            columns,
@@ -68,6 +71,7 @@ step_th2_feature_engineering_new <-
       trained = trained,
       feature_target = feature_target,
       use_holidays = use_holidays,
+      use_meteo = use_meteo,
       all_data = all_data,
       id_name = id_name,
       columns = columns,
@@ -125,6 +129,7 @@ prep.step_th2_feature_engineering <- function(x,
     trained = TRUE,
     feature_target = x$feature_target,
     use_holidays = x$use_holidays,
+    use_meteo = x$use_meteo,
     all_data = x$all_data,
     id_name = training_n[1],
     columns = col_names,
@@ -173,6 +178,8 @@ bake.step_th2_feature_engineering <- function(object,
     feat_len <- feat_len - 1
   }
 
+  if(object$use_meteo == TRUE && !is.null(object$use_meteo)) feat_len <- feat_len + 2
+
   target_col <- object$feature_target
 
   all_data <- object$all_data
@@ -204,7 +211,7 @@ bake.step_th2_feature_engineering <- function(object,
     cols <- (strt):(strt + new_cols[i] - 1)
 
     tmp <- new_data %>%
-      feature_selection(feature_target = target_col, use_holidays = use_holidays, all_data = all_data, id_name = training_n, lags = object$lags, db_conn = object$db_conn) %>%
+      feature_selection(feature_target = target_col, use_holidays = use_holidays, use_meteo = object$use_meteo,, all_data = all_data, id_name = training_n, lags = object$lags, db_conn = object$db_conn) %>%
       dplyr::select(-object$columns[i], -target_col) %>%
       dplyr::as_tibble()
 

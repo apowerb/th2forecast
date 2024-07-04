@@ -77,7 +77,7 @@ th2_tune_model <- function(resample_data, model, tuning_param) {
 #' @return renvoie un ensemble de plusieurs modèles entraînés
 #' @export
 #' @examples
-th2_ensemble_engine <- function(dataset_input, var_date, var_target, models, list_features = c(), ensamble_type = "mean", use_holidays = TRUE) {
+th2_ensemble_engine <- function(dataset_input, var_date, var_target, models, list_features = c(), ensamble_type = "mean", use_holidays = NULL) {
   list_output_models <- list()
   error_models <- NULL
 
