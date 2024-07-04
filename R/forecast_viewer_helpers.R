@@ -1,4 +1,5 @@
 # ===================== DB cconn function ==================
+#' @export
 db_conn_function <- function(dbms = NULL, server = NULL, user = NULL, password = NULL, port = NULL,
                              host = NULL, db_name = NULL) {
   db_conn <- DatabaseConnector::connect(
@@ -11,6 +12,7 @@ db_conn_function <- function(dbms = NULL, server = NULL, user = NULL, password =
   return(db_conn)
 }
 # ===================== output data function ( prediction data)==================
+#' @export
 output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL) {
   # Récupérer les données de prédiction
   tryCatch(
@@ -37,6 +39,7 @@ output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL
 }
 
 # ======================input data function ( historical data filtred) ==================
+#' @export
 input_data_fetch <- function(prediction_data = NULL, db_conn = NULL, target_table = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL, as_of = NULL) {
   tryCatch(
     {
@@ -78,6 +81,7 @@ input_data_fetch <- function(prediction_data = NULL, db_conn = NULL, target_tabl
 
 
 # ======= #merged data filtred function =======================================
+#' @export
 prediction_data_filtred <- function(prediction_data = NULL, model = NULL, kpi_value = NULL, group_target_var = NULL) {
   if (!is.null(model)) {
     prediction_data_filtred <- prediction_data %>% dplyr::filter(`_model_desc` == !!model, prediction_data[[group_target_var]] == !!kpi_value)
@@ -96,38 +100,87 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
 
 
 # =========== #create plot (time series) function ==================================
+#' @export
 create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL) {
   historical_data <- historical_data[order(historical_data[[x_var]]), ]
   prediction_data <- prediction_data[order(prediction_data[[x_var]]), ]
 
-  time_series_plot <- plotly::plot_ly() %>%
-    plotly::add_trace(
-      data = historical_data, type = "scatter", mode = "lines",
-      x = ~ get(x_var), y = ~ get(y_var), name = "Historical Values", color = I("blue")
-    ) %>%
-    plotly::add_trace(
-      data = prediction_data, type = "scatter", mode = "lines",
-      x = ~ get(x_var), y = ~ get(y_var), name = "Prediction Values", color = I("red")
-    ) %>%
-    plotly::add_trace(
-      data = prediction_data, type = "scatter", mode = "lines",
-      x = ~ get(x_var), y = ~`_conf_lo`, name = "Lower Confidence",
-      line = list(shape = "spline"), color = "rgba(255,250,250)"
-    ) %>%
-    plotly::add_trace(
-      data = prediction_data, type = "scatter", mode = "lines",
-      x = ~ get(x_var), y = ~`_conf_hi`, name = "High Confidence",
-      line = list(shape = "spline"), color = "rgba(255,250,250)", fill = "tonexty", fillcolor = "rgba(11,156,49,0.2)"
-    ) %>%
-    plotly::layout(
-      title = "Time Series with Confidence Interval",
-      xaxis = list(title = "Date"),
-      yaxis = list(title = "Value"),
-      showlegend = TRUE
-    )
+  historical_data[[x_var]] <- as.Date(historical_data[[x_var]])
+  prediction_data[[x_var]] <- as.Date(prediction_data[[x_var]])
+
+  combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c(".hist", ".pred"))
+
+  time_series_plot <- combined_data %>%
+    echarts4r::e_charts_(x_var) %>%
+    echarts4r::e_line_(paste0(y_var, ".hist"), name = "Historical Values", color = "blue") %>%
+    echarts4r::e_line_(paste0(y_var, ".pred"), name = "Prediction Values", color = "orange") %>%
+    echarts4r::e_line_('_conf_lo', name = "Lower Confidence", lineStyle = list(type = "dashed"), color = "green")%>%
+    echarts4r::e_line_('_conf_hi', name = "High Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
+    echarts4r::e_x_axis(name = "Date") %>%
+    echarts4r::e_y_axis(name = "Value") %>%
+    echarts4r::e_tooltip(trigger = "axis") %>%
+    echarts4r::e_legend(show = TRUE)
 
   time_series_plot
 }
+# =========== #create bar chart (weekly time series) function ==================================
+#' @export
+  create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = NULL) {
+
+    historical_data <- historical_data[order(historical_data[[x_var]]), ]
+    prediction_data <- prediction_data[order(prediction_data[[x_var]]), ]
+
+    historical_data[[x_var]] <- as.Date(historical_data[[x_var]])
+    prediction_data[[x_var]] <- as.Date(prediction_data[[x_var]])
+
+    combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c(".hist", ".pred"))
+
+
+    combined_data <- combined_data %>%
+      mutate(week = lubridate::ceiling_date(as.Date(get(x_var)), unit = "week", week_start = 1))
+
+    if(agg_type == "sum"){
+      weekly_data <- combined_data %>%
+        group_by(week) %>%
+        summarise(across(ends_with(".hist"), sum, na.rm = TRUE),
+                  across(ends_with(".pred"), sum, na.rm = TRUE),
+                  `_conf_lo` = sum(`_conf_lo`, na.rm = TRUE),
+                  `_conf_hi` = sum(`_conf_hi`, na.rm = TRUE))
+    }else if(agg_type == "mean"){
+      weekly_data <- combined_data %>%
+        group_by(week) %>%
+        summarise(across(ends_with(".hist"), mean, na.rm = TRUE),
+                  across(ends_with(".pred"), mean, na.rm = TRUE),
+                  `_conf_lo` = mean(`_conf_lo`, na.rm = TRUE),
+                  `_conf_hi` = mean(`_conf_hi`, na.rm = TRUE))
+    }else if(agg_type == "max"){
+      weekly_data <- combined_data %>%
+        group_by(week) %>%
+        summarise(across(ends_with(".hist"), max, na.rm = TRUE),
+                  across(ends_with(".pred"), max, na.rm = TRUE),
+                  `_conf_lo` = max(`_conf_lo`, na.rm = TRUE),
+                  `_conf_hi` = max(`_conf_hi`, na.rm = TRUE))
+    }else if(agg_type == "min"){
+      weekly_data <- combined_data %>%
+        group_by(week) %>%
+        summarise(across(ends_with(".hist"), min, na.rm = TRUE),
+                  across(ends_with(".pred"), min, na.rm = TRUE),
+                  `_conf_lo` = min(`_conf_lo`, na.rm = TRUE),
+                  `_conf_hi` = min(`_conf_hi`, na.rm = TRUE))
+    }
+
+   weekly_bar_chart <- weekly_data %>%
+     echarts4r::e_charts_('week') %>%
+     echarts4r::e_bar_(paste0(y_var, ".hist"), name = "Historical Values", stack = "grp") %>%
+     echarts4r::e_bar_(paste0(y_var, ".pred"), name = "Prediction Values", stack = "grp2", color = "orange") %>%
+     echarts4r::e_x_axis(name = "Week") %>%
+     echarts4r::e_y_axis(name = "Value") %>%
+     echarts4r::e_tooltip(trigger = "axis") %>%
+     echarts4r::e_legend(show = TRUE)
+
+   weekly_bar_chart
+  }
+
 
 # ===================== output data function ( prediction data)==================
 calendars_businness_days <- function(db_conn = NULL, country_code = NULL) {
