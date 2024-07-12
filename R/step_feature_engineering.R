@@ -104,7 +104,7 @@ prep.step_th2_feature_engineering <- function(x,
       dplyr::select(-name_id)
   }
 
-  if(!is.null(x$use_holidays)) {
+  if (!is.null(x$use_holidays)) {
     bh_country <- x$use_holidays
     if (!!bh_country %in% colnames(training)) {
       country_n <- as.character(training[[bh_country]][1])
@@ -164,21 +164,21 @@ bake.step_th2_feature_engineering <- function(object,
 
   feat_len <- ((timetk::tk_get_timeseries_signature(lubridate::ymd("2016-01-01")) %>% ncol()) - 1 + object$lags) - 2
 
-  if(!is.null(object$use_holidays)) {
+  if (!is.null(object$use_holidays)) {
     bh_country <- object$use_holidays
     if (!!bh_country %in% colnames(new_data)) {
       use_holidays <- as.character(new_data[[bh_country]][1])
       new_data <- new_data %>%
         dplyr::select(-!!bh_country)
-    }else{
+    } else {
       use_holidays <- object$use_holidays
     }
-  }else{
+  } else {
     use_holidays <- object$use_holidays
     feat_len <- feat_len - 1
   }
 
-  if(object$use_meteo == TRUE && !is.null(object$use_meteo)) feat_len <- feat_len + 2
+  if (object$use_meteo == TRUE && !is.null(object$use_meteo)) feat_len <- feat_len + 2
 
   target_col <- object$feature_target
 
@@ -211,7 +211,7 @@ bake.step_th2_feature_engineering <- function(object,
     cols <- (strt):(strt + new_cols[i] - 1)
 
     tmp <- new_data %>%
-      feature_selection(feature_target = target_col, use_holidays = use_holidays, use_meteo = object$use_meteo,, all_data = all_data, id_name = training_n, lags = object$lags, db_conn = object$db_conn) %>%
+      feature_selection(feature_target = target_col, use_holidays = use_holidays, use_meteo = object$use_meteo, , all_data = all_data, id_name = training_n, lags = object$lags, db_conn = object$db_conn) %>%
       dplyr::select(-object$columns[i], -target_col) %>%
       dplyr::as_tibble()
 

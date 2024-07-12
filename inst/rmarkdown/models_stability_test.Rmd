@@ -8,6 +8,10 @@ params:
   kpi: NA
   models: NA
   column_kpi: NA
+  split_date: NA
+  horizon: NA
+  var_date: NA
+  var_target: NA
 ---
 
 # Comparison of model stability
@@ -20,27 +24,40 @@ For all models, a 7-day increment is made in each iteration, so as to observe th
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 
-library(th2forecast)
-
 table_accuracy <-- data.frame()
 
-data_filter <- params$data %>%
-  dplyr::filter(params$data[[params$column_kpi]] == params$kpi)
+result_test_report <- params$data 
+#   dplyr::filter(params$data[[params$column_kpi]] == params$kpi)
+# 
+# result_test_report <- th2forecast::th2_rolling_forecast_stablizer(data_filter, params$var_date, params$var_target, params$column_kpi, params$models, params$split_date, params$horizon)
 
 ```
 
 ```{r, results='asis', echo=FALSE, warning=FALSE, message=FALSE}
 for (model in params$models) {
+  
+  if (model == "lr"){
+    model <- "lm"
+  }
+  
+  if(model == "mars"){
+      model <- "earth"
+  }
 
   cat(" \n\n")
   cat(paste0("## ", gsub("_", " ", sub("^.", toupper(substr(model, 1, 1)), model)), "\n\n"))
+  
+  models_upper <- gsub("_", "", toupper(model))
 
   cat(paste0( gsub("_", " ", sub("^.", toupper(substr(model, 1, 1)), model)), " model evaluation metrics with incremental days per iteration:" , "\n\n"))
   
-  result_test <- th2forecast::th2_rolling_forecast_stablizer(data_filter, model)
+  # result_test_report <- th2forecast::th2_rolling_forecast_stablizer(data_filter, model)
   
   if (model != params$models[length(params$models)]){
-    table_acc <- DT::datatable(result_test$accuracy_df)
+    table_acc <- DT::datatable(result_test_report$accuracy_df %>% 
+                                 dplyr::filter(`model_desc` == models_upper)%>%
+                                 dplyr::select(-c(mae, rmse, rsq))
+                               )
     print(htmltools::tagList(table_acc))
     # cat(tests$accuracy_df %>%
     #   knitr::kable("pipe") %>%
@@ -51,12 +68,12 @@ for (model in params$models) {
     cat("comparison of results\n\n")
     
     # cat(tests$time_series_plot)
-    plot_test <- result_test$time_series_plot
+    plot_test <- result_test_report$time_series_plot[[model]]
     print(htmltools::tagList(plot_test))
     cat("_______\n\n")
     cat("------------------------------------------------------------------------ \n\n")
   }
-  table_accuracy <- rbind(table_accuracy, result_test$accuracy_df)
+  table_accuracy <- rbind(table_accuracy, result_test_report$accuracy_df %>% dplyr::filter(`model_desc` == models_upper))
   
 }
 ```
@@ -64,10 +81,11 @@ for (model in params$models) {
 
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-library(th2forecast)
-
 # reult_forecast_arima <- th2forecast::th2_rolling_forecast_stablizer(data_filter, "arima")
-result_test$accuracy_df %>%
+result_test_report$accuracy_df %>%
+  dplyr::filter(`model_desc` == gsub("_", "", toupper(params$models[length(params$models)]))) %>%
+  dplyr::select(-c(mae, rmse, rsq)) %>%
+  dplyr::rename(mae = test_mae, rmse = test_rmse, rsq = test_rsq) %>%
   DT::datatable()
 ```
 
@@ -76,34 +94,61 @@ result_test$accuracy_df %>%
 comparison of results
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-result_test$time_series_plot
+result_test_report$time_series_plot[[params$models[length(params$models)]]]
 ```
 
 ## Comparison {.tabset}
 ### MAE 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-
 mae_accuracy <- table_accuracy %>% 
-  dplyr::select(period, .model_desc, mae) %>%
-  pivot_wider(names_from = .model_desc, values_from = mae)
+  dplyr::select(period, model_desc, mae, test_mae) %>%
+  group_by(period)
+  # tidyr::pivot_wider(names_from = .model_desc, values_from = mae)
 
-weekly_bar_chart <- mae_accuracy %>%
-    echarts4r::e_charts(period)
-  
-if("ARIMA" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(ARIMA, stack = "grp") }
-if("PROPHET" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(PROPHET, stack = "grp2") }
-if("LR" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(LR, stack = "grp3") }
-if("EARTH" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(EARTH, stack = "grp4") }
-if("RANDOMFOREST" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(RANDOMFOREST, stack = "grp5") }
-if("XGBOOST" %in% colnames(mae_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(XGBOOST, stack = "grp6") }
 
-weekly_bar_chart <- weekly_bar_chart %>%
+mae_accuracy <- mae_accuracy %>%
+  dplyr::mutate(ranking = rank(mae))
+# coparison_chart <- mae_accuracy %>%
+#     echarts4r::e_charts(period)
+
+coparison_chart <- mae_accuracy |> 
+  echarts4r::group_by(model_desc) |>
+  echarts4r::e_chart(period) |>
+  echarts4r::e_bar(test_mae, 
+        bind = ranking,
+        label = list(
+          show = TRUE,
+          formatter = "{b}",
+          position = "outside"
+        )
+  )
+
+coparison_chart <- coparison_chart %>%
     echarts4r::e_x_axis(name = "Period") %>%
     echarts4r::e_y_axis(name = "Value") %>%
-    echarts4r::e_tooltip(trigger = "axis") %>%
-    echarts4r::e_legend(show = TRUE)
+    echarts4r::e_title(text = "Performance model - MAE", top = 0, left = "center") %>%
+    # echarts4r::e_tooltip(trigger = "axis") %>%
+    echarts4r::e_tooltip(trigger = "axis", formatter = htmlwidgets::JS('
+        function (params) {
+          let tooltip = `<p style="width: auto;">${params[0].axisValue}</p>`;
+          min = Infinity
+          min_val = ""
+          i = 0
+          params.forEach(({ seriesName, marker, value }) => {
+                if( parseInt(params[i].name) < min){
+                  min = parseInt(params[i].name)
+                  min_val = seriesName
+                }
+                tooltip += `<p style="width: auto; float: center;">${marker} ${seriesName}<span style="float: right;"><strong>${value[1]}</strong></span></p>`;
+                i = i + 1
+              });
+          tooltip += `<hr> <p style="width: auto;"><strong>Best model in training: ${min_val}</strong></p>`;
+          
+          return tooltip;
+            }')) %>%
+    echarts4r::e_legend(top = 20, show = TRUE)
 
-weekly_bar_chart
+coparison_chart
 
 ```
 
@@ -111,53 +156,126 @@ weekly_bar_chart
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 
 rmse_accuracy <- table_accuracy %>%
-  dplyr::select(period, .model_desc, rmse) %>%
-  pivot_wider(names_from = .model_desc, values_from = rmse)
+  dplyr::select(period, model_desc, rmse, test_rmse) %>%
+  group_by(period)
+  # tidyr::pivot_wider(names_from = .model_desc, values_from = rmse)
+rmse_accuracy <- rmse_accuracy %>%
+  dplyr::mutate(ranking = rank(rmse))
 
-weekly_bar_chart <- rmse_accuracy %>%
-    echarts4r::e_charts(period)
+# coparison_chart <- rmse_accuracy %>%
+#     echarts4r::e_charts(period)
 
-if("ARIMA" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(ARIMA, stack = "grp") }
-if("PROPHET" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(PROPHET, stack = "grp2") }
-if("LR" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(LR, stack = "grp3") }
-if("EARTH" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(EARTH, stack = "grp4") }
-if("RANDOMFOREST" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(RANDOMFOREST, stack = "grp5") }
-if("XGBOOST" %in% colnames(rmse_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(XGBOOST, stack = "grp6") }
+coparison_chart <- rmse_accuracy |> 
+  echarts4r::group_by(model_desc) |>
+  echarts4r::e_chart(period) |>
+  echarts4r::e_bar(test_rmse, 
+        bind = ranking,
+        label = list(
+          show = TRUE,
+          formatter = "{b}",
+          position = "outside"
+        )
+  )
 
-weekly_bar_chart <- weekly_bar_chart %>%
+coparison_chart <- coparison_chart %>%
     echarts4r::e_x_axis(name = "Period") %>%
     echarts4r::e_y_axis(name = "Value") %>%
-    echarts4r::e_tooltip(trigger = "axis") %>%
-    echarts4r::e_legend(show = TRUE)
+    echarts4r::e_title(text = "Performance model - RMSE", top = 0, left = "center") %>%
+    # echarts4r::e_tooltip(trigger = "axis") %>%
+    echarts4r::e_tooltip(trigger = "axis", formatter = htmlwidgets::JS('
+        function (params) {
+          let tooltip = `<p style="width: auto;">${params[0].axisValue}</p>`;
+          
+          min = Infinity
+          min_val = ""
+          i = 0
+          params.forEach(({ seriesName, marker, value }) => {
+                if( parseInt(params[i].name) < min){
+                  min = parseInt(params[i].name)
+                  min_val = seriesName
+                }
+          
+                tooltip += `<p style="width: auto; float: center;">${marker} ${seriesName}<span style="float: right;"><strong>${value[1]}</strong></span></p>`;
+                
+                i = i + 1
+              });
+          tooltip += `<hr> <p style="width: auto;"><strong>Best model in training: ${min_val}</strong></p>`;
+          
+          return tooltip;
+            }')) %>%
+    echarts4r::e_legend(top = 20, show = TRUE)
 
-weekly_bar_chart
+coparison_chart
 
 ```
 
 ### RSQ
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
-
+```{r, echo=FALSE, warning=FALSE, message=FALSE }
 rsq_accuracy <- table_accuracy %>%
-  dplyr::select(period, .model_desc, rsq) %>%
-  pivot_wider(names_from = .model_desc, values_from = rsq)
+  dplyr::select(period, model_desc, rsq, test_rsq) %>%
+  group_by(period)
+  # tidyr::pivot_wider(names_from = .model_desc, values_from = rsq) %>%
+  # dplyr::mutate(ranking = "")
 
-weekly_bar_chart <- rsq_accuracy %>%
-    echarts4r::e_charts(period)
+rsq_accuracy <- rsq_accuracy %>%
+  # dplyr::mutate(ranking = rank(rsq))
+  dplyr::mutate(ranking = n() - rank(rsq) + 1)
 
-if("ARIMA" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(ARIMA, stack = "grp") }
-if("PROPHET" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(PROPHET, stack = "grp2") }
-if("LR" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(LR, stack = "grp3") }
-if("EARTH" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(EARTH, stack = "grp4") }
-if("RANDOMFOREST" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(RANDOMFOREST, stack = "grp5") }
-if("XGBOOST" %in% colnames(rsq_accuracy)) { weekly_bar_chart <- weekly_bar_chart %>% echarts4r::e_bar(XGBOOST, stack = "grp6") }
+# list_ranks <- list()
+# for (i in 1:nrow(rsq_accuracy)) {
+#   ranking_accu <- rank(rsq_accuracy[i, 3: (ncol(rsq_accuracy)-1)])
+#   
+#   list_ranks <- c(list_ranks, list(ranking_accu))
+# }
+# 
+# rsq_accuracy$ranking <- list_ranks
+# View(rsq_accuracy)
+# View(rsq_accuracy)
 
-weekly_bar_chart <- weekly_bar_chart %>%
+# coparison_chart <- rsq_accuracy %>%
+#     echarts4r::e_charts(period)
+
+coparison_chart <- rsq_accuracy |> 
+  echarts4r::group_by(model_desc) |>
+  echarts4r::e_chart(period) |>
+  echarts4r::e_bar(test_rsq, 
+        bind = ranking,
+        label = list(
+          show = TRUE,
+          formatter = "{b}",
+          position = "outside"
+        )
+  )
+
+test_model <- "RANDOMFOREST"
+coparison_chart <- coparison_chart %>%
     echarts4r::e_x_axis(name = "Period") %>%
     echarts4r::e_y_axis(name = "Value") %>%
-    echarts4r::e_tooltip(trigger = "axis") %>%
-    echarts4r::e_legend(show = TRUE)
+    echarts4r::e_title(text = "Performance model  - RSQ", top = 0, left = "center") %>%
+    # echarts4r::e_tooltip(trigger = "axis") %>%
+    echarts4r::e_tooltip(trigger = "axis", formatter = htmlwidgets::JS('
+      function (params) {
+        let tooltip = `<p style="width: auto;">${params[0].axisValue}</p>`;
+        
+        min = Infinity
+        min_val = ""
+        i = 0
+        params.forEach(({ seriesName, marker, value }) => {
+              if( parseInt(params[i].name) < min){
+                  min = parseInt(params[i].name)
+                  min_val = seriesName
+              }
+              tooltip += `<p style="width: auto; float: center;">${marker} ${seriesName}<span style="float: right;"><strong>${value[1]}</strong></span></p>`;
+              
+              i = i + 1
+            });
+        tooltip += `<hr> <p style="width: auto;"><strong>Best model in training: ${min_val}</strong></p>`;
+        
+        return tooltip;
+          }')) %>%
+    echarts4r::e_legend(top = 20, show = TRUE)
 
-weekly_bar_chart
+coparison_chart
 
 ```
 
