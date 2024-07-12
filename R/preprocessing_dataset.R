@@ -110,11 +110,10 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 #'
 #' @examples
 holidays_detection <- function(input_data, model, calendar = "calendar_france", region = "metropole", db_conn = NULL) {
-
   date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
   var_date_feature <- colnames(input_data[, date_variable])
 
-  if(calendar == "calendar_france"){
+  if (calendar == "calendar_france") {
     url <- paste0("https://calendrier.api.gouv.fr/jours-feries/", region, ".json")
 
     holidays_req <- httr2::request(base_url = url) %>%
@@ -125,7 +124,7 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
 
     list_holidays <- holidays_resp %>%
       httr2::resp_body_json()
-  }else{
+  } else {
     tryCatch(
       {
         # list_holidays_years <- list()
@@ -151,9 +150,8 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
         list_holidays <- list()
 
         for (i in 1:nrow(calendar_country_bh)) {
-          list_holidays[calendar_country_bh[i, '_date']] <- calendar_country_bh[i, '_name']
+          list_holidays[calendar_country_bh[i, "_date"]] <- calendar_country_bh[i, "_name"]
         }
-
       },
       error = function(error) {
         print(error)
@@ -161,7 +159,6 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
         return(NULL)
       }
     )
-
   }
 
   if (model == "ml") {
@@ -198,7 +195,6 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
 
 #' @export
 meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius") {
-
   date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
   var_date_feature <- colnames(input_data[, date_variable])
 
@@ -210,15 +206,15 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
   co_ordinate <- openmeteo::geocode(region)
   co_ordinate <- c(co_ordinate$latitude, co_ordinate$longitude)
 
-  if(min_date > as.Date(lubridate::now()) ){
+  if (min_date > as.Date(lubridate::now())) {
     temp_result <- openmeteo::climate_forecast(
-        co_ordinate,
-        min_date,
-        max_date,
-        daily = "temperature_2m_max",
-        model = "MPI_ESM1_2_XR",
-        response_units = list(temperature_unit = temperature_unit)
-      )
+      co_ordinate,
+      min_date,
+      max_date,
+      daily = "temperature_2m_max",
+      model = "MPI_ESM1_2_XR",
+      response_units = list(temperature_unit = temperature_unit)
+    )
 
     precipitation_result <- openmeteo::climate_forecast(
       co_ordinate,
@@ -228,7 +224,7 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
       model = "MPI_ESM1_2_XR",
       response_units = list(precipitation_unit = "mm")
     )
-  }else{
+  } else {
     temp_result <- openmeteo::weather_history(
       co_ordinate,
       start = min_date,
@@ -249,7 +245,6 @@ meteo_feature <- function(input_data, region = NULL, temperature_unit = "celsius
   df_meteo <- cbind(temp_result, precipitation_result[2])
 
   return(df_meteo)
-
 }
 
 

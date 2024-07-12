@@ -103,7 +103,6 @@ feature_selection <- function(
           data_features[paste(feature_target, "_lag", i, sep = "")] <- data_lag
         }
       } else {
-
         dim_input_data <- nrow(input_data)
         dim_train_data <- nrow(data_features) - dim_input_data
 
