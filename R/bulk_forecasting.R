@@ -26,7 +26,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
     test_data <- test_data %>%
       dplyr::group_by(test_data[[date_var]]) %>%
-      dplyr::summarise(count = n())
+      dplyr::summarise(count = dplyr::n())
 
     future_forecast <- nrow(test_data)
   } else {
@@ -262,7 +262,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_refit(
-      control = modeltime::control_nested_refit(verbose = TRUE)
+      control = modeltime::control_nested_refit(allow_par = TRUE, verbose = FALSE)
     )
 
   accuracy_test <- best_nested_modeltime_tbl %>%
