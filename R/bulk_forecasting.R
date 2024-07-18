@@ -225,7 +225,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     c(
       list(nested_data = nested_data_tbl),
       list_output_models,
-      list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = FALSE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
+      list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
     )
   )
 
@@ -256,7 +256,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_refit(
-      control = modeltime::control_nested_refit(allow_par = allow_par, verbose = FALSE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
+      control = modeltime::control_nested_refit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
     )
 
   accuracy_test <- best_nested_modeltime_tbl %>%
@@ -291,7 +291,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     modeltime::parallel_stop()
 
     # Disconnects Spark
-    sparklyr::spark_disconnect_all()
+    # sparklyr::spark_disconnect_all()
   }
 
   return(forecast_result)
