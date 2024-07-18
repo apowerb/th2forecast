@@ -11,7 +11,9 @@
 #' @export
 #' @examples
 th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL, spark_conection = NULL) {
+  allow_par <- FALSE
   if (!is.null(spark_conection)) {
+    allow_par <- TRUE
     modeltime::parallel_start(spark_conection, .method = "spark")
   }
 
@@ -217,24 +219,16 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   }
 
 
-  if (!is.null(spark_conection)) {
-    nested_modeltime_tbl <- do.call(
-      modeltime::modeltime_nested_fit,
-      c(
-        list(nested_data = nested_data_tbl),
-        list_output_models,
-        list(control = modeltime::control_nested_fit(allow_par = TRUE, verbose = TRUE))
-      )
+
+  nested_modeltime_tbl <- do.call(
+    modeltime::modeltime_nested_fit,
+    c(
+      list(nested_data = nested_data_tbl),
+      list_output_models,
+      list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE))
     )
-  } else {
-    nested_modeltime_tbl <- do.call(
-      modeltime::modeltime_nested_fit,
-      c(
-        list(nested_data = nested_data_tbl),
-        list_output_models
-      )
-    )
-  }
+  )
+
 
   # nested_modeltime_tbl <- modeltime::modeltime_nested_fit
 
@@ -262,7 +256,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_refit(
-      control = modeltime::control_nested_refit(allow_par = TRUE, verbose = FALSE)
+      control = modeltime::control_nested_refit(allow_par = allow_par, verbose = FALSE)
     )
 
   accuracy_test <- best_nested_modeltime_tbl %>%
