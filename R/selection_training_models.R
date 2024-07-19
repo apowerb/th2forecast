@@ -74,8 +74,8 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
     }
 
     model_prophet <- modeltime::prophet_reg(
-      # changepoint_num = ifelse(fit_model == FALSE, tune(), changepoint_num),
-      # changepoint_range = ifelse(fit_model == FALSE, tune(), changepoint_range)
+      changepoint_num = ifelse(fit_model == FALSE, tune(), changepoint_num),
+      changepoint_range = ifelse(fit_model == FALSE, tune(), changepoint_range)
     ) %>%
       parsnip::set_engine(engine = engine, holidays = holidays_df)
 

@@ -254,7 +254,12 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     )
 
 
-  nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
+  cloned_tbl <- data.table::copy(nested_modeltime_tbl)
+
+  rm(nested_modeltime_tbl)
+  gc()
+
+  nested_modeltime_refit_tbl <- cloned_tbl %>%
     modeltime::modeltime_nested_refit(
       control = modeltime::control_nested_refit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
     )
