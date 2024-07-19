@@ -35,6 +35,8 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
     train_data <- input_data
   }
 
+  db_conn <- NULL
+
   group_target_output <- group_target
   if (group_target == "all_columns") {
     data_tbl <- train_data %>%
@@ -145,11 +147,11 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
-      # if (!is.null(use_holidays)) {
-      #   res_bh <- ifelse(use_holidays != "in_data", use_holidays, country_column)
-      # } else {
-      #   res_bh <- use_holidays
-      # }
+      if (!is.null(use_holidays)) {
+        res_bh <- ifelse(use_holidays != "in_data", use_holidays, country_column)
+      } else {
+        res_bh <- use_holidays
+      }
       #
       # training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
 
@@ -161,13 +163,14 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
         parsnip::set_engine("xgboost")
 
       recipe_xgboost <- recipes::recipe(formula, data = nested_data) %>%
-        step_th2_feature_engineering(recipes::all_predictors(), feature_target = target_var, use_holidays = NULL, use_meteo = use_meteo, all_data = nested_data_tbl, lags = lags) %>%
-        recipes::step_rm(target_var)
+        step_th2_feature_engineering(recipes::all_predictors(), feature_target = target_var, use_holidays = res_bh, use_meteo = use_meteo, all_data = nested_data_tbl, lags = lags) %>%
+        recipes::step_rm("date")
+
       model_xgboost_fit <- workflows::workflow() %>%
         workflows::add_recipe(recipe_xgboost) %>%
         workflows::add_model(model_xgboost)
 
-      training_model <- model_prophet_fit
+      training_model <- model_xgboost_fit
 
       label_model <- "model_xgboost"
     } else if (model == "arimax") {
