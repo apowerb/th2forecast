@@ -120,6 +120,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       .length_test = test_size
     )
 
+  print(nested_data_tbl)
+
   for (i in 1:nrow(nested_data_tbl)) {
     list_nestede_data <- nested_data_tbl[i, ]$.actual_data
     if (!is.null(country_column) && use_holidays == "in_data") {
@@ -239,19 +241,19 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       filter_test_forecasts = TRUE
     )
 
-  mae_best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
-    modeltime::modeltime_nested_select_best(
-      metric                = "mae",
-      minimize              = TRUE,
-      filter_test_forecasts = TRUE
-    )
+  # mae_best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
+  #   modeltime::modeltime_nested_select_best(
+  #     metric                = "mae",
+  #     minimize              = TRUE,
+  #     filter_test_forecasts = TRUE
+  #   )
 
-  rsq_nested_modeltime_tbl <- nested_modeltime_tbl %>%
-    modeltime::modeltime_nested_select_best(
-      metric                = "rsq",
-      minimize              = FALSE,
-      filter_test_forecasts = TRUE
-    )
+  # rsq_nested_modeltime_tbl <- nested_modeltime_tbl %>%
+  #   modeltime::modeltime_nested_select_best(
+  #     metric                = "rsq",
+  #     minimize              = FALSE,
+  #     filter_test_forecasts = TRUE
+  #   )
 
 
   nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
@@ -274,9 +276,9 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   forecast_result <- forecast_result %>%
     dplyr::mutate(accuracy = list(accuracy_test)) %>%
-    dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-    dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-    dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
+    dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) #%>%
+    # dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
+    # dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
 
