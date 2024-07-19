@@ -115,7 +115,19 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       training_model <- th2_arima_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
       label_model <- "model_arima"
     } else if (model == "prophet") {
-      training_model <- th2_prophet_engine(nested_data, target_var, "date", use_holidays = use_holidays, fit_model = "bulk", db_conn = db_conn)$fit
+      # training_model <- th2_prophet_engine(nested_data, target_var, "date", use_holidays = use_holidays, fit_model = "bulk", db_conn = db_conn)$fit
+
+      formula <- as.formula(paste(target_var, "~", "date"))
+
+      model_prophet <- modeltime::prophet_reg() %>%
+        parsnip::set_engine(engine = "prophet")
+      recipe_prophet <- recipes::recipe(formula, data = nested_data)
+
+      model_prophet_fit <- workflows::workflow() %>%
+        workflows::add_recipe(recipe_prophet) %>%
+        workflows::add_model(model_prophet)
+
+      training_model <- model_prophet_fit
       label_model <- "model_prophet"
     } else if (model == "lr") {
       training_model <- th2_linear_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
