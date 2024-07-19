@@ -218,62 +218,45 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     list_output_models[[label_model]] <- training_model
   }
 
-  rec_prophet <- recipes::recipe(sales ~ date, extract_nested_train_split(nested_data_tbl))
-
-  wflw_prophet <- workflows::workflow() %>%
-    workflows::add_model(
-      prophet_reg("regression") %>%
-        parsnip::set_engine("prophet")
-    ) %>%
-    workflows::add_recipe(rec_prophet)
 
 
-  nested_modeltime_tbl <- nested_data_tbl %>%
-    modeltime_nested_fit(
-      wflw_prophet,
-      control = control_nested_fit(allow_par = TRUE, verbose = TRUE)
+  nested_modeltime_tbl <- do.call(
+    modeltime::modeltime_nested_fit,
+    c(
+      list(nested_data = nested_data_tbl),
+      list_output_models,
+      list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
     )
-
-
-  # nested_modeltime_tbl <- do.call(
-  #   modeltime::modeltime_nested_fit,
-  #   c(
-  #     list(nested_data = nested_data_tbl),
-  #     list_output_models,
-  #     list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
-  #   )
-  # )
+  )
 
 
   # nested_modeltime_tbl <- modeltime::modeltime_nested_fit
-
-
-
-  # mae_best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
-  #   modeltime::modeltime_nested_select_best(
-  #     metric                = "mae",
-  #     minimize              = TRUE,
-  #     filter_test_forecasts = TRUE
-  #   )
-
-  # rsq_nested_modeltime_tbl <- nested_modeltime_tbl %>%
-  #   modeltime::modeltime_nested_select_best(
-  #     metric                = "rsq",
-  #     minimize              = FALSE,
-  #     filter_test_forecasts = TRUE
-  #   )
-
-
-  nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
-    modeltime::modeltime_nested_refit(
-      control = modeltime::control_nested_refit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
-    )
 
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_select_best(
       metric                = "rmse",
       minimize              = TRUE,
       filter_test_forecasts = TRUE
+    )
+
+  mae_best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
+    modeltime::modeltime_nested_select_best(
+      metric                = "mae",
+      minimize              = TRUE,
+      filter_test_forecasts = TRUE
+    )
+
+  rsq_nested_modeltime_tbl <- nested_modeltime_tbl %>%
+    modeltime::modeltime_nested_select_best(
+      metric                = "rsq",
+      minimize              = FALSE,
+      filter_test_forecasts = TRUE
+    )
+
+
+  nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
+    modeltime::modeltime_nested_refit(
+      control = modeltime::control_nested_refit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
     )
 
   accuracy_test <- best_nested_modeltime_tbl %>%
@@ -291,9 +274,9 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   forecast_result <- forecast_result %>%
     dplyr::mutate(accuracy = list(accuracy_test)) %>%
-    dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) #%>%
-    # dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-    # dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
+    dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
+    dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
+    dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
 
