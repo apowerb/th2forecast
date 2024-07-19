@@ -218,6 +218,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     list_output_models[[label_model]] <- training_model
   }
 
+  rec_prophet <- recipes::recipe(sales ~ date, extract_nested_train_split(nested_data_tbl))
 
   wflw_prophet <- workflows::workflow() %>%
     workflows::add_model(
