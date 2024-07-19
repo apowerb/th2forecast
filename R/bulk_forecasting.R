@@ -234,12 +234,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   # nested_modeltime_tbl <- modeltime::modeltime_nested_fit
 
-  best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
-    modeltime::modeltime_nested_select_best(
-      metric                = "rmse",
-      minimize              = TRUE,
-      filter_test_forecasts = TRUE
-    )
+
 
   # mae_best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
   #   modeltime::modeltime_nested_select_best(
@@ -259,6 +254,13 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_refit(
       control = modeltime::control_nested_refit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
+    )
+
+  best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
+    modeltime::modeltime_nested_select_best(
+      metric                = "rmse",
+      minimize              = TRUE,
+      filter_test_forecasts = TRUE
     )
 
   accuracy_test <- best_nested_modeltime_tbl %>%
