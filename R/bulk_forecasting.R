@@ -120,8 +120,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       .length_test = test_size
     )
 
-  print(nested_data_tbl)
-
   for (i in 1:nrow(nested_data_tbl)) {
     list_nestede_data <- nested_data_tbl[i, ]$.actual_data
     if (!is.null(country_column) && use_holidays == "in_data") {
@@ -221,15 +219,29 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   }
 
 
+  wflw_prophet <- workflows::workflow() %>%
+    workflows::add_model(
+      prophet_reg("regression") %>%
+        parsnip::set_engine("prophet")
+    ) %>%
+    workflows::add_recipe(rec_prophet)
 
-  nested_modeltime_tbl <- do.call(
-    modeltime::modeltime_nested_fit,
-    c(
-      list(nested_data = nested_data_tbl),
-      list_output_models,
-      list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
+
+  nested_modeltime_tbl <- nested_data_tbl %>%
+    modeltime_nested_fit(
+      wflw_prophet,
+      control = control_nested_fit(allow_par = TRUE, verbose = TRUE)
     )
-  )
+
+
+  # nested_modeltime_tbl <- do.call(
+  #   modeltime::modeltime_nested_fit,
+  #   c(
+  #     list(nested_data = nested_data_tbl),
+  #     list_output_models,
+  #     list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
+  #   )
+  # )
 
 
   # nested_modeltime_tbl <- modeltime::modeltime_nested_fit
