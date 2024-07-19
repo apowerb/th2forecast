@@ -145,13 +145,30 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
-      if (!is.null(use_holidays)) {
-        res_bh <- ifelse(use_holidays != "in_data", use_holidays, country_column)
-      } else {
-        res_bh <- use_holidays
-      }
+      # if (!is.null(use_holidays)) {
+      #   res_bh <- ifelse(use_holidays != "in_data", use_holidays, country_column)
+      # } else {
+      #   res_bh <- use_holidays
+      # }
+      #
+      # training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
 
-      training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
+      formula <- as.formula(paste(target_var, "~ ."))
+
+      model_xgboost <-
+        parsnip::boost_tree() %>%
+        parsnip::set_mode("regression") %>%
+        parsnip::set_engine("xgboost")
+
+      recipe_xgboost <- recipes::recipe(formula, data = nested_data) %>%
+        step_th2_feature_engineering(recipes::all_predictors(), feature_target = target_var, use_holidays = NULL, use_meteo = use_meteo, all_data = nested_data_tbl, lags = lags) %>%
+        recipes::step_rm(target_var)
+      model_xgboost_fit <- workflows::workflow() %>%
+        workflows::add_recipe(recipe_xgboost) %>%
+        workflows::add_model(model_xgboost)
+
+      training_model <- model_prophet_fit
+
       label_model <- "model_xgboost"
     } else if (model == "arimax") {
       training_model <- th2_arimax_engine(nested_data, "date", target_var, use_holidays = res_bh, fit_model = "bulk", external_data = external_data, exogenous_var = exogenous_var)$fit
