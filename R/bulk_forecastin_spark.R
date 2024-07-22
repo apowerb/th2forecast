@@ -105,8 +105,6 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
 
   nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
 
-  nested_data_spark <- sparklyr::sdf_copy_to(sc, nested_data_tbl)
-
   target_var <- tolower(target_var)
 
   for (model in models_list) {
@@ -190,7 +188,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
   nested_modeltime_tbl <- do.call(
     modeltime::modeltime_nested_fit,
     c(
-      list(nested_data = nested_data_spark),
+      list(nested_data = nested_data_tbl),
       list_output_models,
       list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
     )

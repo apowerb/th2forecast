@@ -56,7 +56,7 @@ feature_selection <- function(
     var_date_feature <- names(input_data)[column_date]
 
     if (length(list_features) > 0) {
-      list_features <- c(var_date_feature, list_features, feature_target)
+      list_features <- c(var_date_feature, feature_target, list_features)
       data_features <- input_data %>%
         dplyr::select(all_of(list_features))
     } else {
