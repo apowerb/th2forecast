@@ -37,188 +37,204 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
 
   db_conn <- NULL
 
-  group_target_output <- group_target
-  if (group_target == "all_columns") {
-    data_tbl <- train_data %>%
-      tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
-      rename(date := !!date_var)
-    group_target <- "id"
-  } else {
-    if (!is.null(country_column) && (use_holidays == "in_data")) {
-      select_vars <- c(group_target, date_var, target_var, country_column)
-    } else {
-      select_vars <- c(group_target, date_var, target_var)
-    }
+  # group_target_output <- group_target
+  # if (group_target == "all_columns") {
+  #   data_tbl <- train_data %>%
+  #     tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
+  #     rename(date := !!date_var)
+  #   group_target <- "id"
+  # } else {
+  #   if (!is.null(country_column) && (use_holidays == "in_data")) {
+  #     select_vars <- c(group_target, date_var, target_var, country_column)
+  #   } else {
+  #     select_vars <- c(group_target, date_var, target_var)
+  #   }
+  #
+  #   data_tbl <- train_data %>%
+  #     dplyr::select(all_of(select_vars)) %>%
+  #     rename(id := !!group_target, date := !!date_var)
+  #   group_target <- "id"
+  #   # data_tbl <- data_tbl %>%
+  #   #   mutate(id_group = paste(store_nbr, family, sep = "_"))
+  # }
 
-    data_tbl <- train_data %>%
-      dplyr::select(all_of(select_vars)) %>%
-      rename(id := !!group_target, date := !!date_var)
-    group_target <- "id"
-    # data_tbl <- data_tbl %>%
-    #   mutate(id_group = paste(store_nbr, family, sep = "_"))
-  }
-
-  data_tbl <- data_tbl %>%
+  input_data <- input_data %>%
     dplyr::group_by_at(vars("date", group_target)) %>%
     dplyr::summarise_at(vars(target_var), sum)
 
 
-  count_data <- table(data_tbl[[group_target]])
+  count_data <- table(input_data[[group_target]])
   column_value <- as.numeric(count_data[1])
   num_ids <- length(names(count_data[count_data > 1]))
 
-  train_size <- round((nrow(data_tbl) / num_ids) * 0.8)
+  train_size <- round((nrow(input_data) / num_ids) * 0.8)
   test_size <- column_value - train_size
 
-  nested_data_tbl <- data_tbl %>%
-    modeltime::extend_timeseries(
-      .id_var        = id,
-      .date_var      = date,
-      .length_future = future_forecast
-    ) %>%
-    modeltime::nest_timeseries(
-      .id_var        = id,
-      .length_future = future_forecast
-    ) %>%
-    modeltime::split_nested_timeseries(
-      .length_test = test_size
-    )
+  print(input_data)
 
-  for (i in 1:nrow(nested_data_tbl)) {
-    list_nestede_data <- nested_data_tbl[i, ]$.actual_data
+  input_data <- preprocessing_data(input_data %>% dplyr::select(target_var, date_var))[["dataset_clean"]]
 
-    data_output_t <- preprocessing_data(list_nestede_data)[["dataset_clean"]]
-
-    data_output_t["name_id"] <- nested_data_tbl[i, 1]
-    nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
-
-    future_data <- nested_data_tbl[i, ]$.future_data[[1]]
-
-    future_data["name_id"] <- nested_data_tbl[i, 1]
-    nested_data_tbl[i, ]$.future_data[[1]] <- future_data
-
-    if (!is.null(country_column) && use_holidays == "in_data") {
-      nested_data_tbl[i, ]$.future_data[[1]] <- nested_data_tbl[i, ]$.future_data[[1]] %>%
-        dplyr::mutate(!!country_column := (list_nestede_data[[1]] %>% dplyr::select(country_column))[[1]][[1]])
-    }
-  }
-
-  nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
-
-  target_var <- tolower(target_var)
-
-  for (model in models_list) {
-    # tune -- for
-    tuning_param <- ""
-    training_model <- NULL
-    label_model <- ""
-
-    if (model == "arima") {
-      training_model <- th2_arima_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
-      label_model <- "model_arima"
-    } else if (model == "prophet") {
-      # training_model <- th2_prophet_engine(nested_data, target_var, "date", use_holidays = use_holidays, fit_model = "bulk", db_conn = db_conn)$fit
-
-      formula <- as.formula(paste(target_var, "~", "date"))
-
-      model_prophet <- modeltime::prophet_reg() %>%
-        parsnip::set_engine(engine = "prophet")
-      recipe_prophet <- recipes::recipe(formula, data = nested_data)
-
-      model_prophet_fit <- workflows::workflow() %>%
-        workflows::add_recipe(recipe_prophet) %>%
-        workflows::add_model(model_prophet)
-
-      training_model <- model_prophet_fit
-      label_model <- "model_prophet"
-    } else if (model == "lr") {
-      training_model <- th2_linear_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
-      label_model <- "model_lm"
-    } else if (model == "mars") {
-      training_model <- th2_mars_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
-      label_model <- "model_mars"
-    } else if (model == "random_forest") {
-      if (!is.null(use_holidays)) {
-        res_bh <- ifelse(use_holidays != "in_data", use_holidays, country_column)
-      } else {
-        res_bh <- use_holidays
-      }
-
-      training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
-      label_model <- "model_random_forest"
-    } else if (model == "xgboost") {
-      if (!is.null(use_holidays)) {
-        res_bh <- ifelse(use_holidays != "in_data", use_holidays, country_column)
-      } else {
-        res_bh <- use_holidays
-      }
-      #
-      # training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
-
-      formula <- as.formula(paste(target_var, "~ ."))
-
-      model_xgboost <-
-        parsnip::boost_tree() %>%
-        parsnip::set_mode("regression") %>%
-        parsnip::set_engine("xgboost")
-
-      recipe_xgboost <- recipes::recipe(formula, data = nested_data) %>%
-        step_th2_feature_engineering(recipes::all_predictors(), feature_target = target_var, use_holidays = res_bh, use_meteo = use_meteo, all_data = nested_data_tbl, lags = lags) %>%
-        recipes::step_rm("date")
-
-      model_xgboost_fit <- workflows::workflow() %>%
-        workflows::add_recipe(recipe_xgboost) %>%
-        workflows::add_model(model_xgboost)
-
-      training_model <- model_xgboost_fit
-
-      label_model <- "model_xgboost"
-    } else if (model == "arimax") {
-      training_model <- th2_arimax_engine(nested_data, "date", target_var, use_holidays = res_bh, fit_model = "bulk", external_data = external_data, exogenous_var = exogenous_var)$fit
-      label_model <- "arimax"
-    } else {
-      error_models <- c(NULL, model)
-    }
-
-    list_output_models[[label_model]] <- training_model
-  }
+  print(input_data)
 
 
+  dataset_train_test <- th2forecast::split_dataset(input_data = input_data, var_time = date_var, var_target = target_var, assess = test_size)[["traintest"]]
 
-  nested_modeltime_tbl <- do.call(
-    modeltime::modeltime_nested_fit,
-    c(
-      list(nested_data = nested_data_tbl),
-      list_output_models,
-      list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
-    )
-  )
+  print(rsample::training(dataset_train_test))
 
-  nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
-    modeltime::modeltime_nested_refit(
-      control = modeltime::control_nested_refit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
-    )
+  model_train <- th2forecast::th2_prophet_engine(rsample::training(dataset_train_test), target_var, date_var, fit_model = TRUE, use_holidays = NULL)
 
-  # accuracy_test <- best_nested_modeltime_tbl %>%
-  #   modeltime::extract_nested_test_accuracy() %>%
-  #   dplyr::select(id, .model_id, .model_desc, .type, mae, rmse, rsq)
+  print(model_train)
 
-  forecast_result <- nested_modeltime_refit_tbl %>%
-    modeltime::extract_nested_future_forecast(
-      .include_actual = FALSE
-    ) %>%
-    dplyr::mutate(as_of = Sys.Date()) %>%
-    dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
-    dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
-    dplyr::rename(!!group_target_output := id)
 
-  if (!is.null(spark_conection)) {
-    # Unregisters the Spark Backend
-    modeltime::parallel_stop()
-
-    # Disconnects Spark
-    # sparklyr::spark_disconnect_all()
-  }
-
-  return(forecast_result)
+  # nested_data_tbl <- data_tbl %>%
+  #   modeltime::extend_timeseries(
+  #     .id_var        = id,
+  #     .date_var      = date,
+  #     .length_future = future_forecast
+  #   ) %>%
+  #   modeltime::nest_timeseries(
+  #     .id_var        = id,
+  #     .length_future = future_forecast
+  #   ) %>%
+  #   modeltime::split_nested_timeseries(
+  #     .length_test = test_size
+  #   )
+  #
+  # for (i in 1:nrow(nested_data_tbl)) {
+  #   list_nestede_data <- nested_data_tbl[i, ]$.actual_data
+  #
+  #   data_output_t <- preprocessing_data(list_nestede_data)[["dataset_clean"]]
+  #
+  #   data_output_t["name_id"] <- nested_data_tbl[i, 1]
+  #   nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
+  #
+  #   future_data <- nested_data_tbl[i, ]$.future_data[[1]]
+  #
+  #   future_data["name_id"] <- nested_data_tbl[i, 1]
+  #   nested_data_tbl[i, ]$.future_data[[1]] <- future_data
+  #
+  #   if (!is.null(country_column) && use_holidays == "in_data") {
+  #     nested_data_tbl[i, ]$.future_data[[1]] <- nested_data_tbl[i, ]$.future_data[[1]] %>%
+  #       dplyr::mutate(!!country_column := (list_nestede_data[[1]] %>% dplyr::select(country_column))[[1]][[1]])
+  #   }
+  # }
+  #
+  # nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
+  #
+  # target_var <- tolower(target_var)
+  #
+  # for (model in models_list) {
+  #   # tune -- for
+  #   tuning_param <- ""
+  #   training_model <- NULL
+  #   label_model <- ""
+  #
+  #   if (model == "arima") {
+  #     training_model <- th2_arima_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
+  #     label_model <- "model_arima"
+  #   } else if (model == "prophet") {
+  #     # training_model <- th2_prophet_engine(nested_data, target_var, "date", use_holidays = use_holidays, fit_model = "bulk", db_conn = db_conn)$fit
+  #
+  #     formula <- as.formula(paste(target_var, "~", "date"))
+  #
+  #     model_prophet <- modeltime::prophet_reg() %>%
+  #       parsnip::set_engine(engine = "prophet")
+  #     recipe_prophet <- recipes::recipe(formula, data = nested_data)
+  #
+  #     model_prophet_fit <- workflows::workflow() %>%
+  #       workflows::add_recipe(recipe_prophet) %>%
+  #       workflows::add_model(model_prophet)
+  #
+  #     training_model <- model_prophet_fit
+  #     label_model <- "model_prophet"
+  #   } else if (model == "lr") {
+  #     training_model <- th2_linear_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
+  #     label_model <- "model_lm"
+  #   } else if (model == "mars") {
+  #     training_model <- th2_mars_engine(nested_data, target_var, "date", fit_model = "bulk")$fit
+  #     label_model <- "model_mars"
+  #   } else if (model == "random_forest") {
+  #     if (!is.null(use_holidays)) {
+  #       res_bh <- ifelse(use_holidays != "in_data", use_holidays, country_column)
+  #     } else {
+  #       res_bh <- use_holidays
+  #     }
+  #
+  #     training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
+  #     label_model <- "model_random_forest"
+  #   } else if (model == "xgboost") {
+  #     if (!is.null(use_holidays)) {
+  #       res_bh <- ifelse(use_holidays != "in_data", use_holidays, country_column)
+  #     } else {
+  #       res_bh <- use_holidays
+  #     }
+  #     #
+  #     # training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
+  #
+  #     formula <- as.formula(paste(target_var, "~ ."))
+  #
+  #     model_xgboost <-
+  #       parsnip::boost_tree() %>%
+  #       parsnip::set_mode("regression") %>%
+  #       parsnip::set_engine("xgboost")
+  #
+  #     recipe_xgboost <- recipes::recipe(formula, data = nested_data) %>%
+  #       step_th2_feature_engineering(recipes::all_predictors(), feature_target = target_var, use_holidays = res_bh, use_meteo = use_meteo, all_data = nested_data_tbl, lags = lags) %>%
+  #       recipes::step_rm("date")
+  #
+  #     model_xgboost_fit <- workflows::workflow() %>%
+  #       workflows::add_recipe(recipe_xgboost) %>%
+  #       workflows::add_model(model_xgboost)
+  #
+  #     training_model <- model_xgboost_fit
+  #
+  #     label_model <- "model_xgboost"
+  #   } else if (model == "arimax") {
+  #     training_model <- th2_arimax_engine(nested_data, "date", target_var, use_holidays = res_bh, fit_model = "bulk", external_data = external_data, exogenous_var = exogenous_var)$fit
+  #     label_model <- "arimax"
+  #   } else {
+  #     error_models <- c(NULL, model)
+  #   }
+  #
+  #   list_output_models[[label_model]] <- training_model
+  # }
+  #
+  #
+  #
+  # nested_modeltime_tbl <- do.call(
+  #   modeltime::modeltime_nested_fit,
+  #   c(
+  #     list(nested_data = nested_data_tbl),
+  #     list_output_models,
+  #     list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
+  #   )
+  # )
+  #
+  # nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
+  #   modeltime::modeltime_nested_refit(
+  #     control = modeltime::control_nested_refit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
+  #   )
+  #
+  # # accuracy_test <- best_nested_modeltime_tbl %>%
+  # #   modeltime::extract_nested_test_accuracy() %>%
+  # #   dplyr::select(id, .model_id, .model_desc, .type, mae, rmse, rsq)
+  #
+  # forecast_result <- nested_modeltime_refit_tbl %>%
+  #   modeltime::extract_nested_future_forecast(
+  #     .include_actual = FALSE
+  #   ) %>%
+  #   dplyr::mutate(as_of = Sys.Date()) %>%
+  #   dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
+  #   dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
+  #   dplyr::rename(!!group_target_output := id)
+  #
+  # if (!is.null(spark_conection)) {
+  #   # Unregisters the Spark Backend
+  #   modeltime::parallel_stop()
+  #
+  #   # Disconnects Spark
+  #   # sparklyr::spark_disconnect_all()
+  # }
+  #
+  # return(forecast_result)
 }

@@ -272,8 +272,17 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
 
   if (fit_model == TRUE) {
     set.seed(1)
-    model_xgboost_fit <- model_xgboost %>%
-      parsnip::fit(formula, data = input_data)
+    # model_xgboost_fit <- model_xgboost %>%
+    #   parsnip::fit(formula, data = input_data)
+
+    recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn) %>%
+      recipes::step_rm(var_date)
+
+    model_xgboost_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipe_xgboost) %>%
+      workflows::add_model(model_xgboost) %>%
+      parsnip::fit(input_data)
   } else if (fit_model == "bulk") {
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
       step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn) %>%
