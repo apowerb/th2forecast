@@ -98,7 +98,6 @@ prep.step_th2_feature_engineering <- function(x,
   # print(x$terms)
   # print("name_id" %in% colnames(training))
   # print(training_n)
-  browser()
   training_n <- list()
 
   if ("name_id" %in% colnames(training)) {
@@ -160,7 +159,6 @@ bake.step_th2_feature_engineering <- function(object,
   # print(dim(new_data))
   # print("llego a bake")
   # print(new_data)
-  browser()
   training_n <- ""
   if ("name_id" %in% colnames(new_data)) {
     training_n <- as.character(new_data$name_id[1])

@@ -225,6 +225,18 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
   if (fit_model == TRUE) {
     model_rf_fit <- model_rf %>%
       parsnip::fit(formula, data = input_data)
+
+
+    set.seed(1)
+    # model_xgboost_fit <- model_xgboost %>%
+    #   parsnip::fit(formula, data = input_data)
+    recipe_rf <- recipes::recipe(formula, data = input_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn)
+
+    model_rf_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipe_rf) %>%
+      workflows::add_model(model_rf) %>%
+      parsnip::fit(input_data)
   } else if (fit_model == "bulk") {
     recipe_rf <- recipes::recipe(formula, data = input_data) %>%
       step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn)

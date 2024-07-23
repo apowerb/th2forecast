@@ -12,7 +12,7 @@
 #' @examples model_evaluation(input_data, model_tbl)
 model_evaluation <- function(input_data, model_table) {
   calib_tbl <- model_table %>%
-    modeltime::modeltime_calibrate(testing(input_data), quiet = FALSE)
+    modeltime::modeltime_calibrate(rsample::testing(input_data), quiet = FALSE)
 
   accuracy_model <- calib_tbl %>%
     modeltime::modeltime_accuracy(metric_set = yardstick::metric_set(yardstick::mae, yardstick::rmse, yardstick::rsq))
