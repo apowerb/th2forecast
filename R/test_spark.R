@@ -1,18 +1,55 @@
 library(sparklyr)
 
-function_test_sparklyr <- function(){
+#' @export
+th2_forecast_spark <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split=NULL){
+
+  suppressPackageStartupMessages({
+    library(sparklyr)
+  })
+
+  Sys.setenv("SPARK_HOME" = sparklyr::spark_home_dir(version = "3.5.1"))
   ip_address <- system("hostname -I | awk '{print $1}'", intern = TRUE)
 
+  # options(sparklyr.log.console = TRUE)
+
   config <- sparklyr::spark_config()
-  config$spark.executor.memory <- "8G"
+  config$spark.executor.memory <- "2000M"
+  config$spark.driver.memory <- "6G"
+
   config$`spark.executor.cores` <- "1"
+  config$`spark.executor.instances` <- "12"
+
   config$`spark.executor.extraJavaOptions=-Dlog4j.logLevel`<- "debug"
-  config$`spark.app.name` <- "minhut test 1222333"
+  config$`spark.app.name` <- "test bulk forecast"
   config$`spark.driver.host` <- ip_address
+  config$spark.executor.extraJavaOptions <- "-XX:+UseG1GC -XX:InitiatingHeapOccupancyPercent=35"
 
+  sc <- sparklyr::spark_connect(master = "spark://spark-1721310514-master-0.spark-1721310514-headless.th2mage.svc.cluster.local:7077", config = config)
+  # sc <- sparklyr::spark_connect(master = "local")
+  # sc <- sparklyr::spark_connect(method = "databricks")
 
-  sc <- sparklyr::spark_connect(master = "spark://spark-1721050712-master-0.spark-1721050712-headless.th2mage.svc.cluster.local:7077", config = config)
+  dataset_raw <- input_data %>%
+    dplyr::select(store_nbr, family)%>%
+    dplyr::distinct_all(.keep_all = TRUE)
 
+  unique_kpis  <- sparklyr::sdf_copy_to(sc, dataset_raw)
 
-  result <- th2forecast::th2_bulk_forecasting(dataset_raw, "family", "sales", "X_date", 50, c("prophet"), train_split = "2016-12-31", spark_conection =  sc)
+  result_forecast <- sparklyr::spark_apply(
+    unique_kpis,
+    function(e){
+      library(dplyr);
+      library(modeltime);
+      dataset_raw <- input_data;
+      result_forecast <- e %>%
+        dplyr::inner_join(dataset_raw, by = c("store_nbr","family")) %>%
+        th2forecast::th2_bulk_forecasting_spark(., group_target, target_var, date_var, future_forecast, models_list, train_split=train_split);
+
+      return(result_forecast)
+      },
+    group_by = c("family","store_nbr"),
+    packages = FALSE)
+
+  write.csv(x=result_forecast, file="result_forecast.csv")
+
+  spark_disconnect(sc)
 }

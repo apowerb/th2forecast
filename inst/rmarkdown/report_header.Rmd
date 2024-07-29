@@ -1,0 +1,31 @@
+---
+title: "Model Stability Test"
+author: "Harold Villafuerte"
+date: "`r Sys.Date()`"
+output: html_document
+params: 
+  data: NA
+  kpi: NA
+  models: NA
+  column_kpi: NA
+  split_date: NA
+  horizon: NA
+  var_date: NA
+  var_target: NA
+---
+
+
+# Comparison of model stability
+
+------------------------------------------------------------------------
+
+The following report shows the stability of the various models when running a short-term forecast. For each test, the last three full months have been taken into account, and the second month within these was taken for training and forecasting.
+
+For all models, a 7-day increment is made in each iteration, so as to observe the behavior of the model when it receives new information. At the end, we will be able to compare the results of each iteration.
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+list_kpis <<- NULL
+results_table <<- NULL
+```
+

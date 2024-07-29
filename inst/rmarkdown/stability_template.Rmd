@@ -1,40 +1,25 @@
----
-title: "Model Stability Test"
-author: "Harold Villafuerte"
-date: "`r Sys.Date()`"
-output: html_document
-params: 
-  data: NA
-  kpi: NA
-  models: NA
-  column_kpi: NA
-  split_date: NA
-  horizon: NA
-  var_date: NA
-  var_target: NA
----
 
-# Comparison of model stability
+
+## KPI analysis: TARGET_KPI
 
 ------------------------------------------------------------------------
 
-The following report shows the stability of the various models when running a short-term forecast. For each test, the last three full months have been taken into account, and the second month within these was taken for training and forecasting.
-
-For all models, a 7-day increment is made in each iteration, so as to observe the behavior of the model when it receives new information. At the end, we will be able to compare the results of each iteration.
-
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 table_accuracy <-- data.frame()
 
-result_test_report <- params$data 
-#   dplyr::filter(params$data[[params$column_kpi]] == params$kpi)
-# 
-# result_test_report <- th2forecast::th2_rolling_forecast_stablizer(data_filter, params$var_date, params$var_target, params$column_kpi, params$models, params$split_date, params$horizon)
+data_filter <- params$data %>%
+  dplyr::filter(params$data[[params$column_kpi]] == "TARGET_KPI")
+
+result_test_report <- th2forecast::th2_rolling_forecast_stablizer(data_filter, params$var_date, params$var_target, params$column_kpi, params$models, params$split_date, params$horizon)
+
+results_table <<- rbind(results_table, result_test_report$accuracy_df)
+
+list_models <- c(params$models, "TH2ENSEMBLE")
 
 ```
 
 ```{r, results='asis', echo=FALSE, warning=FALSE, message=FALSE}
-for (model in params$models) {
+for (model in list_models) {
   
   if (model == "lr"){
     model <- "lm"
@@ -53,7 +38,7 @@ for (model in params$models) {
   
   # result_test_report <- th2forecast::th2_rolling_forecast_stablizer(data_filter, model)
   
-  if (model != params$models[length(params$models)]){
+  if (model != list_models[length(list_models)]){
     table_acc <- DT::datatable(result_test_report$accuracy_df %>% 
                                  dplyr::filter(`model_desc` == models_upper)%>%
                                  dplyr::select(-c(mae, rmse, rsq)) %>%
@@ -69,7 +54,7 @@ for (model in params$models) {
     cat("comparison of results\n\n")
     
     # cat(tests$time_series_plot)
-    plot_test <- result_test_report$time_series_plot[[model]]
+    plot_test <- result_test_report$time_series_plots[["TARGET_KPI"]][[model]]
     print(htmltools::tagList(plot_test))
     cat("_______\n\n")
     cat("------------------------------------------------------------------------ \n\n")
@@ -84,7 +69,7 @@ for (model in params$models) {
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # reult_forecast_arima <- th2forecast::th2_rolling_forecast_stablizer(data_filter, "arima")
 result_test_report$accuracy_df %>%
-  dplyr::filter(`model_desc` == gsub("_", "", toupper(params$models[length(params$models)]))) %>%
+  dplyr::filter(`model_desc` == gsub("_", "", toupper(list_models[length(list_models)]))) %>%
   dplyr::select(-c(mae, rmse, rsq)) %>%
   dplyr::rename(mae = test_mae, rmse = test_rmse, rsq = test_rsq) %>%
   DT::datatable()
@@ -95,7 +80,7 @@ result_test_report$accuracy_df %>%
 comparison of results
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
-result_test_report$time_series_plot[[params$models[length(params$models)]]]
+result_test_report$time_series_plots[["TARGET_KPI"]][[list_models[length(list_models)]]]
 ```
 
 ## Comparison {.tabset}
@@ -248,7 +233,6 @@ coparison_chart <- rsq_accuracy |>
         )
   )
 
-test_model <- "RANDOMFOREST"
 coparison_chart <- coparison_chart %>%
     echarts4r::e_x_axis(name = "Period") %>%
     echarts4r::e_y_axis(name = "Value") %>%
@@ -278,5 +262,12 @@ coparison_chart <- coparison_chart %>%
 
 coparison_chart
 
+```
+
+```{r}
+list_kpis <<- c(list_kpis, "TARGET_KPI")
+
+cat("lista de KPIs para la table de performance")
+cat(list_kpis)
 ```
 

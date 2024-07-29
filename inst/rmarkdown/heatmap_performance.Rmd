@@ -1,0 +1,38 @@
+
+## Heatmap {.tabset}
+
+### MAE
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+matrix <- results_table |>
+  dplyr::group_by(model_desc, kpi_data) |>
+  dplyr::summarise(test_mae = mean(test_mae)) |>
+  dplyr::ungroup()
+
+matrix |>
+  echarts4r::e_charts(model_desc) |>
+  echarts4r::e_heatmap(kpi_data, test_mae, itemStyle = list(emphasis = list(shadowBlur = 10))) |>
+  # echarts4r::e_visual_map(test_mae,  inRange = list(color = c("#0000FF", "#FF0000"))) |>
+  echarts4r::e_title("Heatmap - MAE") |>
+  echarts4r::e_visual_map(test_mae)
+
+
+```
+
+### RMSE
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+matrix <- results_table |>
+  dplyr::group_by(model_desc, kpi_data) |>
+  dplyr::summarise(test_rmse = mean(test_rmse)) |>
+  dplyr::ungroup()
+
+matrix |>
+  echarts4r::e_charts(model_desc) |>
+  echarts4r::e_heatmap(kpi_data, test_rmse, itemStyle = list(emphasis = list(shadowBlur = 10))) |>
+  # echarts4r::e_visual_map(test_rmse,  inRange = list(color = c("#0000FF", "#FF0000"))) |>
+  echarts4r::e_title("Heatmap - RMSE") |>
+  echarts4r::e_visual_map(test_rmse)
+
+
+```
