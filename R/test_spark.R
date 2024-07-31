@@ -1,16 +1,14 @@
-library(sparklyr)
-
 #' @export
-th2_forecast_spark <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split=NULL){
-
-  suppressPackageStartupMessages({
-    library(sparklyr)
-  })
+th2_forecast_spark <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split=NULL, lags = FALSE){
+  library(sparklyr)
+  # suppressPackageStartupMessages({
+  #   library(sparklyr)
+  # })
 
   Sys.setenv("SPARK_HOME" = sparklyr::spark_home_dir(version = "3.5.1"))
   ip_address <- system("hostname -I | awk '{print $1}'", intern = TRUE)
 
-  # options(sparklyr.log.console = TRUE)
+  options(sparklyr.log.console = TRUE)
 
   config <- sparklyr::spark_config()
   config$spark.executor.memory <- "2000M"
@@ -26,7 +24,6 @@ th2_forecast_spark <- function(input_data, group_target, target_var, date_var, f
 
   sc <- sparklyr::spark_connect(master = "spark://spark-1721310514-master-0.spark-1721310514-headless.th2mage.svc.cluster.local:7077", config = config)
   # sc <- sparklyr::spark_connect(master = "local")
-  # sc <- sparklyr::spark_connect(method = "databricks")
 
   dataset_raw <- input_data %>%
     dplyr::select(store_nbr, family)%>%
@@ -40,16 +37,27 @@ th2_forecast_spark <- function(input_data, group_target, target_var, date_var, f
       library(dplyr);
       library(modeltime);
       dataset_raw <- input_data;
-      result_forecast <- e %>%
-        dplyr::inner_join(dataset_raw, by = c("store_nbr","family")) %>%
-        th2forecast::th2_bulk_forecasting_spark(., group_target, target_var, date_var, future_forecast, models_list, train_split=train_split);
 
-      return(result_forecast)
-      },
+      # tryCatch(
+      #   {
+          result_forecast <- e %>%
+            dplyr::inner_join(dataset_raw, by = c("store_nbr","family")) %>%
+            th2forecast::th2_bulk_forecasting_spark(., group_target, target_var, date_var, future_forecast, models_list, train_split = train_split, lags = lags);
+
+          return(result_forecast)
+        # },
+        # error = function(error) {
+        #   print(error)
+        #   shinyalert::shinyalert("Error th2 forecast.", type = "error")
+        #   return(NULL)
+        # }
+      # )
+
+    },
     group_by = c("family","store_nbr"),
     packages = FALSE)
 
-  write.csv(x=result_forecast, file="result_forecast.csv")
+  write.csv(x=result_forecast, file="result_forecast.csv", row.names = FALSE)
 
   spark_disconnect(sc)
 }
