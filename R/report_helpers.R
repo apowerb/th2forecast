@@ -45,3 +45,19 @@ generate_rmd_skeleton <- function(dataset_input, var_date, var_target, target_kp
   rmarkdown::render(input = export_file, output_file = paste0("models_stability_test_multiple_kpis"), params = report_params, output_dir = "./reports")
 
 }
+
+
+#' @export
+generate_rmd_performance_spark <- function(dataset_input, column_kpi, var_target, var_date, horizon, models, train_split = NULL, spark_conection = NULL, test_models = FALSE){
+
+  path_rmarkdown <- system.file("rmarkdown", package = "th2forecast")
+
+  draft_file <- paste0(path_rmarkdown, "/report_performance_spark.Rmd")
+
+  data_performance <- th2forecast::test_forecast_spark_perfomance(dataset_input, column_kpi, var_target, var_date, horizon, models, train_split = train_split, test_models = test_models)
+
+  report_params <- list(data = data_performance, models = models)
+
+  rmarkdown::render(input = draft_file, output_file = "models_performance_spark", params = report_params, output_dir = "./default_repo/reports")
+
+}

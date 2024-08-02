@@ -195,20 +195,20 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
   table_performance <- models_evaluated$accuracy_models
   models_evaluated <- models_evaluated$model_calibrated
 
-  if (length(models_list) > 1)
-  {
-    ensemble_fit <- models_trained %>%
-      modeltime.ensemble::ensemble_average(type = "mean")
-
-    ensemble_calibration_tbl <- modeltime_table(ensemble_fit) %>%
-      modeltime::modeltime_calibrate(rsample::testing(dataset_train_test), quiet = FALSE) %>%
-      dplyr::mutate(.model_id = length(models_list)+1)
-
-    ensemble_accuracy <- ensemble_calibration_tbl %>% modeltime::modeltime_accuracy(metric_set = yardstick::metric_set(yardstick::mae, yardstick::rmse, yardstick::rsq))
-
-    models_evaluated <- bind_rows(models_evaluated, ensemble_calibration_tbl)
-    table_performance <- bind_rows(table_performance, ensemble_accuracy)
-  }
+  # if (length(models_list) > 1)
+  # {
+  #   ensemble_fit <- models_trained %>%
+  #     modeltime.ensemble::ensemble_average(type = "mean")
+  #
+  #   ensemble_calibration_tbl <- modeltime_table(ensemble_fit) %>%
+  #     modeltime::modeltime_calibrate(rsample::testing(dataset_train_test), quiet = FALSE) %>%
+  #     dplyr::mutate(.model_id = length(models_list)+1)
+  #
+  #   ensemble_accuracy <- ensemble_calibration_tbl %>% modeltime::modeltime_accuracy(metric_set = yardstick::metric_set(yardstick::mae, yardstick::rmse, yardstick::rsq))
+  #
+  #   models_evaluated <- bind_rows(models_evaluated, ensemble_calibration_tbl)
+  #   table_performance <- bind_rows(table_performance, ensemble_accuracy)
+  # }
 
   # df_models_evaluated <- models_evaluated %>%
   #   modeltime::modeltime_forecast(

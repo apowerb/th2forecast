@@ -277,11 +277,11 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
     dplyr::rename(!!group_target_output := id)
 
-  forecast_result <- forecast_result %>%
-    dplyr::mutate(accuracy = list(accuracy_test)) %>%
-    dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-    dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-    dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
+  # forecast_result <- forecast_result %>%
+  #   dplyr::mutate(accuracy = list(accuracy_test)) %>%
+  #   dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
+  #   dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
+  #   dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
 
