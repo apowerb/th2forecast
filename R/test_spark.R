@@ -1,10 +1,10 @@
 #' @export
-th2_forecast_spark <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split=NULL, lags = FALSE){
+th2_forecast_spark <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split=NULL, lags = FALSE, group_by_col = NULL, master_spark = NULL){
   library(sparklyr)
   # suppressPackageStartupMessages({
   #   library(sparklyr)
   # })
-
+  result_forecast <- data.frame()
   Sys.setenv("SPARK_HOME" = sparklyr::spark_home_dir(version = "3.5.1"))
   ip_address <- system("hostname -I | awk '{print $1}'", intern = TRUE)
 
@@ -22,11 +22,11 @@ th2_forecast_spark <- function(input_data, group_target, target_var, date_var, f
   config$`spark.driver.host` <- ip_address
   config$spark.executor.extraJavaOptions <- "-XX:+UseG1GC -XX:InitiatingHeapOccupancyPercent=35"
 
-  sc <- sparklyr::spark_connect(master = "spark://spark-1721310514-master-0.spark-1721310514-headless.th2mage.svc.cluster.local:7077", config = config)
+  sc <- sparklyr::spark_connect(master = master_spark, config = config)
   # sc <- sparklyr::spark_connect(master = "local")
 
   dataset_raw <- input_data %>%
-    dplyr::select(store_nbr, family)%>%
+    dplyr::select(group_by_col)%>%
     dplyr::distinct_all(.keep_all = TRUE)
 
   unique_kpis  <- sparklyr::sdf_copy_to(sc, dataset_raw)
@@ -38,33 +38,39 @@ th2_forecast_spark <- function(input_data, group_target, target_var, date_var, f
       library(modeltime);
       dataset_raw <- input_data;
 
-      # tryCatch(
-      #   {
+      tryCatch(
+        {
           result_forecast <- e %>%
-            dplyr::inner_join(dataset_raw, by = c("store_nbr","family")) %>%
+            dplyr::inner_join(dataset_raw, by = group_by_col) %>%
             th2forecast::th2_bulk_forecasting_spark(., group_target, target_var, date_var, future_forecast, models_list, train_split = train_split, lags = lags);
 
           return(result_forecast)
-        # },
-        # error = function(error) {
-        #   print(error)
-        #   shinyalert::shinyalert("Error th2 forecast.", type = "error")
-        #   return(NULL)
-        # }
-      # )
+        },
+        error = function(error) {
+          print(error)
+          shinyalert::shinyalert("Error th2Forecast.", type = "error")
+          return(NULL)
+        }
+      )
 
     },
-    group_by = c("family","store_nbr"),
+    group_by = group_by_col,
     packages = FALSE)
 
-  write.csv(x=result_forecast, file="result_forecast.csv", row.names = FALSE)
+  # write.csv(x=result_forecast, file="result_forecast.csv", row.names = FALSE)
+  result_forecast <- sparklyr::sdf_collect(result_forecast)
+
+  result_forecast <- result_forecast %>%
+    tidyr::unite(!!group_target, all_of(group_by_col), sep = "_", remove = TRUE)
 
   spark_disconnect(sc)
+
+  return(result_forecast)
 }
 
 
 #' @export
-test_forecast_spark_perfomance <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split=NULL, lags = FALSE, test_models = FALSE){
+test_forecast_spark_perfomance <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split=NULL, lags = FALSE, test_models = FALSE, group_by_col = NULL, master_spark = NULL){
   library(sparklyr)
   library(dplyr)
   library(modeltime)
@@ -86,11 +92,10 @@ test_forecast_spark_perfomance <- function(input_data, group_target, target_var,
   config$`spark.driver.host` <- ip_address
   config$spark.executor.extraJavaOptions <- "-XX:+UseG1GC -XX:InitiatingHeapOccupancyPercent=35"
 
-  sc <- sparklyr::spark_connect(master = "spark://spark-1721310514-master-0.spark-1721310514-headless.th2mage.svc.cluster.local:7077", config = config)
-  # sc <- sparklyr::spark_connect(master = "local")
+  sc <- sparklyr::spark_connect(master = master_spark, config = config)
 
   dataset_raw <- input_data %>%
-    dplyr::select(store_nbr, family)%>%
+    dplyr::select(group_by_col)%>%
     dplyr::distinct_all(.keep_all = TRUE)
 
   unique_kpis  <- sparklyr::sdf_copy_to(sc, dataset_raw)
@@ -116,12 +121,12 @@ test_forecast_spark_perfomance <- function(input_data, group_target, target_var,
         dataset_raw <- input_data;
 
         result_forecast <- e %>%
-          dplyr::inner_join(dataset_raw, by = c("store_nbr","family")) %>%
+          dplyr::inner_join(dataset_raw, by = group_by_col) %>%
           suppressMessages(th2forecast::th2_bulk_forecasting_spark(., group_target, target_var, date_var, future_forecast, models_list, train_split = train_split, lags = lags));
 
         return(result_forecast)
       },
-      group_by = c("family","store_nbr"),
+      group_by = group_by_col,
       packages = FALSE)
 
     time_execution <- proc.time() - t
@@ -153,12 +158,12 @@ test_forecast_spark_perfomance <- function(input_data, group_target, target_var,
           dataset_raw <- input_data;
 
           result_forecast <- e %>%
-            dplyr::inner_join(dataset_raw, by = c("store_nbr","family")) %>%
+            dplyr::inner_join(dataset_raw, by = group_by_col) %>%
             suppressWarnings(suppressMessages({th2forecast::th2_bulk_forecasting_spark(., group_target, target_var, date_var, future_forecast, c(model), train_split = train_split, lags = lags)}));
 
           return(result_forecast)
         },
-        group_by = c("family","store_nbr"),
+        group_by = group_by_col,
         packages = FALSE)
 
       time_execution <- proc.time() - t
@@ -174,9 +179,6 @@ test_forecast_spark_perfomance <- function(input_data, group_target, target_var,
 
   spark_disconnect(sc)
 
-
-  result_forecast_chunk <- NULL
-
   print("Start of series process")
   for (nkpis in c(10,50,100)) {
 
@@ -186,30 +188,15 @@ test_forecast_spark_perfomance <- function(input_data, group_target, target_var,
     pb <- utils::txtProgressBar(min = 0, max = nkpis, style = 3, width = 50, char = "=")
     for (i_kpi in 1:nkpis) {
       data_serie <- dataset_raw[i_kpi, ] %>%
-        dplyr::inner_join(input_data, by = c("store_nbr","family"))
+        dplyr::inner_join(input_data, by = group_by_col)
       suppressWarnings(suppressMessages({
         result_forecast <-  th2forecast::th2_bulk_forecasting_spark(data_serie, group_target, target_var, date_var, future_forecast, models_list, train_split = train_split, lags = lags)
       }))
 
       utils::setTxtProgressBar(pb, i_kpi)
     }
-    # result_forecast <- purrr::map(
-    #     dataset_raw %>% head(nkpis),
-    #     function(e){
-    #     # e <- .
-    #     browser()
-    #     dataset_raw <- input_data
-    #
-    #     result_forecast <- e %>%
-    #       dplyr::inner_join(dataset_raw, by = c("store_nbr", "family")) %>%
-    #       # merge(e, dataset_raw, by = c("store_nbr", "family")) %>%
-    #       th2forecast::th2_bulk_forecasting_spark(., group_target, target_var, date_var, future_forecast, models_list, train_split = train_split, lags = lags)
-    #
-    #     return(result_forecast)
-    #   })
 
     close(pb)
-    # result_forecast_chunk <- rbind(result_forecast_chunk, result_forecast)
 
     time_execution <- proc.time() - t
     time_execution <- time_execution[[3]]

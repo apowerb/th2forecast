@@ -58,6 +58,6 @@ generate_rmd_performance_spark <- function(dataset_input, column_kpi, var_target
 
   report_params <- list(data = data_performance, models = models)
 
-  rmarkdown::render(input = draft_file, output_file = "models_performance_spark", params = report_params, output_dir = "./default_repo/reports")
+  rmarkdown::render(input = draft_file, output_file = "models_performance_spark", params = report_params, output_dir = "./reports")
 
 }

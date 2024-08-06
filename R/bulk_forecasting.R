@@ -10,12 +10,8 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL, spark_conection = NULL) {
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL) {
   allow_par <- FALSE
-  if (!is.null(spark_conection)) {
-    allow_par <- TRUE
-    modeltime::parallel_start(spark_conection, .method = "spark")
-  }
 
   list_output_models <- list()
 
@@ -289,14 +285,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     forecast_result$.value <- round(forecast_result$.value)
     forecast_result$.conf_lo <- round(forecast_result$.conf_lo)
     forecast_result$.conf_hi <- round(forecast_result$.conf_hi)
-  }
-
-  if (!is.null(spark_conection)) {
-    # Unregisters the Spark Backend
-    modeltime::parallel_stop()
-
-    # Disconnects Spark
-    # sparklyr::spark_disconnect_all()
   }
 
   return(forecast_result)

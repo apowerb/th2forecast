@@ -20,6 +20,19 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
 
   dataframe_input <- input_data
 
+  if (!is.null(country_column) && use_holidays == "in_data") {
+    dataframe_input <- dataframe_input %>%
+      dplyr::mutate(!!group_target := paste(dataframe_input[[group_target]], "_", dataframe_input[[country_column]], sep = ""))
+
+    dataframe_input <- dataframe_input %>%
+      dplyr::group_by_at(vars("date", group_target, country_column)) %>%
+      dplyr::summarise_at(vars(target_var), sum)
+  } else {
+    dataframe_input <- dataframe_input %>%
+      dplyr::group_by_at(vars("date", group_target)) %>%
+      dplyr::summarise_at(vars(target_var), sum)
+  }
+
   data_clean <- preprocessing_data(dataframe_input %>% dplyr::select(target_var, date_var))[["dataset_clean"]]
 
   dataframe_input[[target_var]] <- data_clean[[target_var]]
@@ -29,10 +42,10 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
 
   if (!is.null(train_split)) {
     train_data <- dataframe_input %>%
-      dplyr::filter(dataframe_input[[date_var]] < as.Date(train_split))
+      dplyr::filter(.data[[date_var]] < as.Date(train_split))
 
     test_data <- dataframe_input %>%
-      dplyr::filter(dataframe_input[[date_var]] >= as.Date(train_split))
+      dplyr::filter(.data[[date_var]] >= as.Date(train_split))
 
     # test_data <- test_data %>%
     #   dplyr::group_by(test_data[[date_var]]) %>%
@@ -71,18 +84,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
     #   mutate(id_group = paste(store_nbr, family, sep = "_"))
   }
 
-  if (!is.null(country_column) && use_holidays == "in_data") {
-    train_data <- train_data %>%
-      dplyr::mutate(!!group_target := paste(train_data[[group_target]], "_", train_data[[country_column]], sep = ""))
 
-    train_data <- train_data %>%
-      dplyr::group_by_at(vars("date", group_target, country_column)) %>%
-      dplyr::summarise_at(vars(target_var), sum)
-  } else {
-    train_data <- train_data %>%
-      dplyr::group_by_at(vars("date", group_target)) %>%
-      dplyr::summarise_at(vars(target_var), sum)
-  }
 
   # train_data <- train_data %>%
   #   dplyr::group_by_at(vars("date", group_target)) %>%
@@ -224,16 +226,16 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       new_data = test_data
     )
 
-  # models_predictions$.model_desc <- ifelse(grepl("ARIMA", models_predictions$.model_desc), "ARIMA", models_predictions$.model_desc)
-  # models_predictions$.model_desc <- ifelse(grepl("ENSEMBLE", models_predictions$.model_desc), "TH2ENSEMBLE", models_predictions$.model_desc)
-  #
-  # table_performance$.model_desc <- ifelse(grepl("ARIMA", table_performance$.model_desc), "ARIMA", table_performance$.model_desc)
-  # table_performance$.model_desc <- ifelse(grepl("ENSEMBLE", table_performance$.model_desc), "TH2ENSEMBLE", table_performance$.model_desc)
-  #
-  # models_predictions <- models_predictions %>%
-  #   dplyr::mutate(as_of = Sys.Date()) %>%
-  #   dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
-  #   dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
+  models_predictions$.model_desc <- ifelse(grepl("ARIMA", models_predictions$.model_desc), "ARIMA", models_predictions$.model_desc)
+  models_predictions$.model_desc <- ifelse(grepl("ENSEMBLE", models_predictions$.model_desc), "TH2ENSEMBLE", models_predictions$.model_desc)
+
+  table_performance$.model_desc <- ifelse(grepl("ARIMA", table_performance$.model_desc), "ARIMA", table_performance$.model_desc)
+  table_performance$.model_desc <- ifelse(grepl("ENSEMBLE", table_performance$.model_desc), "TH2ENSEMBLE", table_performance$.model_desc)
+
+  models_predictions <- models_predictions %>%
+    dplyr::mutate(as_of = Sys.Date()) %>%
+    dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
+    dplyr::mutate(end_date = max(input_data[[date_var]])) #%>%
   #   dplyr::mutate(accuracy = list(table_performance))
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
