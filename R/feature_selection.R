@@ -88,7 +88,7 @@ feature_selection <- function(
     data_signature <- timetk::tk_get_timeseries_signature(data_features[[var_date_feature]]) %>%
       janitor::remove_empty() %>%
       # janitor::remove_constant() %>%
-      dplyr::select(- c(index, diff, wday.lbl, month.lbl, hour, minute, second, hour12, am.pm))
+      dplyr::select(-c(index, diff, wday.lbl, month.lbl, hour, minute, second, hour12, am.pm))
 
     data_features <- cbind(data_features, data_signature)
 
@@ -182,7 +182,7 @@ feature_selection <- function(
       data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], lags, mean, fill = NA)
       data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], lags, sd, fill = NA)
 
-      col_lags <- c(paste0(feature_target,"_lag", 1:lags))
+      col_lags <- c(paste0(feature_target, "_lag", 1:lags))
 
       for (i in 1:lags) {
         data_features[i, "rolling_mean"] <- rowMeans(data_features[i, col_lags])

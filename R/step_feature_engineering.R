@@ -104,7 +104,7 @@ prep.step_th2_feature_engineering <- function(x,
     training_n <- as.character(training$name_id[1])
     training <- training %>%
       dplyr::select(-name_id)
-  }else{
+  } else {
     training_n[1] <- NULL
   }
 

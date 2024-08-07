@@ -117,7 +117,6 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", f
   if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))) {
     return(warning("Selected variables do not exist in the data."))
   } else {
-
     formula <- as.formula(paste(var_target, "~", var_date))
 
     model_linear <- parsnip::linear_reg() %>%
@@ -306,7 +305,6 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
 
     model_xgboost_fit <- list("fit" = model_xgboost_fit, "model" = model_xgboost)
   } else {
-
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
       step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn) %>%
       recipes::step_rm(var_date)
@@ -364,8 +362,7 @@ th2_arimax_engine <- function(input_data, var_date, var_target, external_data = 
 
 
 #' @export
-th2_ets_engine <- function(input_data, var_date, var_target, fit_model = TRUE){
-
+th2_ets_engine <- function(input_data, var_date, var_target, fit_model = TRUE) {
   formula <- as.formula(paste(var_target, "~", var_date))
 
   model_ets_fit <- modeltime::exp_smoothing() %>%

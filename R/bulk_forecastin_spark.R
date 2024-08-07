@@ -11,7 +11,6 @@
 #' @export
 #' @examples
 th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL, spark_conection = NULL, tuning = FALSE) {
-
   # allow_par <- FALSE
   # if (!is.null(spark_conection)) {
   #   allow_par <- TRUE
@@ -91,7 +90,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
   #   dplyr::summarise_at(vars(target_var), sum)
 
 
-  if(tuning == TRUE){
+  if (tuning == TRUE) {
     resample_data <- th2forecast::th2_resamples(train_data, date_var)
   }
 
@@ -115,8 +114,8 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       #   tuning_param <- dials::grid_regular(modeltime::non_seasonal_ar(), modeltime::non_seasonal_differences(), modeltime::non_seasonal_ma(), levels = 3)
       #   label_model <- "model_arima"
       # }else{
-        model_arima <- th2forecast::th2_arima_engine(rsample::training(dataset_train_test), target_var, date_var, fit_model = TRUE)
-        list_output_models[["model_arima"]] <- model_arima
+      model_arima <- th2forecast::th2_arima_engine(rsample::training(dataset_train_test), target_var, date_var, fit_model = TRUE)
+      list_output_models[["model_arima"]] <- model_arima
       # }
     } else if (model == "prophet") {
       if (tuning == TRUE) {
@@ -124,7 +123,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
         formula <- as.formula(paste(target_var, "~", date_var))
         tuning_param <- dials::grid_regular(modeltime::changepoint_num(c(10L, 50L)), modeltime::changepoint_range(), levels = 3)
         label_model <- "model_prophet"
-      }else{
+      } else {
         model_prophet <- th2forecast::th2_prophet_engine(rsample::training(dataset_train_test), target_var, date_var, fit_model = TRUE, use_holidays = use_holidays, , db_conn = db_conn)
         list_output_models[["model_prophet"]] <- model_prophet
       }
@@ -136,8 +135,8 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       #   tuning_param <- FALSE
       #   label_model <- "model_lm"
       # }else{
-        model_lm <- th2forecast::th2_linear_engine(rsample::training(dataset_train_test), target_var, date_var, fit_model = TRUE)
-        list_output_models[["model_lm"]] <- model_lm
+      model_lm <- th2forecast::th2_linear_engine(rsample::training(dataset_train_test), target_var, date_var, fit_model = TRUE)
+      list_output_models[["model_lm"]] <- model_lm
       # }
     } else if (model == "mars") {
       if (tuning == TRUE) {
@@ -145,28 +144,28 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
         formula <- as.formula(paste(target_var, "~", date_var))
         tuning_param <- dials::grid_regular(dials::num_terms(c(5L, 20L)), dials::prod_degree(c(2L, 10L)), levels = 3)
         label_model <- "model_mars"
-      }else{
+      } else {
         model_mars <- th2forecast::th2_mars_engine(rsample::training(dataset_train_test), target_var, date_var, fit_model = TRUE)
         list_output_models[["model_mars"]] <- model_mars
       }
     } else if (model == "random_forest") {
       if (tuning == TRUE) {
-        training_model <- th2_random_forest_engine(rsample::training(dataset_train_test) %>% dplyr::select(- group_target), target_var, use_holidays = use_holidays, db_conn = db_conn, use_meteo = use_meteo, lags = lags, fit_model = FALSE)
+        training_model <- th2_random_forest_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), target_var, use_holidays = use_holidays, db_conn = db_conn, use_meteo = use_meteo, lags = lags, fit_model = FALSE)
         formula <- as.formula(paste(target_var, "~ ."))
         tuning_param <- dials::grid_regular(dials::trees(), dials::min_n(), levels = 3)
         label_model <- "model_random_forest"
-      }else{
-        model_random_forest <- th2forecast::th2_random_forest_engine(rsample::training(dataset_train_test) %>% dplyr::select(- group_target), target_var, use_holidays = use_holidays, db_conn = db_conn, use_meteo = use_meteo, lags = lags, fit_model = TRUE)
+      } else {
+        model_random_forest <- th2forecast::th2_random_forest_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), target_var, use_holidays = use_holidays, db_conn = db_conn, use_meteo = use_meteo, lags = lags, fit_model = TRUE)
         list_output_models[["model_random_forest"]] <- model_random_forest
       }
     } else if (model == "xgboost") {
       if (tuning == TRUE) {
-        training_model <- th2_xgboost_engine(rsample::training(dataset_train_test) %>% dplyr::select(- group_target), date_var, target_var, use_holidays = use_holidays, use_meteo = use_meteo, db_conn = db_conn, lags = lags, fit_model = FALSE)
+        training_model <- th2_xgboost_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), date_var, target_var, use_holidays = use_holidays, use_meteo = use_meteo, db_conn = db_conn, lags = lags, fit_model = FALSE)
         formula <- as.formula(paste(target_var, "~ ."))
         tuning_param <- dials::grid_regular(dials::trees(), dials::min_n(), dials::learn_rate(), levels = 3)
         label_model <- "model_xgboost"
-      }else{
-        model_xgboost <- th2forecast::th2_xgboost_engine(rsample::training(dataset_train_test) %>% dplyr::select(- group_target), date_var, target_var, use_holidays = use_holidays, use_meteo = use_meteo, db_conn = db_conn, lags = lags, fit_model = TRUE)
+      } else {
+        model_xgboost <- th2forecast::th2_xgboost_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), date_var, target_var, use_holidays = use_holidays, use_meteo = use_meteo, db_conn = db_conn, lags = lags, fit_model = TRUE)
         list_output_models[["model_xgboost"]] <- model_xgboost
       }
     } else if (model == "ets") {
@@ -181,7 +180,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
 
       fitted_model <- training_model$fit %>%
         tune::finalize_workflow(best_params) %>%
-        parsnip::fit(data = rsample::training(dataset_train_test) %>% dplyr::select(- group_target))
+        parsnip::fit(data = rsample::training(dataset_train_test) %>% dplyr::select(-group_target))
 
       list_output_models[[label_model]] <- fitted_model
     }
@@ -235,7 +234,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
   models_predictions <- models_predictions %>%
     dplyr::mutate(as_of = Sys.Date()) %>%
     dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
-    dplyr::mutate(end_date = max(input_data[[date_var]])) #%>%
+    dplyr::mutate(end_date = max(input_data[[date_var]])) # %>%
   #   dplyr::mutate(accuracy = list(table_performance))
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)

@@ -9,20 +9,22 @@ mod_forecasting_viewer_ui <- function(id) {
     id = ns("forecastViz_tabbox"), width = 12, selected = "Forecasting Pipelines",
     column(width = 12, uiOutput(ns("infos_and_help"))),
     tabPanel(
-      title = shiny::tags$div(shiny::icon("database"),"Forecasting Pipelines",
-                              `data-bs-toggle` = "tooltip",
-                              `data-bs-placement` = "top",
-                              title = "Manage forecasting pipelines"),
+      title = shiny::tags$div(shiny::icon("database"), "Forecasting Pipelines",
+        `data-bs-toggle` = "tooltip",
+        `data-bs-placement` = "top",
+        title = "Manage forecasting pipelines"
+      ),
       fluidPage(
         DT::dataTableOutput(ns("pipelines_table")),
         uiOutput(ns("forecast_pipeline_boxes"))
       )
     ),
     tabPanel(
-      title = shiny::tags$div(shiny::icon("chart-line"),"Forecasting Viewer",
-                              `data-bs-toggle` = "tooltip",
-                              `data-bs-placement` = "top",
-                              title = "Explore forecasting results"),
+      title = shiny::tags$div(shiny::icon("chart-line"), "Forecasting Viewer",
+        `data-bs-toggle` = "tooltip",
+        `data-bs-placement` = "top",
+        title = "Explore forecasting results"
+      ),
       fluidPage(
         fluidRow(
           column(width = 2, uiOutput(ns("as_of"))),
@@ -55,7 +57,7 @@ mod_forecasting_viewer_server <- function(id) {
     input_data_result <- reactiveVal()
     output_data_result <- reactiveVal()
 
-   # help and infos
+    # help and infos
     output$infos_and_help <- renderUI({
       fluidRow(
         column(width = 10, uiOutput(ns("void_object"))),
@@ -234,10 +236,9 @@ mod_forecasting_viewer_server <- function(id) {
     output$aggregation <- renderUI({
       req(input$as_of)
       req(input$agg_by)
-      if(input$agg_by == "weeks"){
-      selectInput(inputId = ns("agg_type"), "Aggregation",choices = c("Sum" = "sum", "Mean" = "mean", "Max" = "max", "Min" = "min"))
-      }
-      else{
+      if (input$agg_by == "weeks") {
+        selectInput(inputId = ns("agg_type"), "Aggregation", choices = c("Sum" = "sum", "Mean" = "mean", "Max" = "max", "Min" = "min"))
+      } else {
         NULL
       }
     })
@@ -269,40 +270,40 @@ mod_forecasting_viewer_server <- function(id) {
         kpi_value = input$kpi_value
       )
 
-        prediction_data_aggregated <- prediction_data_filtred_result %>%
-          dplyr::filter(execution_date == input$as_of)
+      prediction_data_aggregated <- prediction_data_filtred_result %>%
+        dplyr::filter(execution_date == input$as_of)
 
-          historical_data_aggregated <- historical_data_filtred_result %>%
-            dplyr::group_by_at(vars(selected_info()$date_var)) %>%
-            dplyr::summarise_at(vars(selected_info()$target_var), sum)
+      historical_data_aggregated <- historical_data_filtred_result %>%
+        dplyr::group_by_at(vars(selected_info()$date_var)) %>%
+        dplyr::summarise_at(vars(selected_info()$target_var), sum)
 
 
 
-        # Ajustement du nombre de lignes de historical_data_aggregated
-        prediction_rows <- nrow(prediction_data_aggregated)
-        historical_rows <- prediction_rows * 3
+      # Ajustement du nombre de lignes de historical_data_aggregated
+      prediction_rows <- nrow(prediction_data_aggregated)
+      historical_rows <- prediction_rows * 3
 
-        if (nrow(historical_data_aggregated) >= historical_rows) {
-          historical_data_aggregated <- tail(historical_data_aggregated, historical_rows)
+      if (nrow(historical_data_aggregated) >= historical_rows) {
+        historical_data_aggregated <- tail(historical_data_aggregated, historical_rows)
+      } else {
+        # Si historical_data_aggregated contient moins de lignes que nécessaire
+        historical_data_aggregated <- historical_data_aggregated
+      }
+
+
+      if (!is.null(historical_data_aggregated) && !is.null(prediction_data_aggregated)) {
+        if (input$agg_by == "days") {
+          create_time_series_plot(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var)
         } else {
-          # Si historical_data_aggregated contient moins de lignes que nécessaire
-          historical_data_aggregated <- historical_data_aggregated
+          create_weekly_bar_chart(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var, agg_type = input$agg_type)
         }
-
-
-        if (!is.null(historical_data_aggregated) && !is.null(prediction_data_aggregated)) {
-            if(input$agg_by == "days" ){
-              create_time_series_plot(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var)
-           }else{
-              create_weekly_bar_chart(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var, agg_type = input$agg_type)
-          }
-        }else {
-          renderText("No data available for selected filters.")
-        }
+      } else {
+        renderText("No data available for selected filters.")
+      }
     })
 
 
-#=================== Accuracy
+    # =================== Accuracy
 
     accuracy_to_visualize <- eventReactive(input$accuracy, {
       prediction_data_filtred_result <- output_data_result() %>%
@@ -314,7 +315,7 @@ mod_forecasting_viewer_server <- function(id) {
         kpi_value = input$kpi_value
       )
       historical_data_filtred_result <- historical_data_filtred_result %>%
-        dplyr::filter( historical_data_filtred_result[[selected_info()$date_var]] >= min(prediction_data_filtred_result[[selected_info()$date_var]]))
+        dplyr::filter(historical_data_filtred_result[[selected_info()$date_var]] >= min(prediction_data_filtred_result[[selected_info()$date_var]]))
 
       if (input$agg_type == "sum") {
         historical_data_aggregated <- historical_data_filtred_result %>%
@@ -322,7 +323,7 @@ mod_forecasting_viewer_server <- function(id) {
           dplyr::summarise_at(vars(selected_info()$target_var), sum)
       }
 
-      benchmarking_models_test <- th2_benchmarking(historical_data_aggregated, prediction_data_filtred_result, group_target = NULL, group_value = NULL, target_var = selected_info()$target_var, as_of = input$as_of )
+      benchmarking_models_test <- th2_benchmarking(historical_data_aggregated, prediction_data_filtred_result, group_target = NULL, group_value = NULL, target_var = selected_info()$target_var, as_of = input$as_of)
 
       showModal(modalDialog(
         title = "Benchmark",

@@ -48,17 +48,15 @@ input_data_fetch <- function(prediction_data = NULL, db_conn = NULL, target_tabl
       start_date <- as.Date(dplyr::first(output_data_filtred$start_date))
       end_date <- as.Date(dplyr::first(output_data_filtred$end_date))
 
-      if(group_target_var == "all_columns"){
-
+      if (group_target_var == "all_columns") {
         query_statement_input <- glue::glue("SELECT DISTINCT * FROM {target_table}")
 
         query_res_input <- DBI::dbSendQuery(db_conn, statement = query_statement_input)
         historical_data <- DBI::dbFetch(query_res_input)
 
         historical_data <- historical_data %>%
-          tidyr::pivot_longer(!date_var , names_to = group_target_var, values_to = target_var)
-
-      }else{
+          tidyr::pivot_longer(!date_var, names_to = group_target_var, values_to = target_var)
+      } else {
         query_statement_input <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var}
                                        FROM {target_table}")
 
@@ -114,8 +112,8 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
     echarts4r::e_charts_(x_var) %>%
     echarts4r::e_line_(paste0(y_var, ".hist"), name = "Historical Values", color = "blue") %>%
     echarts4r::e_line_(paste0(y_var, ".pred"), name = "Prediction Values", color = "orange") %>%
-    echarts4r::e_line_('_conf_lo', name = "Lower Confidence", lineStyle = list(type = "dashed"), color = "green")%>%
-    echarts4r::e_line_('_conf_hi', name = "High Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
+    echarts4r::e_line_("_conf_lo", name = "Lower Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
+    echarts4r::e_line_("_conf_hi", name = "High Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
     echarts4r::e_x_axis(name = "Date") %>%
     echarts4r::e_y_axis(name = "Value") %>%
     echarts4r::e_tooltip(trigger = "axis") %>%
@@ -126,7 +124,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 # =========== #create bar chart (weekly time series) function ==================================
 #' @export
 create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = NULL) {
-
   historical_data <- historical_data[order(historical_data[[x_var]]), ]
   prediction_data <- prediction_data[order(prediction_data[[x_var]]), ]
 
@@ -139,38 +136,42 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
   combined_data <- combined_data %>%
     mutate(week = lubridate::ceiling_date(as.Date(get(x_var)), unit = "week", week_start = 1))
 
-  if(agg_type == "sum"){
+  if (agg_type == "sum") {
     weekly_data <- combined_data %>%
       group_by(week) %>%
       summarise(across(ends_with(".hist"), sum, na.rm = TRUE),
-                across(ends_with(".pred"), sum, na.rm = TRUE),
-                `_conf_lo` = sum(`_conf_lo`, na.rm = TRUE),
-                `_conf_hi` = sum(`_conf_hi`, na.rm = TRUE))
-  }else if(agg_type == "mean"){
+        across(ends_with(".pred"), sum, na.rm = TRUE),
+        `_conf_lo` = sum(`_conf_lo`, na.rm = TRUE),
+        `_conf_hi` = sum(`_conf_hi`, na.rm = TRUE)
+      )
+  } else if (agg_type == "mean") {
     weekly_data <- combined_data %>%
       group_by(week) %>%
       summarise(across(ends_with(".hist"), mean, na.rm = TRUE),
-                across(ends_with(".pred"), mean, na.rm = TRUE),
-                `_conf_lo` = mean(`_conf_lo`, na.rm = TRUE),
-                `_conf_hi` = mean(`_conf_hi`, na.rm = TRUE))
-  }else if(agg_type == "max"){
+        across(ends_with(".pred"), mean, na.rm = TRUE),
+        `_conf_lo` = mean(`_conf_lo`, na.rm = TRUE),
+        `_conf_hi` = mean(`_conf_hi`, na.rm = TRUE)
+      )
+  } else if (agg_type == "max") {
     weekly_data <- combined_data %>%
       group_by(week) %>%
       summarise(across(ends_with(".hist"), max, na.rm = TRUE),
-                across(ends_with(".pred"), max, na.rm = TRUE),
-                `_conf_lo` = max(`_conf_lo`, na.rm = TRUE),
-                `_conf_hi` = max(`_conf_hi`, na.rm = TRUE))
-  }else if(agg_type == "min"){
+        across(ends_with(".pred"), max, na.rm = TRUE),
+        `_conf_lo` = max(`_conf_lo`, na.rm = TRUE),
+        `_conf_hi` = max(`_conf_hi`, na.rm = TRUE)
+      )
+  } else if (agg_type == "min") {
     weekly_data <- combined_data %>%
       group_by(week) %>%
       summarise(across(ends_with(".hist"), min, na.rm = TRUE),
-                across(ends_with(".pred"), min, na.rm = TRUE),
-                `_conf_lo` = min(`_conf_lo`, na.rm = TRUE),
-                `_conf_hi` = min(`_conf_hi`, na.rm = TRUE))
+        across(ends_with(".pred"), min, na.rm = TRUE),
+        `_conf_lo` = min(`_conf_lo`, na.rm = TRUE),
+        `_conf_hi` = min(`_conf_hi`, na.rm = TRUE)
+      )
   }
 
   weekly_bar_chart <- weekly_data %>%
-    echarts4r::e_charts_('week') %>%
+    echarts4r::e_charts_("week") %>%
     echarts4r::e_bar_(paste0(y_var, ".hist"), name = "Historical Values", stack = "grp") %>%
     echarts4r::e_bar_(paste0(y_var, ".pred"), name = "Prediction Values", stack = "grp2", color = "orange") %>%
     echarts4r::e_x_axis(name = "Week") %>%

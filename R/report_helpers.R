@@ -24,16 +24,15 @@ generate_report_forecast <- function(dataset_input, var_date, var_target, kpi, m
 
 
 #' @export
-generate_rmd_skeleton <- function(dataset_input, var_date, var_target, target_kpis, models, column_kpi, split_date = NULL, horizon = NULL, spark_conection = NULL, draft_file = "/stability_template.Rmd", export_file = "/multiplekpis_report.Rmd" ){
-
+generate_rmd_skeleton <- function(dataset_input, var_date, var_target, target_kpis, models, column_kpi, split_date = NULL, horizon = NULL, spark_conection = NULL, draft_file = "/stability_template.Rmd", export_file = "/multiplekpis_report.Rmd") {
   path_rmarkdown <- system.file("rmarkdown", package = "th2forecast")
 
   draft_file <- paste0(path_rmarkdown, draft_file)
   rmd_draft <- heddlr::import_draft(draft_file)
-  rmd_header <- heddlr::import_draft( paste0(path_rmarkdown, "/report_header.Rmd"))
-  rmd_heatmap <- heddlr::import_draft( paste0(path_rmarkdown, "/heatmap_performance.Rmd"))
+  rmd_header <- heddlr::import_draft(paste0(path_rmarkdown, "/report_header.Rmd"))
+  rmd_heatmap <- heddlr::import_draft(paste0(path_rmarkdown, "/heatmap_performance.Rmd"))
 
-  report_rmd_chunks <- target_kpis %>% purrr::map(~ heddlr::heddle(data = .x,pattern = rmd_draft, "TARGET_KPI"))
+  report_rmd_chunks <- target_kpis %>% purrr::map(~ heddlr::heddle(data = .x, pattern = rmd_draft, "TARGET_KPI"))
   report_skeleton <- c(rmd_header, report_rmd_chunks, rmd_heatmap)
 
   export_file <- paste0(path_rmarkdown, export_file)
@@ -43,13 +42,11 @@ generate_rmd_skeleton <- function(dataset_input, var_date, var_target, target_kp
 
   report_params <- list(data = dataset_input, var_date = var_date, var_target = var_target, kpi = target_kpis, models = models, column_kpi = column_kpi, split_date = split_date, horizon = horizon)
   rmarkdown::render(input = export_file, output_file = paste0("models_stability_test_multiple_kpis"), params = report_params, output_dir = "./reports")
-
 }
 
 
 #' @export
-generate_rmd_performance_spark <- function(dataset_input, column_kpi, var_target, var_date, horizon, models, train_split = NULL, spark_conection = NULL, test_models = FALSE){
-
+generate_rmd_performance_spark <- function(dataset_input, column_kpi, var_target, var_date, horizon, models, train_split = NULL, spark_conection = NULL, test_models = FALSE) {
   path_rmarkdown <- system.file("rmarkdown", package = "th2forecast")
 
   draft_file <- paste0(path_rmarkdown, "/report_performance_spark.Rmd")
@@ -59,5 +56,4 @@ generate_rmd_performance_spark <- function(dataset_input, column_kpi, var_target
   report_params <- list(data = data_performance, models = models)
 
   rmarkdown::render(input = draft_file, output_file = "models_performance_spark", params = report_params, output_dir = "./reports")
-
 }
