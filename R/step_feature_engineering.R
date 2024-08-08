@@ -98,10 +98,14 @@ prep.step_th2_feature_engineering <- function(x,
   # print(x$terms)
   # print("name_id" %in% colnames(training))
   # print(training_n)
+  training_n <- list()
+
   if ("name_id" %in% colnames(training)) {
     training_n <- as.character(training$name_id[1])
     training <- training %>%
       dplyr::select(-name_id)
+  } else {
+    training_n[1] <- NULL
   }
 
   if (!is.null(x$use_holidays)) {
@@ -162,7 +166,7 @@ bake.step_th2_feature_engineering <- function(object,
       dplyr::select(-name_id)
   }
 
-  feat_len <- ((timetk::tk_get_timeseries_signature(lubridate::ymd("2016-01-01")) %>% ncol()) - 1 + object$lags) - 2
+  # feat_len <- (((timetk::tk_get_timeseries_signature(lubridate::ymd("2016-01-01")) %>% ncol()) - 1 + object$lags) - 2) - 3
 
   if (!is.null(object$use_holidays)) {
     bh_country <- object$use_holidays
@@ -175,10 +179,10 @@ bake.step_th2_feature_engineering <- function(object,
     }
   } else {
     use_holidays <- object$use_holidays
-    feat_len <- feat_len - 1
+    # feat_len <- feat_len - 1
   }
 
-  if (object$use_meteo == TRUE && !is.null(object$use_meteo)) feat_len <- feat_len + 2
+  # if (object$use_meteo == TRUE && !is.null(object$use_meteo)) feat_len <- feat_len + 2
 
   target_col <- object$feature_target
 
@@ -193,42 +197,43 @@ bake.step_th2_feature_engineering <- function(object,
 
   # feat_len <- 11
 
-  new_cols <- rep(
-    feat_len,
-    each = length(object$columns)
-  )
-
-  date_values <- matrix(NA, nrow = nrow(new_data), ncol = sum(new_cols))
-
-  colnames(date_values) <- as.character(seq_len(sum(new_cols)))
-
-  date_values <- tibble::as_tibble(date_values)
-
-  new_names <- vector("character", length = ncol(date_values))
+  # new_cols <- rep(
+  #   feat_len,
+  #   each = length(object$columns)
+  # )
+  #
+  # date_values <- matrix(NA, nrow = nrow(new_data), ncol = sum(new_cols))
+  #
+  # colnames(date_values) <- as.character(seq_len(sum(new_cols)))
+  #
+  # date_values <- tibble::as_tibble(date_values)
+  #
+  # new_names <- vector("character", length = ncol(date_values))
 
   strt <- 1
+  tmp <- NULL
   for (i in seq_along(object$columns)) {
-    cols <- (strt):(strt + new_cols[i] - 1)
+    # cols <- (strt):(strt + new_cols[i] - 1)
 
     tmp <- new_data %>%
       feature_selection(feature_target = target_col, use_holidays = use_holidays, use_meteo = object$use_meteo, , all_data = all_data, id_name = training_n, lags = object$lags, db_conn = object$db_conn) %>%
       dplyr::select(-object$columns[i], -target_col) %>%
       dplyr::as_tibble()
 
-    date_values[, cols] <- tmp
-
-    new_names[cols] <- paste(
-      object$columns[i],
-      names(tmp),
-      sep = "_"
-    )
-
-    strt <- max(cols) + 1
+    # date_values[, cols] <- tmp
+    #
+    # new_names[cols] <- paste(
+    #   object$columns[i],
+    #   names(tmp),
+    #   sep = "_"
+    # )
+    #
+    # strt <- max(cols) + 1
   }
 
-  names(date_values) <- new_names
+  # names(date_values) <- new_names
 
-  new_data <- dplyr::bind_cols(new_data, date_values)
+  new_data <- dplyr::bind_cols(new_data, tmp)
 
   if (!tibble::is_tibble(new_data)) {
     new_data <- tibble::as_tibble(new_data)

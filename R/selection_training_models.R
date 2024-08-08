@@ -117,7 +117,6 @@ th2_linear_engine <- function(input_data, var_target, var_date, engine = "lm", f
   if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))) {
     return(warning("Selected variables do not exist in the data."))
   } else {
-    # formula <- as.formula(paste(var_target, "~", "as.numeric(",var_date,") + factor(month(",var_date,", label = TRUE), ordered = FALSE)"))
     formula <- as.formula(paste(var_target, "~", var_date))
 
     model_linear <- parsnip::linear_reg() %>%
@@ -174,12 +173,10 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
       parsnip::set_mode("regression")
 
     recipe_spec <- recipes::recipe(formula, data = input_data) %>%
-      # step_th2_pre_processing(value) %>%
-      # ifelse(fit_model == "bulk", step_th2_pre_processing(value) )%>%
-      recipes::step_date(var_date, features = mars_features, ordinal = FALSE) %>%
+      recipes::step_date(!!var_date, features = mars_features, ordinal = FALSE) %>%
       recipes::step_mutate(date_num = as.numeric(!!sym(var_date))) %>%
       recipes::step_normalize(date_num) %>%
-      recipes::step_rm(var_date)
+      recipes::step_rm(!!var_date)
 
     if (fit_model == TRUE) {
       model_fit_mars <- workflows::workflow() %>%
@@ -223,8 +220,20 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
   formula <- as.formula(paste(var_target, "~ ."))
 
   if (fit_model == TRUE) {
-    model_rf_fit <- model_rf %>%
-      parsnip::fit(formula, data = input_data)
+    # model_rf_fit <- model_rf %>%
+    #   parsnip::fit(formula, data = input_data)
+
+
+    set.seed(1)
+    # model_xgboost_fit <- model_xgboost %>%
+    #   parsnip::fit(formula, data = input_data)
+    recipe_rf <- recipes::recipe(formula, data = input_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn)
+
+    model_rf_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipe_rf) %>%
+      workflows::add_model(model_rf) %>%
+      parsnip::fit(input_data)
   } else if (fit_model == "bulk") {
     recipe_rf <- recipes::recipe(formula, data = input_data) %>%
       step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn)
@@ -235,8 +244,11 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 
     model_rf_fit <- list("fit" = model_rf_fit, "model" = model_rf)
   } else {
+    recipe_rf <- recipes::recipe(formula, data = input_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn)
+
     model_rf_fit <- workflows::workflow() %>%
-      workflows::add_recipe(recipes::recipe(formula, data = input_data)) %>%
+      workflows::add_recipe(recipe_rf) %>%
       workflows::add_model(model_rf)
 
     model_rf_fit <- list("fit" = model_rf_fit, "model" = model_rf)
@@ -258,7 +270,7 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees = 200, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, use_meteo = FALSE, fit_model = TRUE, all_data = "", lags = FALSE, db_conn = NULL) {
   model_xgboost <-
     parsnip::boost_tree(
-      mtry = ifelse(fit_model == FALSE, tune(), mtry),
+      # mtry = ifelse(fit_model == FALSE, tune(), mtry),
       trees = ifelse(fit_model == FALSE, tune(), trees),
       min_n = ifelse(fit_model == FALSE, tune(), min_n),
       learn_rate = ifelse(fit_model == FALSE, tune(), learn_rate)
@@ -272,8 +284,17 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
 
   if (fit_model == TRUE) {
     set.seed(1)
-    model_xgboost_fit <- model_xgboost %>%
-      parsnip::fit(formula, data = input_data)
+    # model_xgboost_fit <- model_xgboost %>%
+    #   parsnip::fit(formula, data = input_data)
+
+    recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn) %>%
+      recipes::step_rm(var_date)
+
+    model_xgboost_fit <- workflows::workflow() %>%
+      workflows::add_recipe(recipe_xgboost) %>%
+      workflows::add_model(model_xgboost) %>%
+      parsnip::fit(input_data)
   } else if (fit_model == "bulk") {
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
       step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn) %>%
@@ -284,8 +305,12 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
 
     model_xgboost_fit <- list("fit" = model_xgboost_fit, "model" = model_xgboost)
   } else {
+    recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%
+      step_th2_feature_engineering(recipes::all_predictors(), feature_target = var_target, use_holidays = use_holidays, use_meteo = use_meteo, all_data = all_data, lags = lags, db_conn = db_conn) %>%
+      recipes::step_rm(var_date)
+
     model_xgboost_fit <- workflows::workflow() %>%
-      workflows::add_recipe(recipes::recipe(formula, data = dplyr::select(input_data, -var_date))) %>%
+      workflows::add_recipe(recipe_xgboost) %>%
       workflows::add_model(model_xgboost)
 
     model_xgboost_fit <- list("fit" = model_xgboost_fit, "model" = model_xgboost)
@@ -333,6 +358,18 @@ th2_arimax_engine <- function(input_data, var_date, var_target, external_data = 
       workflows::add_model(model_arimax)
   }
   model_xgboost_fit <- list("fit" = model_arimax_fit, "model" = model_arimax)
+}
+
+
+#' @export
+th2_ets_engine <- function(input_data, var_date, var_target, fit_model = TRUE) {
+  formula <- as.formula(paste(var_target, "~", var_date))
+
+  model_ets_fit <- modeltime::exp_smoothing() %>%
+    parsnip::set_engine(engine = "ets") %>%
+    parsnip::fit(formula, data = input_data)
+
+  return(model_ets_fit)
 }
 
 

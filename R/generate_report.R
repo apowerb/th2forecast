@@ -17,7 +17,7 @@ generate_report_forecast <- function(dataset_input, var_date, var_target, kpi, m
       dplyr::filter(kpi_data == kpi_plot)
 
 
-    report_params <- list(data = result_test_kpi, var_date = var_date, var_target = var_target, kpi = kpi, models = models, column_kpi = column_kpi, split_date = split_date, horizon = horizon)
+    report_params <- list(data = result_test_kpi, var_date = var_date, var_target = var_target, kpi = kpi, models = c(models, "TH2ENSEMBLE"), column_kpi = column_kpi, split_date = split_date, horizon = horizon)
     rmarkdown::render(input = rmd_report_file, output_file = paste0("models_stability_test_", kpi_plot), params = report_params, output_dir = "./reports")
   }
 }

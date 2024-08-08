@@ -12,7 +12,7 @@
 #' @examples model_evaluation(input_data, model_tbl)
 model_evaluation <- function(input_data, model_table) {
   calib_tbl <- model_table %>%
-    modeltime::modeltime_calibrate(testing(input_data), quiet = FALSE)
+    modeltime::modeltime_calibrate(rsample::testing(input_data), quiet = FALSE)
 
   accuracy_model <- calib_tbl %>%
     modeltime::modeltime_accuracy(metric_set = yardstick::metric_set(yardstick::mae, yardstick::rmse, yardstick::rsq))
@@ -173,7 +173,12 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
         dplyr::filter(input_data[[var_date]] >= as.Date(split_date) & input_data[[var_date]] < as.Date(split_date) + horizon)
     }
 
-    output_forecast <- th2_bulk_forecasting(data_prevision, "column_kpi", var_target, var_date, horizon, c(model), train_split = split_date, spark_conection = spark_conection)
+    # output_forecast <- th2_bulk_forecasting(data_prevision, "column_kpi", var_target, var_date, horizon, c(model), train_split = split_date, spark_conection = spark_conection)
+    output_forecast <- th2_bulk_forecasting_spark(data_prevision, "column_kpi", var_target, var_date, horizon, c(model), train_split = split_date, lags = 5)
+
+    if (!("column_kpi" %in% colnames(output_forecast))) {
+      output_forecast$column_kpi <- list_kpis[1]
+    }
 
     if (!is.null(split_date)) {
       output_forecast <- output_forecast %>%
@@ -231,7 +236,8 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
 
   list_kpis_plots <- list()
   input_data_plot <- ""
-  # browser()
+
+  model <- c(model, "TH2ENSEMBLE")
 
   for (kpi_plot in list_kpis)
   {
@@ -315,13 +321,13 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
 
       time_series_plot <- data_temp %>%
         echarts4r::group_by(column_kpi) %>%
-        echarts4r::e_charts(X_date) %>%
+        echarts4r::e_charts(date) %>%
         echarts4r::e_line(sales, name = "Historical Values", color = "#2C3E50") %>%
         echarts4r::e_line(forecast_1, name = paste(m, "1"), color = "#B0226B") %>%
         echarts4r::e_line(forecast_2, name = paste(m, "2"), color = "#6DB539") %>%
         echarts4r::e_line(forecast_3, name = paste(m, "3"), color = "#7AC6EA") %>%
         echarts4r::e_title("Time Series Test") %>%
-        echarts4r::e_x_axis(X_date, name = "Date") %>%
+        echarts4r::e_x_axis(date, name = "Date") %>%
         echarts4r::e_y_axis(sales, name = "Value") %>%
         echarts4r::e_legend(TRUE) %>%
         echarts4r::e_tooltip(trigger = "axis")

@@ -1,0 +1,83 @@
+---
+title: "Series and parallel performance evaluation"
+author: "Harold Villafuerte"
+date: "`r Sys.Date()`"
+output: html_document
+params: 
+  data: NA
+  models: NA
+---
+
+The following report shows the performance of the parallel and serial execution for the complete forecasting process. For each test performed, 10, 50 and 100 kpis are used, showing the execution time in each case.
+
+## Benchmarking
+
+Selected models:
+
+
+`r paste("-", params$models, collapse = "\n ")`
+
+------------------------------------------------------------------------
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+df_performance <- params$data %>%
+  dplyr::filter(type %in% c("parallel", "series"))
+
+df_performance |> 
+  echarts4r::group_by(type) |>
+  echarts4r::e_chart(n_kpis) |> 
+  echarts4r::e_bar(time_execution) |>
+  echarts4r::e_x_axis(name = "N° kpis") |>
+  echarts4r::e_y_axis(name = "Time of execution") |>
+  echarts4r::e_title(text = "Series and parallel performance", top = 0, left = "center") |>
+  echarts4r::e_flip_coords() |>
+  echarts4r::e_tooltip(trigger = "axis", formatter = htmlwidgets::JS('
+          function (params) {
+            let tooltip = `<p style="width: 200px; float: center;"><strong>${params[0].axisValue} KPIs</strong></p>`;
+
+            params.forEach(({ seriesName, marker, value }) => {
+              tooltip += `<p style="width: 200px;">${marker}${seriesName}<span style="float: right;"> <strong>${value[0]}</strong> sec.</span></p>`;
+            });
+            
+            return tooltip;
+          }')) |>
+  echarts4r::e_legend(top = 20, show = TRUE)
+  
+```
+
+
+`r if(length(params$models) > 1) "## Benchmarking by model"`
+
+`r if(length(params$models) > 1) "100 KPIs in parallel per model."`
+
+------------------------------------------------------------------------
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+if(length(params$models) > 1) {
+  df_performance_model <- params$data %>%
+    dplyr::filter(type %in% params$models)
+  
+  df_performance_model |> 
+    echarts4r::e_chart(type) |> 
+    echarts4r::e_bar(time_execution) |>
+    echarts4r::e_x_axis(name = "Models") |>
+    echarts4r::e_y_axis(name = "Time of execution") |>
+    echarts4r::e_title(text = "Parallel performance by model", top = 0, left = "center") |>
+    echarts4r::e_tooltip(trigger = "axis", formatter = htmlwidgets::JS('
+            function (params) {
+              let tooltip = `<p style="width: 200px; float: center;"><strong>${params[0].axisValue}</strong></p>`;
+  
+              params.forEach(({ seriesName, marker, value }) => {
+                tooltip += `<p style="width: 200px;">${marker}${seriesName}<span style="float: right;"> <strong>${value[1]}</strong> sec.</span></p>`;
+              });
+              
+              return tooltip;
+            }')) |>
+    echarts4r::e_legend(top = 20, show = TRUE) #|>
+    # echarts4r::e_flip_coords()
+}
+
+```
+

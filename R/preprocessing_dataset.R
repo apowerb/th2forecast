@@ -185,7 +185,7 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
       holiday = values,
       ds = as.Date(names(list_holidays)),
       lower_window = 0,
-      upper_window = 0
+      upper_window = 1
     )
 
     return(dataframe_holidays)

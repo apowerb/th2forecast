@@ -10,12 +10,8 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL, spark_conection = NULL) {
+th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL) {
   allow_par <- FALSE
-  if (!is.null(spark_conection)) {
-    allow_par <- TRUE
-    modeltime::parallel_start(spark_conection, .method = "spark")
-  }
 
   list_output_models <- list()
 
@@ -254,7 +250,12 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     )
 
 
-  nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
+  cloned_tbl <- data.table::copy(nested_modeltime_tbl)
+
+  rm(nested_modeltime_tbl)
+  gc()
+
+  nested_modeltime_refit_tbl <- cloned_tbl %>%
     modeltime::modeltime_nested_refit(
       control = modeltime::control_nested_refit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk")
     )
@@ -272,11 +273,11 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
     dplyr::rename(!!group_target_output := id)
 
-  forecast_result <- forecast_result %>%
-    dplyr::mutate(accuracy = list(accuracy_test)) %>%
-    dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-    dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-    dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
+  # forecast_result <- forecast_result %>%
+  #   dplyr::mutate(accuracy = list(accuracy_test)) %>%
+  #   dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
+  #   dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
+  #   dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
 
@@ -284,14 +285,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     forecast_result$.value <- round(forecast_result$.value)
     forecast_result$.conf_lo <- round(forecast_result$.conf_lo)
     forecast_result$.conf_hi <- round(forecast_result$.conf_hi)
-  }
-
-  if (!is.null(spark_conection)) {
-    # Unregisters the Spark Backend
-    modeltime::parallel_stop()
-
-    # Disconnects Spark
-    # sparklyr::spark_disconnect_all()
   }
 
   return(forecast_result)

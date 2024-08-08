@@ -48,7 +48,7 @@ th2_resamples <- function(dataset_input, var_date) {
 th2_tune_model <- function(resample_data, model, tuning_param) {
   cv_results <- tune::tune_grid(
     model,
-    grid = expand.grid(tuning_param),
+    grid = tuning_param,
     metrics = yardstick::metric_set(yardstick::rmse),
     resamples = resample_data,
     control = tune::control_resamples(

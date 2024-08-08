@@ -56,7 +56,7 @@ feature_selection <- function(
     var_date_feature <- names(input_data)[column_date]
 
     if (length(list_features) > 0) {
-      list_features <- c(var_date_feature, list_features, feature_target)
+      list_features <- c(var_date_feature, feature_target, list_features)
       data_features <- input_data %>%
         dplyr::select(all_of(list_features))
     } else {
@@ -88,7 +88,7 @@ feature_selection <- function(
     data_signature <- timetk::tk_get_timeseries_signature(data_features[[var_date_feature]]) %>%
       janitor::remove_empty() %>%
       # janitor::remove_constant() %>%
-      dplyr::select(-index, -diff, -wday.lbl, -month.lbl)
+      dplyr::select(-c(index, diff, wday.lbl, month.lbl, hour, minute, second, hour12, am.pm))
 
     data_features <- cbind(data_features, data_signature)
 
@@ -178,13 +178,18 @@ feature_selection <- function(
 
     # window <- window
     #
-    # data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], window, mean, fill = NA)
-    # data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], window, sd, fill = NA)
-    #
-    # for (i in 1:lags) {
-    #   data_features[i, "rolling_mean"] <- rowMeans(data_features[i, c("lag_1", "lag_2", "lag_3", "lag_4", "lag_5")])
-    #   data_features[i, "rolling_std"] <- sd(data_features[i, c("lag_1", "lag_2", "lag_3", "lag_4", "lag_5")])
-    # }
+    if (lags != FALSE) {
+      data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], lags, mean, fill = NA)
+      data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], lags, sd, fill = NA)
+
+      col_lags <- c(paste0(feature_target, "_lag", 1:lags))
+
+      for (i in 1:lags) {
+        data_features[i, "rolling_mean"] <- rowMeans(data_features[i, col_lags])
+        data_features[i, "rolling_std"] <- sd(data_features[i, col_lags])
+      }
+    }
+
     # st_features <- zoo::rollapplyr(
     #   input_data[feature_target],
     #   width = window,
@@ -194,7 +199,7 @@ feature_selection <- function(
     #   )
     #
     # data_features <- cbind(data_features, st_features)
-
+    #
     # data_features <- data_features[complete.cases(data_features), ]
 
     # print(data_features)
