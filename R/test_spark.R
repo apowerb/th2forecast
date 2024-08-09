@@ -15,7 +15,7 @@ th2_forecast_spark <- function(input_data, group_target, target_var, date_var, f
   config$spark.driver.memory <- "6G"
 
   config$`spark.executor.cores` <- "1"
-  config$`spark.executor.instances` <- "12"
+  config$`spark.executor.instances` <- "4"
 
   config$`spark.executor.extraJavaOptions=-Dlog4j.logLevel` <- "debug"
   config$`spark.app.name` <- "test bulk forecast"
@@ -57,11 +57,14 @@ th2_forecast_spark <- function(input_data, group_target, target_var, date_var, f
     packages = FALSE
   )
 
-  # write.csv(x=result_forecast, file="result_forecast.csv", row.names = FALSE)
   result_forecast <- sparklyr::sdf_collect(result_forecast)
 
-  result_forecast <- result_forecast %>%
-    tidyr::unite(!!group_target, all_of(group_by_col), sep = "_", remove = TRUE)
+  # result_forecast <- result_forecast %>%
+  #   tidyr::unite(!!group_target, all_of(group_by_col), sep = "_", remove = TRUE)
+
+  for (e in names(result_forecast)[substr(names(result_forecast), 1, 2) == "X_"]) {
+    result_forecast <- rename(result_forecast, !!sub("^..", "_", e) := !!e)
+  }
 
   spark_disconnect(sc)
 

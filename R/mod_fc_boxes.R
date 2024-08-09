@@ -114,7 +114,7 @@ mod_fc_boxes_server <-
               group_target_var = selected_info()$group_target_var,
               date_var = selected_info()$date_var
             ))
-            updateTabsetPanel(session = parent_session, "forecastViz_tabbox", selected = "Forecasting Viewer")
+            shiny::updateTabsetPanel(session = parent_session, "forecastViz_tabbox", selected = "Forecasting Viewer")
           },
           error = function(err) {
             shinyalert::shinyalert("Error loading output data. Please check the output configuration.", type = "error")

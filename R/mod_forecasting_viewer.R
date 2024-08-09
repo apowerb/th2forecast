@@ -6,13 +6,13 @@ mod_forecasting_viewer_ui <- function(id) {
   ns <- NS(id)
 
   bs4Dash::tabBox(
-    id = ns("forecastViz_tabbox"), width = 12, selected = "Forecasting Pipelines",
-    column(width = 12, uiOutput(ns("infos_and_help"))),
+    id = ns("forecastViz_tabbox"), width = 12,
     tabPanel(
       title = shiny::tags$div(shiny::icon("database"), "Forecasting Pipelines",
         `data-bs-toggle` = "tooltip",
         `data-bs-placement` = "top",
-        title = "Manage forecasting pipelines"
+        title = "Manage forecasting pipelines",
+        value = "Forecasting Pipelines"
       ),
       fluidPage(
         DT::dataTableOutput(ns("pipelines_table")),
@@ -23,7 +23,8 @@ mod_forecasting_viewer_ui <- function(id) {
       title = shiny::tags$div(shiny::icon("chart-line"), "Forecasting Viewer",
         `data-bs-toggle` = "tooltip",
         `data-bs-placement` = "top",
-        title = "Explore forecasting results"
+        title = "Explore forecasting results",
+        value = "Forecasting Viewer"
       ),
       fluidPage(
         fluidRow(
@@ -79,7 +80,8 @@ mod_forecasting_viewer_server <- function(id) {
           join th2_wf_permissions  tb2 on tb1.pipeline_uuid = tb2.object_id
           join data_connection_params tb_in on tb1.input_id = tb_in.table_id
           join data_connection_params tb_out on tb1.output_id = tb_out.table_id
-          where tb2.permitted_users = '{user}' and tb2.object_type = 'fc'"
+          where tb2.permitted_users = '{user}' and tb2.object_type = 'fc'
+          group by tb1.created_at, tb1.calendar_country, tb1.business_days, tb1.id, tb1.date_var, tb1.forecast_duration, tb1.group_target_var, tb1.input_id, tb1.output_id, tb1.pipeline_uuid, tb1.project_name, tb1.split_train_test, tb1.target_var, tb1.use_spark, tb1.group_by_columns,  tb_in.param1, tb_in.data_source, tb_out.param1, tb_out.data_source"
       )
 
       pipelines_metadata <- th2product::fetch_data_from_db_by_sql(sql)
@@ -317,11 +319,11 @@ mod_forecasting_viewer_server <- function(id) {
       historical_data_filtred_result <- historical_data_filtred_result %>%
         dplyr::filter(historical_data_filtred_result[[selected_info()$date_var]] >= min(prediction_data_filtred_result[[selected_info()$date_var]]))
 
-      if (input$agg_type == "sum") {
-        historical_data_aggregated <- historical_data_filtred_result %>%
-          dplyr::group_by_at(vars(selected_info()$date_var)) %>%
-          dplyr::summarise_at(vars(selected_info()$target_var), sum)
-      }
+      # if (input$agg_type == "sum") {
+      historical_data_aggregated <- historical_data_filtred_result %>%
+        dplyr::group_by_at(vars(selected_info()$date_var)) %>%
+        dplyr::summarise_at(vars(selected_info()$target_var), sum)
+      # }
 
       benchmarking_models_test <- th2_benchmarking(historical_data_aggregated, prediction_data_filtred_result, group_target = NULL, group_value = NULL, target_var = selected_info()$target_var, as_of = input$as_of)
 
