@@ -22,7 +22,7 @@ model_evaluation <- function(input_data, model_table) {
 
 
 #' @export
-th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, group_value = NULL, target_var = NULL, as_of = NULL) {
+th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, group_value = NULL, target_var = NULL, date_var = NULL, as_of = NULL) {
   test_data <- test_data[order(test_data[["_date"]]), ]
 
   forecasting_data <- forecasting_data[order(forecasting_data[["_date"]]), ]
@@ -39,7 +39,8 @@ th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, g
     .model_desc = character(),
     .type = character(),
     mae = numeric(),
-    rmse = numeric()
+    rmse = numeric(),
+    rsq = numeric()
   )
 
   y <- as.double(unlist(test_data[[target_var]]))
@@ -54,7 +55,8 @@ th2_benchmarking <- function(test_data, forecasting_data, group_target = NULL, g
       .model_desc = model,
       .type = "Test",
       mae = yardstick::mae_vec(y, y_hat),
-      rsq = yardstick::rmse_vec(y, y_hat)
+      rmse = yardstick::rmse_vec(y, y_hat),
+      rsq = yardstick::rsq_vec(y, y_hat)
     )
 
     df_accuracy_test <- rbind(df_accuracy_test, add_model)
@@ -123,7 +125,71 @@ th2_metric_test <- function(test_data, forecasting_data, date_var = NULL, target
 
 
 #' @export
-th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi, model, split_date = NULL, horizon = NULL, months_test = 3, previsions = 3, spark_conection = NULL) {
+th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var, forecast_horizon, train_split = NULL ){
+
+  dataframe_input <- input_data
+
+
+  dataframe_input <- dataframe_input %>%
+    dplyr::group_by_at(vars(date_var, group_target)) %>%
+    dplyr::summarise_at(vars(target_var), sum)
+
+  data_clean <- preprocessing_data(dataframe_input %>% dplyr::select(target_var, date_var))$dataset_clean #[["dataset_clean"]]
+
+  dataframe_input[[target_var]] <- data_clean[[target_var]]
+
+  if (!is.null(train_split)) {
+    train_data <- dataframe_input %>%
+      dplyr::filter(.data[[date_var]] < as.Date(train_split))
+
+    test_data <- dataframe_input %>%
+      dplyr::filter(.data[[date_var]] >= as.Date(train_split)) %>%
+      dplyr::rename(date := !!date_var)
+
+    forecast_horizon <- nrow(test_data)
+  } else {
+    train_data <- dataframe_input
+  }
+
+  if (group_target == "all_columns") {
+    train_data <- train_data %>%
+      tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
+      rename(date := !!date_var)
+    group_target <- "id"
+  } else {
+
+    select_vars <- c(group_target, date_var, target_var)
+
+    train_data <- train_data %>%
+      dplyr::select(all_of(select_vars)) %>%
+      rename(id := !!group_target, date := !!date_var)
+    group_target <- "id"
+  }
+
+  nixtlar::nixtla_set_api_key(api_key = "nixtla-tok-mxDQi7K32j4ZygikZfIpHdGMUMAYj0pIhKUFn327lx68ToncxK3WHZTsGgnpM6E57dJDMD3Kmm2EWFEP")
+
+  dataset_large_filter <- train_data %>%
+    dplyr::select(id, !!date_var, !!target_var) %>%
+    dplyr::rename(ds = !!date_var, y = !!target_var, unique_id = id)
+
+  nixtla_fcst <- nixtlar::nixtla_client_forecast(dataset_large_filter, h = forecast_horizon, id_col = "unique_id", level = c(95), model = "timegpt-1-long-horizon", finetune_steps=10)
+
+  timegpt_result <- nixtla_fcst %>%
+    dplyr::rename(.index = ds, .value = TimeGPT , .conf_lo = `TimeGPT-lo-95`, .conf_hi = `TimeGPT-hi-95`) %>%
+    dplyr::select(- unique_id) %>%
+    dplyr::mutate(.model_id = 0, .model_desc = "TIMEGPT", .key = "prediction", as_of = Sys.Date(), start_date = min(input_data[[date_var]]), end_date = max(input_data[[date_var]]), accuracy = list(data.frame())) %>%
+    dplyr::relocate(.model_id, .before = 1) %>%
+    dplyr::relocate(.model_desc, .after = 1) %>%
+    dplyr::relocate(.key, .after = 2) %>%
+    as_tibble()
+
+  return(timegpt_result)
+
+}
+
+
+#' @export
+th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi, model, split_date = NULL, horizon = NULL, months_test = 3, previsions = 3, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL, spark_conection = NULL, use_timegpt = TRUE) {
   list_kpis <- unique(input_data[[kpi]])
 
   if (is.null(split_date)) {
@@ -173,8 +239,12 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
         dplyr::filter(input_data[[var_date]] >= as.Date(split_date) & input_data[[var_date]] < as.Date(split_date) + horizon)
     }
 
-    # output_forecast <- th2_bulk_forecasting(data_prevision, "column_kpi", var_target, var_date, horizon, c(model), train_split = split_date, spark_conection = spark_conection)
-    output_forecast <- th2_bulk_forecasting_spark(data_prevision, "column_kpi", var_target, var_date, horizon, c(model), train_split = split_date, lags = 5)
+    output_forecast <- th2_bulk_forecasting_spark(data_prevision, "column_kpi", var_target, var_date, horizon, c(model), train_split = split_date, lags = lags, use_holidays = use_holidays, country_column = country_column, path_driver = path_driver, use_meteo = use_meteo)
+
+    if(use_timegpt == TRUE){
+      timegpt <- th2_benchmark_timegpt(data_prevision, "column_kpi", var_target, var_date, horizon, train_split = split_date)
+      output_forecast <- rbind(output_forecast, timegpt)
+    }
 
     if (!("column_kpi" %in% colnames(output_forecast))) {
       output_forecast$column_kpi <- list_kpis[1]
@@ -183,6 +253,11 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
     if (!is.null(split_date)) {
       output_forecast <- output_forecast %>%
         dplyr::filter(`.index` < as.Date(split_date) + horizon)
+    }
+
+    if(use_timegpt == TRUE){
+      output_forecast$accuracy[1][[1]] <- output_forecast$accuracy[1][[1]] %>%
+          dplyr::add_row(.model_id = 0, .model_desc = "TIMEGPT", .type = "Test", mae = Inf, rmse = Inf, rsq = 0)
     }
 
     test_metric <- cbind(
@@ -237,7 +312,7 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
   list_kpis_plots <- list()
   input_data_plot <- ""
 
-  model <- c(model, "TH2ENSEMBLE")
+  model <- c(model, "timegpt", "TH2ENSEMBLE")
 
   for (kpi_plot in list_kpis)
   {

@@ -10,7 +10,7 @@ table_accuracy <-- data.frame()
 data_filter <- params$data %>%
   dplyr::filter(params$data[[params$column_kpi]] == "TARGET_KPI")
 
-result_test_report <- th2forecast::th2_rolling_forecast_stablizer(data_filter, params$var_date, params$var_target, params$column_kpi, params$models, params$split_date, params$horizon)
+result_test_report <- th2forecast::th2_bulk_forecasting_spark(data_filter, params$var_date, params$var_target, params$column_kpi, params$models, params$split_date, params$horizon, lags = params$lags, use_holidays = params$use_holidays, country_column = params$country_column, path_driver = params$path_driver, use_meteo = params$use_meteo, tuning = params$tuning)
 
 results_table <<- rbind(results_table, result_test_report$accuracy_df)
 
@@ -264,10 +264,4 @@ coparison_chart
 
 ```
 
-```{r}
-list_kpis <<- c(list_kpis, "TARGET_KPI")
-
-cat("lista de KPIs para la table de performance")
-cat(list_kpis)
-```
 

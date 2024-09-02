@@ -119,12 +119,12 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       # }
     } else if (model == "prophet") {
       if (tuning == TRUE) {
-        training_model <- th2_prophet_engine(rsample::training(dataset_train_test), target_var, "date", engine = "prophet", use_holidays = use_holidays, fit_model = FALSE)
+        training_model <- th2_prophet_engine(rsample::training(dataset_train_test), target_var, "date", engine = "prophet", use_holidays = use_holidays, db_conn = db_conn, fit_model = FALSE)
         formula <- as.formula(paste(target_var, "~", "date"))
         tuning_param <- dials::grid_regular(modeltime::changepoint_num(c(10L, 50L)), modeltime::changepoint_range(), levels = 3)
         label_model <- "model_prophet"
       } else {
-        model_prophet <- th2forecast::th2_prophet_engine(rsample::training(dataset_train_test), target_var, "date", fit_model = TRUE, use_holidays = use_holidays, , db_conn = db_conn)
+        model_prophet <- th2forecast::th2_prophet_engine(rsample::training(dataset_train_test), target_var, "date", fit_model = TRUE, use_holidays = use_holidays, db_conn = db_conn)
         list_output_models[["model_prophet"]] <- model_prophet
       }
     } else if (model == "lr") {
@@ -150,22 +150,22 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       }
     } else if (model == "random_forest") {
       if (tuning == TRUE) {
-        training_model <- th2_random_forest_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), target_var, use_holidays = use_holidays, db_conn = db_conn, use_meteo = use_meteo, lags = lags, fit_model = FALSE)
+        training_model <- th2_random_forest_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), target_var, use_holidays = use_holidays, db_conn = db_conn, use_meteo = use_meteo, lags = lags, fit_model = FALSE, all_data = train_data)
         formula <- as.formula(paste(target_var, "~ ."))
         tuning_param <- dials::grid_regular(dials::trees(), dials::min_n(), levels = 3)
         label_model <- "model_random_forest"
       } else {
-        model_random_forest <- th2forecast::th2_random_forest_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), target_var, use_holidays = use_holidays, db_conn = db_conn, use_meteo = use_meteo, lags = lags, fit_model = TRUE)
+        model_random_forest <- th2forecast::th2_random_forest_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), target_var, use_holidays = use_holidays, db_conn = db_conn, use_meteo = use_meteo, lags = lags, fit_model = TRUE, all_data = train_data)
         list_output_models[["model_random_forest"]] <- model_random_forest
       }
     } else if (model == "xgboost") {
       if (tuning == TRUE) {
-        training_model <- th2_xgboost_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), "date", target_var, use_holidays = use_holidays, use_meteo = use_meteo, db_conn = db_conn, lags = lags, fit_model = FALSE)
+        training_model <- th2_xgboost_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), "date", target_var, use_holidays = use_holidays, use_meteo = use_meteo, db_conn = db_conn, lags = lags, fit_model = FALSE, all_data = train_data)
         formula <- as.formula(paste(target_var, "~ ."))
         tuning_param <- dials::grid_regular(dials::trees(), dials::min_n(), dials::learn_rate(), levels = 3)
         label_model <- "model_xgboost"
       } else {
-        model_xgboost <- th2forecast::th2_xgboost_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), "date", target_var, use_holidays = use_holidays, use_meteo = use_meteo, db_conn = db_conn, lags = lags, fit_model = TRUE)
+        model_xgboost <- th2forecast::th2_xgboost_engine(rsample::training(dataset_train_test) %>% dplyr::select(-group_target), "date", target_var, use_holidays = use_holidays, use_meteo = use_meteo, db_conn = db_conn, lags = lags, fit_model = TRUE, all_data = train_data)
         list_output_models[["model_xgboost"]] <- model_xgboost
       }
     } else if (model == "ets") {
@@ -175,7 +175,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       error_models <- c(error_models, model)
     }
 
-    if (tuning == TRUE & !(model == "arima" || model == "lr")) {
+    if (tuning == TRUE & !(model == "arima" || model == "lr" || model == "ets")) {
       best_params <- th2forecast::th2_tune_model(resample_data, training_model$fit, tuning_param)
 
       fitted_model <- training_model$fit %>%
@@ -194,29 +194,29 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
 
   models_evaluated <- model_evaluation(dataset_train_test, models_trained)
   table_performance <- models_evaluated$accuracy_models
-  models_evaluated <- models_evaluated$model_calibrated
+  models_results <- models_evaluated[["model_calibrated"]]
 
-  # if (length(models_list) > 1)
-  # {
-  #   ensemble_fit <- models_trained %>%
-  #     modeltime.ensemble::ensemble_average(type = "mean")
-  #
-  #   ensemble_calibration_tbl <- modeltime_table(ensemble_fit) %>%
-  #     modeltime::modeltime_calibrate(rsample::testing(dataset_train_test), quiet = FALSE) %>%
-  #     dplyr::mutate(.model_id = length(models_list)+1)
-  #
-  #   ensemble_accuracy <- ensemble_calibration_tbl %>% modeltime::modeltime_accuracy(metric_set = yardstick::metric_set(yardstick::mae, yardstick::rmse, yardstick::rsq))
-  #
-  #   models_evaluated <- bind_rows(models_evaluated, ensemble_calibration_tbl)
-  #   table_performance <- bind_rows(table_performance, ensemble_accuracy)
-  # }
+  if (length(models_list) > 1)
+  {
+    ensemble_fit <- models_trained %>%
+      modeltime.ensemble::ensemble_average(type = "mean")
 
-  # df_models_evaluated <- models_evaluated %>%
-  #   modeltime::modeltime_forecast(
-  #     new_data = rsample::testing(dataset_train_test)
-  #   )
+    ensemble_calibration_tbl <- modeltime_table(ensemble_fit) %>%
+      modeltime::modeltime_calibrate(rsample::testing(dataset_train_test), quiet = FALSE) %>%
+      dplyr::mutate(.model_id = length(models_list)+1)
 
-  model_refit <- models_evaluated %>%
+    ensemble_accuracy <- ensemble_calibration_tbl %>% modeltime::modeltime_accuracy(metric_set = yardstick::metric_set(yardstick::mae, yardstick::rmse, yardstick::rsq))
+
+    models_results <- bind_rows(models_results, ensemble_calibration_tbl)
+    table_performance <- bind_rows(table_performance, ensemble_accuracy)
+  }
+
+  df_models_evaluated <- models_results %>%
+    modeltime::modeltime_forecast(
+      new_data = rsample::testing(dataset_train_test)
+    )
+
+  model_refit <- models_results %>%
     modeltime::modeltime_refit(data = train_data)
 
   models_predictions <- model_refit %>%
@@ -226,16 +226,19 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
     )
 
   models_predictions$.model_desc <- ifelse(grepl("ARIMA", models_predictions$.model_desc), "ARIMA", models_predictions$.model_desc)
+  models_predictions$.model_desc <- ifelse(grepl("ETS", models_predictions$.model_desc), "ETS", models_predictions$.model_desc)
   models_predictions$.model_desc <- ifelse(grepl("ENSEMBLE", models_predictions$.model_desc), "TH2ENSEMBLE", models_predictions$.model_desc)
 
+
   table_performance$.model_desc <- ifelse(grepl("ARIMA", table_performance$.model_desc), "ARIMA", table_performance$.model_desc)
+  table_performance$.model_desc <- ifelse(grepl("ETS", table_performance$.model_desc), "ETS", table_performance$.model_desc)
   table_performance$.model_desc <- ifelse(grepl("ENSEMBLE", table_performance$.model_desc), "TH2ENSEMBLE", table_performance$.model_desc)
 
   models_predictions <- models_predictions %>%
     dplyr::mutate(as_of = Sys.Date()) %>%
     dplyr::mutate(start_date = min(input_data[[date_var]])) %>%
-    dplyr::mutate(end_date = max(input_data[[date_var]])) # %>%
-  #   dplyr::mutate(accuracy = list(table_performance))
+    dplyr::mutate(end_date = max(input_data[[date_var]])) %>%
+    dplyr::mutate(accuracy = list(table_performance))
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
 
