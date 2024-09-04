@@ -57,8 +57,13 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 
     filter_targets <- colnames(input_data %>% dplyr::select(-all_of(var_date_feature)))
 
+    date_min <- input_data %>%
+      dplyr::select(!!var_date_feature) %>%
+      dplyr::summarise(min_date = min(input_data[[var_date_feature]])) %>%
+      dplyr::mutate(year = lubridate::year(min_date), month = lubridate::month(min_date))
+
     for (variable in filter_targets) {
-      y <- ts(unlist(input_data[variable]))
+      y <- ts(input_data[[variable]], start = c(date_min$year, date_min$month), frequency = 365)
 
       if (method_ls == "tso") {
         resul_out <- tsoutliers::tso(y,
@@ -85,6 +90,10 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
           segment <- y[(indexes_cpt[i]):indexes_cpt[i + 1]]
           fixed_series[(indexes_cpt[i]):indexes_cpt[i + 1]] <- segment
         }
+
+        # cpt <- fastcpd::fastcpd.meanvariance(input_data[[variable]])
+        #
+        # cpt@residuals <- (cpt@residuals + mean(cpt@data$x))
 
         input_data[variable] <- fixed_series
       } else {

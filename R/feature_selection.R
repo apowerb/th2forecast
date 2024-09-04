@@ -48,7 +48,7 @@ feature_selection <- function(
     if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty"))
     }
-    # browser()
+
     lag_g <<- lags
     target_g <<- feature_target
 
@@ -66,11 +66,18 @@ feature_selection <- function(
     }
 
     if (any(is.na(data_features[feature_target])) && lags != FALSE) {
-      var_temp <- ((all_data %>%
+      if(id_name != ""){
+        var_temp <- ((all_data %>%
         filter(id == id_name) %>%
         select(.actual_data))[[1]][[1]]) %>%
         dplyr::select(all_of(list_features))
-      data_features <- var_temp %>% rbind(data_features)
+        data_features <- var_temp %>% rbind(data_features)
+      }
+      else{
+        var_temp <- all_data  %>%
+          dplyr::select(all_of(list_features))
+        data_features <- var_temp %>% rbind(data_features)
+      }
     }
 
     if (!is.null(use_holidays)) {
@@ -107,16 +114,21 @@ feature_selection <- function(
         dim_train_data <- nrow(data_features) - dim_input_data
 
         all_train_data <- data_features[1:dim_train_data, ] %>%
+          ungroup() %>%
           dplyr::select(all_of(list_features))
+
 
         lag_data_features <- data_features %>%
+          ungroup() %>%
           dplyr::select(all_of(list_features))
 
-        for (i in 1:lags) {
-          data_lag <- dplyr::lag(data_features[feature_target], i)
-          data_lag[1:i, 1] <- data_features[i + 1, 2]
-          lag_data_features[paste(feature_target, "_lag", i, sep = "")] <- data_lag
-        }
+        # for (i in 1:lags) {
+        #   data_lag <- dplyr::lag(data_features[feature_target], i)
+        #   data_lag[1:i, 1] <- data_features[i + 1, 2]
+        #   lag_data_features[paste(feature_target, "_lag", i, sep = "")] <- data_lag
+        # }
+
+        lag_data_features <- th2_lag_roll_transformer(lag_data_features)
 
         train_data_lags <- lag_data_features[1:dim_train_data, ] %>%
           tidyr::drop_na()
@@ -129,14 +141,16 @@ feature_selection <- function(
         #   parsnip::fit(formula, data = train_data_lags) %>%
         #   modeltime::recursive(
         #     transform  = th2_lag_roll_transformer,
-        #     train_tail = tail(train_data_lags, 200)
+        #     train_tail = tail(train_data_lags, dim_input_data)
         #   )
 
         formula <- as.formula(paste(feature_target, "~ ."))
         set.seed(123)
         model_fit_xgb_recursive <- parsnip::boost_tree(
           mode = "regression",
-          learn_rate = 0.05
+          trees = 300,
+          min_n = 5,
+          learn_rate = 0.1
         ) %>%
           parsnip::set_engine("xgboost") %>%
           parsnip::fit(formula, data = dplyr::select(train_data_lags, -var_date_feature)) %>%
@@ -144,6 +158,15 @@ feature_selection <- function(
             transform  = th2_lag_roll_transformer,
             train_tail = tail(train_data_lags, dim_input_data)
           )
+
+        # formula <- as.formula(paste(feature_target, "~", var_date_feature))
+        # model_fit_prophet <- modeltime::prophet_reg() %>%
+        #   parsnip::set_engine(engine = "prophet") %>%
+        #   parsnip::fit(formula, data = train_data_lags) %>%
+        #   modeltime::recursive(
+        #     transform  = th2_lag_roll_transformer,
+        #     train_tail = tail(train_data_lags, dim_input_data)
+        #   )
 
         model_tbl <- modeltime_table(
           model_fit_xgb_recursive
@@ -164,23 +187,33 @@ feature_selection <- function(
         data_lags_final <- data_features
         data_lags_final[(dim_train_data + 1):(dim_train_data + dim_input_data), 2] <- future_lags_result
 
+        data_mergem_lags <- lag_data_features %>%
+          dplyr::select(all_of(list_features))
+
         for (i in 1:lags) {
           data_lag <- dplyr::lag(data_lags_final[feature_target], i)
           data_lag[1:i, 1] <- data_lags_final[i + 1, 2]
-          lag_data_features[paste(feature_target, "_lag", i, sep = "")] <- data_lag
+          data_mergem_lags[paste(feature_target, "_lag", i, sep = "")] <- data_lag
         }
 
-        data_features <- cbind(data_features, lag_data_features[, 3:ncol(lag_data_features)]) %>%
+        data_features <- cbind(data_features, data_mergem_lags[, 3:ncol(data_mergem_lags)]) %>%
           tail(dim_input_data) %>%
           dplyr::as_tibble()
+        # %>%
+        #   dplyr::select(- date)
       }
     }
 
     # window <- window
     #
     if (lags != FALSE) {
-      data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], lags, mean, fill = NA)
-      data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], lags, sd, fill = NA)
+      if (!any(is.na(data_features[feature_target]))) {
+        data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], lags, mean, fill = NA)
+        data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], lags, sd, fill = NA)
+      }else{
+        data_features["rolling_mean"] <- zoo::rollapplyr(data_features[paste0(feature_target, "_lag1")], lags, mean, fill = NA)
+        data_features["rolling_std"] <- zoo::rollapplyr(data_features[paste0(feature_target, "_lag1")], lags, sd, fill = NA)
+      }
 
       col_lags <- c(paste0(feature_target, "_lag", 1:lags))
 
@@ -190,6 +223,7 @@ feature_selection <- function(
       }
     }
 
+    data_features <- data_features %>% dplyr::ungroup()
     # st_features <- zoo::rollapplyr(
     #   input_data[feature_target],
     #   width = window,

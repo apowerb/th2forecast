@@ -43,30 +43,33 @@ output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL
 input_data_fetch <- function(prediction_data = NULL, db_conn = NULL, target_table = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL, as_of = NULL) {
   tryCatch(
     {
-      output_data_filtred <- prediction_data %>% dplyr::filter(as_of == !!as_of)
+      if(as_of != "" || is.null(as_of))
+      {
+        output_data_filtred <- prediction_data %>% dplyr::filter(execution_date  == !!as_of)
 
-      start_date <- as.Date(dplyr::first(output_data_filtred$start_date))
-      end_date <- as.Date(dplyr::first(output_data_filtred$end_date))
+        start_date <- as.Date(dplyr::first(output_data_filtred$start_date))
+        end_date <- as.Date(dplyr::first(output_data_filtred$end_date))
 
-      if (group_target_var == "all_columns") {
-        query_statement_input <- glue::glue("SELECT DISTINCT * FROM {target_table}")
+        if (group_target_var == "all_columns") {
+          query_statement_input <- glue::glue("SELECT DISTINCT * FROM {target_table}")
 
-        query_res_input <- DBI::dbSendQuery(db_conn, statement = query_statement_input)
-        historical_data <- DBI::dbFetch(query_res_input)
+          query_res_input <- DBI::dbSendQuery(db_conn, statement = query_statement_input)
+          historical_data <- DBI::dbFetch(query_res_input)
 
-        historical_data <- historical_data %>%
-          tidyr::pivot_longer(!date_var, names_to = group_target_var, values_to = target_var)
-      } else {
-        query_statement_input <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var}
-                                       FROM {target_table}")
+          historical_data <- historical_data %>%
+            tidyr::pivot_longer(!date_var, names_to = group_target_var, values_to = target_var)
+        } else {
+          query_statement_input <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var}
+                                         FROM {target_table}")
 
-        query_res_input <- DBI::dbSendQuery(db_conn, statement = query_statement_input)
-        historical_data <- DBI::dbFetch(query_res_input)
+          query_res_input <- DBI::dbSendQuery(db_conn, statement = query_statement_input)
+          historical_data <- DBI::dbFetch(query_res_input)
+        }
+
+        historical_data_filtred <- historical_data %>% filter(between(as.Date(historical_data[[date_var]]), start_date, end_date))
+        DBI::dbDisconnect(db_conn)
+        return(historical_data_filtred)
       }
-
-      historical_data_filtred <- historical_data %>% filter(between(as.Date(historical_data[[date_var]]), start_date, end_date))
-      DBI::dbDisconnect(db_conn)
-      return(historical_data_filtred)
     },
     error = function(error) {
       DBI::dbDisconnect(db_conn)
