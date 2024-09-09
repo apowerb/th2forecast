@@ -54,3 +54,4 @@ man/
 R/initializer.R
 logs/log4j.spark.log
 derby.log
+/app_forecast/images
