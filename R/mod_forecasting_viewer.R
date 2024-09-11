@@ -8,24 +8,14 @@ mod_forecasting_viewer_ui <- function(id) {
   bs4Dash::tabBox(
     id = ns("forecastViz_tabbox"), width = 12,
     tabPanel(
-      title = shiny::tags$div(shiny::icon("database"), "Forecasting Pipelines",
-        `data-bs-toggle` = "tooltip",
-        `data-bs-placement` = "top",
-        title = "Manage forecasting pipelines",
-        value = "Forecasting Pipelines"
-      ),
+      title = "Forecasting Pipelines",
       fluidPage(
         DT::dataTableOutput(ns("pipelines_table")),
         uiOutput(ns("forecast_pipeline_boxes"))
       )
     ),
     tabPanel(
-      title = shiny::tags$div(shiny::icon("chart-line"), "Forecasting Viewer",
-        `data-bs-toggle` = "tooltip",
-        `data-bs-placement` = "top",
-        title = "Explore forecasting results",
-        value = "Forecasting Viewer"
-      ),
+      title = "Forecasting Viewer",
       fluidPage(
         fluidRow(
           column(width = 2, uiOutput(ns("as_of"))),
@@ -115,7 +105,7 @@ mod_forecasting_viewer_server <- function(id) {
           perm_table = "th2_wf_permissions",
           box_uuid = pipelines_list[x, "pipeline_uuid"],
           box_title = pipelines_list[x, "project_name"],
-          box_color = "info",
+          box_color = "primary",
           box_bg_color = "white",
           box_icon = "timeline",
           box_body = pipeline_content,
