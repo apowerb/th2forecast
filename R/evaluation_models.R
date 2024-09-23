@@ -125,8 +125,7 @@ th2_metric_test <- function(test_data, forecasting_data, date_var = NULL, target
 
 
 #' @export
-th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var, forecast_horizon, train_split = NULL ){
-
+th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var, forecast_horizon, train_split = NULL) {
   dataframe_input <- input_data
 
 
@@ -134,7 +133,7 @@ th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var
     dplyr::group_by_at(vars(date_var, group_target)) %>%
     dplyr::summarise_at(vars(target_var), sum)
 
-  data_clean <- preprocessing_data(dataframe_input %>% dplyr::select(target_var, date_var))$dataset_clean #[["dataset_clean"]]
+  data_clean <- preprocessing_data(dataframe_input %>% dplyr::select(target_var, date_var))$dataset_clean # [["dataset_clean"]]
 
   dataframe_input[[target_var]] <- data_clean[[target_var]]
 
@@ -157,7 +156,6 @@ th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var
       rename(date := !!date_var)
     group_target <- "id"
   } else {
-
     select_vars <- c(group_target, date_var, target_var)
 
     train_data <- train_data %>%
@@ -172,11 +170,11 @@ th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var
     dplyr::select(id, !!date_var, !!target_var) %>%
     dplyr::rename(ds = !!date_var, y = !!target_var, unique_id = id)
 
-  nixtla_fcst <- nixtlar::nixtla_client_forecast(dataset_large_filter, h = forecast_horizon, id_col = "unique_id", level = c(95), model = "timegpt-1-long-horizon", finetune_steps=10)
+  nixtla_fcst <- nixtlar::nixtla_client_forecast(dataset_large_filter, h = forecast_horizon, id_col = "unique_id", level = c(95), model = "timegpt-1-long-horizon", finetune_steps = 10)
 
   timegpt_result <- nixtla_fcst %>%
-    dplyr::rename(.index = ds, .value = TimeGPT , .conf_lo = `TimeGPT-lo-95`, .conf_hi = `TimeGPT-hi-95`) %>%
-    dplyr::select(- unique_id) %>%
+    dplyr::rename(.index = ds, .value = TimeGPT, .conf_lo = `TimeGPT-lo-95`, .conf_hi = `TimeGPT-hi-95`) %>%
+    dplyr::select(-unique_id) %>%
     dplyr::mutate(.model_id = 0, .model_desc = "TIMEGPT", .key = "prediction", as_of = Sys.Date(), start_date = min(input_data[[date_var]]), end_date = max(input_data[[date_var]]), accuracy = list(data.frame())) %>%
     dplyr::relocate(.model_id, .before = 1) %>%
     dplyr::relocate(.model_desc, .after = 1) %>%
@@ -184,7 +182,6 @@ th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var
     as_tibble()
 
   return(timegpt_result)
-
 }
 
 
@@ -241,7 +238,7 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
 
     output_forecast <- th2_bulk_forecasting_spark(data_prevision, "column_kpi", var_target, var_date, horizon, c(model), train_split = split_date, lags = lags, use_holidays = use_holidays, country_column = country_column, path_driver = path_driver, use_meteo = use_meteo)
 
-    if(use_timegpt == TRUE){
+    if (use_timegpt == TRUE) {
       timegpt <- th2_benchmark_timegpt(data_prevision, "column_kpi", var_target, var_date, horizon, train_split = split_date)
       output_forecast <- rbind(output_forecast, timegpt)
     }
@@ -255,9 +252,9 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
         dplyr::filter(`.index` < as.Date(split_date) + horizon)
     }
 
-    if(use_timegpt == TRUE){
+    if (use_timegpt == TRUE) {
       output_forecast$accuracy[1][[1]] <- output_forecast$accuracy[1][[1]] %>%
-          dplyr::add_row(.model_id = 0, .model_desc = "TIMEGPT", .type = "Test", mae = Inf, rmse = Inf, rsq = 0)
+        dplyr::add_row(.model_id = 0, .model_desc = "TIMEGPT", .type = "Test", mae = Inf, rmse = Inf, rsq = 0)
     }
 
     test_metric <- cbind(

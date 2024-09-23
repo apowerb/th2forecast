@@ -32,7 +32,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       dplyr::summarise_at(vars(target_var), sum)
   }
 
-  data_clean <- preprocessing_data(dataframe_input %>% dplyr::select(target_var, date_var))$dataset_clean #[["dataset_clean"]]
+  data_clean <- preprocessing_data(dataframe_input %>% dplyr::select(target_var, date_var))$dataset_clean # [["dataset_clean"]]
 
   dataframe_input[[target_var]] <- data_clean[[target_var]]
 
@@ -196,14 +196,13 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
   table_performance <- models_evaluated$accuracy_models
   models_results <- models_evaluated[["model_calibrated"]]
 
-  if (length(models_list) > 1)
-  {
+  if (length(models_list) > 1) {
     ensemble_fit <- models_trained %>%
       modeltime.ensemble::ensemble_average(type = "mean")
 
     ensemble_calibration_tbl <- modeltime_table(ensemble_fit) %>%
       modeltime::modeltime_calibrate(rsample::testing(dataset_train_test), quiet = FALSE) %>%
-      dplyr::mutate(.model_id = length(models_list)+1)
+      dplyr::mutate(.model_id = length(models_list) + 1)
 
     ensemble_accuracy <- ensemble_calibration_tbl %>% modeltime::modeltime_accuracy(metric_set = yardstick::metric_set(yardstick::mae, yardstick::rmse, yardstick::rsq))
 

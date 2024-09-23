@@ -19,14 +19,19 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     train_data <- input_data %>%
       dplyr::filter(input_data[[date_var]] < as.Date(train_split))
 
-    test_data <- input_data %>%
-      dplyr::filter(input_data[[date_var]] >= as.Date(train_split))
+    max_date <- max(train_data[[date_var]])
+    if (max_date < as.Date(train_split)) {
+      test_data <- input_data
+    } else {
+      test_data <- input_data %>%
+        dplyr::filter(input_data[[date_var]] >= as.Date(train_split))
 
-    test_data <- test_data %>%
-      dplyr::group_by(test_data[[date_var]]) %>%
-      dplyr::summarise(count = dplyr::n())
+      test_data <- test_data %>%
+        dplyr::group_by(test_data[[date_var]]) %>%
+        dplyr::summarise(count = dplyr::n())
 
-    future_forecast <- nrow(test_data)
+      future_forecast <- nrow(test_data)
+    }
   } else {
     train_data <- input_data
   }
