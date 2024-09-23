@@ -43,9 +43,8 @@ output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL
 input_data_fetch <- function(prediction_data = NULL, db_conn = NULL, target_table = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL, as_of = NULL) {
   tryCatch(
     {
-      if(as_of != "" || is.null(as_of))
-      {
-        output_data_filtred <- prediction_data %>% dplyr::filter(execution_date  == !!as_of)
+      if (as_of != "" || is.null(as_of)) {
+        output_data_filtred <- prediction_data %>% dplyr::filter(execution_date == !!as_of)
 
         start_date <- as.Date(dplyr::first(output_data_filtred$start_date))
         end_date <- as.Date(dplyr::first(output_data_filtred$end_date))

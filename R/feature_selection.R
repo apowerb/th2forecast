@@ -66,15 +66,14 @@ feature_selection <- function(
     }
 
     if (any(is.na(data_features[feature_target])) && lags != FALSE) {
-      if(id_name != ""){
+      if (id_name != "") {
         var_temp <- ((all_data %>%
-        filter(id == id_name) %>%
-        select(.actual_data))[[1]][[1]]) %>%
-        dplyr::select(all_of(list_features))
+          filter(id == id_name) %>%
+          select(.actual_data))[[1]][[1]]) %>%
+          dplyr::select(all_of(list_features))
         data_features <- var_temp %>% rbind(data_features)
-      }
-      else{
-        var_temp <- all_data  %>%
+      } else {
+        var_temp <- all_data %>%
           dplyr::select(all_of(list_features))
         data_features <- var_temp %>% rbind(data_features)
       }
@@ -210,7 +209,7 @@ feature_selection <- function(
       if (!any(is.na(data_features[feature_target]))) {
         data_features["rolling_mean"] <- zoo::rollapplyr(input_data[feature_target], lags, mean, fill = NA)
         data_features["rolling_std"] <- zoo::rollapplyr(input_data[feature_target], lags, sd, fill = NA)
-      }else{
+      } else {
         data_features["rolling_mean"] <- zoo::rollapplyr(data_features[paste0(feature_target, "_lag1")], lags, mean, fill = NA)
         data_features["rolling_std"] <- zoo::rollapplyr(data_features[paste0(feature_target, "_lag1")], lags, sd, fill = NA)
       }
