@@ -126,11 +126,16 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 # =========== #create bar chart (weekly time series) function ==================================
 #' @export
 create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = NULL) {
+  x_var <- tolower(x_var)
+  y_var <- tolower(y_var)
+  historical_data[[x_var]] <- as.Date(historical_data[[x_var]])
+  if (!startsWith(x_var, "_")) {
+    prediction_data[[x_var]] <- as.Date(prediction_data[[paste0("_",x_var)]])
+  } else {
+    prediction_data[[x_var]] <- as.Date(prediction_data[[x_var]])
+  }
   historical_data <- historical_data[order(historical_data[[x_var]]), ]
   prediction_data <- prediction_data[order(prediction_data[[x_var]]), ]
-
-  historical_data[[x_var]] <- as.Date(historical_data[[x_var]])
-  prediction_data[[x_var]] <- as.Date(prediction_data[[x_var]])
 
   combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c(".hist", ".pred"))
 
@@ -175,7 +180,7 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
   weekly_bar_chart <- weekly_data %>%
     echarts4r::e_charts_("week") %>%
     echarts4r::e_bar_(paste0(y_var, ".hist"), name = "Historical Values", stack = "grp") %>%
-    echarts4r::e_bar_(paste0(y_var, ".pred"), name = "Prediction Values", stack = "grp2", color = "orange") %>%
+    echarts4r::e_bar_(paste0(y_var, ".pred"), name = "Prediction Values", stack = "grp", color = "orange") %>%
     echarts4r::e_x_axis(name = "Week") %>%
     echarts4r::e_y_axis(name = "Value") %>%
     echarts4r::e_tooltip(trigger = "axis") %>%
