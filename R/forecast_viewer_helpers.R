@@ -14,12 +14,21 @@ db_conn_function <- function(dbms = NULL, server = NULL, user = NULL, password =
 # ===================== output data function ( prediction data)==================
 #' @export
 output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL) {
-  date_var <- paste0("_", date_var)
+
+  if (!startsWith(date_var, "_")) {
+    date_var <- paste0("_", date_var)
+  }
+
   # Récupérer les données de prédiction
+
   tryCatch(
     {
       query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,execution_date, start_date, end_date
                                         FROM {schema}.{target_table}")
+      if(schema == "" || is.null(schema)){
+        query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,execution_date, start_date, end_date
+                                        FROM {target_table}")
+      }
 
       query_res_output <- DBI::dbSendQuery(db_conn, statement = query_statement_output)
       prediction_data <- DBI::dbFetch(query_res_output)
@@ -33,6 +42,8 @@ output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL
       print(error)
       DBI::dbDisconnect(db_conn)
       shinyalert::shinyalert("Error returning output data. Please check the output datasource configuration.", type = "error")
+      print(paste0("Error returning output data. Please check the output datasource configuration."))
+      print(paste0("Error: ", error))
       return(NULL)
     }
   )
@@ -109,7 +120,11 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
   y_var <- tolower(y_var)
 
   historical_data[[x_var]] <- as.Date(historical_data[[x_var]])
-  prediction_data[[x_var]] <- as.Date(prediction_data[[paste0("_",x_var)]])
+  if (!startsWith(x_var, "_")) {
+    prediction_data[[x_var]] <- as.Date(prediction_data[[paste0("_",x_var)]])
+  } else {
+    prediction_data[[x_var]] <- as.Date(prediction_data[[x_var]])
+  }
   historical_data <- historical_data[order(historical_data[[x_var]]), ]
   prediction_data <- prediction_data[order(prediction_data[[x_var]]), ]
 
