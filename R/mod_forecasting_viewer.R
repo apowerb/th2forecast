@@ -184,7 +184,6 @@ mod_forecasting_viewer_server <- function(id) {
             host = decrypted_input_connection$host,
             db_name = decrypted_input_connection$database
           )
-
           input_data_result(input_data_fetch(
             prediction_data = output_data_result(),
             db_conn = db_conn,
@@ -196,6 +195,7 @@ mod_forecasting_viewer_server <- function(id) {
           ))
         },
         error = function(err) {
+          print(err)
           shinyalert::shinyalert("Error loading input data. Please check the input configuration.", type = "error")
         }
       )
@@ -208,6 +208,7 @@ mod_forecasting_viewer_server <- function(id) {
       req(input_data_result())
 
       group_target_var <- selected_info()$group_target_var
+      group_target_var <- tolower(group_target_var)
       kpi_values <- base::unique(input_data_result()[group_target_var])
       selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
     })
@@ -264,10 +265,11 @@ mod_forecasting_viewer_server <- function(id) {
 
       prediction_data_aggregated <- prediction_data_filtred_result %>%
         dplyr::filter(execution_date == input$as_of)
-
+      date_var <- tolower(selected_info()$date_var)
+      target_var <- tolower(selected_info()$target_var)
       historical_data_aggregated <- historical_data_filtred_result %>%
-        dplyr::group_by_at(vars(selected_info()$date_var)) %>%
-        dplyr::summarise_at(vars(selected_info()$target_var), sum)
+        dplyr::group_by_at(vars(date_var)) %>%
+        dplyr::summarise_at(vars(target_var), sum)
 
 
 
