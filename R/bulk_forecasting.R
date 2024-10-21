@@ -11,6 +11,7 @@
 #' @export
 #' @examples
 th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL) {
+
   allow_par <- FALSE
 
   list_output_models <- list()
@@ -218,8 +219,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
     list_output_models[[label_model]] <- training_model
   }
-
-
 
   nested_modeltime_tbl <- do.call(
     modeltime::modeltime_nested_fit,

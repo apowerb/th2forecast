@@ -95,7 +95,19 @@ input_data_fetch <- function(prediction_data = NULL, db_conn = NULL, target_tabl
 # ======= #merged data filtred function =======================================
 #' @export
 prediction_data_filtred <- function(prediction_data = NULL, model = NULL, kpi_value = NULL, group_target_var = NULL) {
+  # browser()
   group_target_var <- tolower(group_target_var)
+  model <- toupper(model)
+  # kpi_value <- toupper(kpi_value)
+  colnames(prediction_data) <- lapply(colnames(prediction_data), function(x) {
+    if(startsWith(x, ".")){
+      # remplacer les . par _
+      x <- gsub("\\.", "_", x)
+    } else {
+      x
+    }
+  })
+
   if (!is.null(model)) {
     prediction_data_filtred <- prediction_data %>% dplyr::filter(`_model_desc` == !!model, prediction_data[[group_target_var]] == !!kpi_value)
   }
@@ -104,7 +116,7 @@ prediction_data_filtred <- function(prediction_data = NULL, model = NULL, kpi_va
 }
 
 historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, group_target_var = NULL) {
-  group_target_var <- tolower(group_target_var)
+
   if (!is.null(kpi_value)) {
     historical_data_filtred <- historical_data %>% dplyr::filter(historical_data[[group_target_var]] == !!kpi_value)
   }
@@ -120,7 +132,7 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
   y_var <- tolower(y_var)
 
   historical_data[[x_var]] <- as.Date(historical_data[[x_var]])
-  if (!startsWith(x_var, "_")) {
+  if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- as.Date(prediction_data[[paste0("_",x_var)]])
   } else {
     prediction_data[[x_var]] <- as.Date(prediction_data[[x_var]])
