@@ -115,6 +115,7 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
   missing_value_variable <- reactiveValues()
 
   tisefka_tizegzawin <- reactiveVal(NULL)
+  data_to_visualize <- reactiveVal(NULL)
 
   observeEvent(input$load_ml_data, {
     print("tisefka_tizegzawin")
@@ -136,6 +137,7 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
     }
 
     result_forecast(NULL)
+    data_to_visualize(NULL)
     data_is_loaded(input$selected_ml_data)
     tisefka_tizegzawin(data)
   })
@@ -472,7 +474,7 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
     actionButton(inputId = ns("run"), label = "Run", icon = icon("play"), style = button_theme, class = "btn-primary")
   })
 
-  data_to_visualize <- eventReactive(input$run, {
+  observeEvent(input$run, {
     prediction_data_filtred_result <- prediction_data_filtred(
       prediction_data = result_forecast(),
       group_target_var = input$fc_group_target,
@@ -511,17 +513,18 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
 
     if (!is.null(historical_data_aggregated) && !is.null(prediction_data_aggregated)) {
       if (input$agg_by == "days") {
-        create_time_series_plot(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = input$fc_date_var, y_var = input$fc_target_var)
+        data_to_visualize(create_time_series_plot(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = input$fc_date_var, y_var = input$fc_target_var))
       }
       else {
-        create_weekly_bar_chart(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = input$fc_date_var, y_var = input$fc_target_var, agg_type = input$agg_type)
+        data_to_visualize(create_weekly_bar_chart(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = input$fc_date_var, y_var = input$fc_target_var, agg_type = input$agg_type))
       }
     } else {
-      renderText("No data available for selected filters.")
+      data_to_visualize(renderText("No data available for selected filters."))
     }
   })
 
   output$forecast_train_box <- renderUI({
+    req(data_is_loaded())
     data_to_visualize()
   })
 
