@@ -362,6 +362,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         fc_data = tisefka_iheggan(),
         fc_meta_data = fc_meta_data
       )
+      return(fc_result)
     })
   output$fc_future_forecast <- renderUI({
     numericInput(
@@ -395,63 +396,47 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     })
 
 
-    tisefka_tables <- reactive({
-      req(fc_target_var())
-      tisefka_tables <- fc_target_var() %>%
-        purrr::map(~ tisefka_aggregated() %>%
-                     dplyr::filter(all_columns == !!.x) %>%
-                     DT::datatable(.,
-                                   extensions = c("Scroller"),
-                                   options = list(dom = "Bfrtip", deferRender = TRUE, scrollY = 200, scroller = TRUE)
-                     ))
-    })
+    # tisefka_tables <- reactive({
+    #   req(fc_target_var())
+    #   tisefka_tables <- fc_target_var() %>%
+    #     purrr::map(~ tisefka_aggregated() %>%
+    #                  dplyr::filter(all_columns == !!.x) %>%
+    #                  DT::datatable(.,
+    #                                extensions = c("Scroller"),
+    #                                options = list(dom = "Bfrtip", deferRender = TRUE, scrollY = 200, scroller = TRUE)
+    #                  ))
+    # })
 
 
-    observeEvent(fc_target_var(),{
-      fc_target_var() %>%
-        purrr::map(~{
-          fcast_inputs <<- list(target_var = .x, date_var = input$fc_date_var,
-                                historical_data_aggregated = tisefka_iheggan()%>%
-                                  dplyr::select(!!input$fc_date_var, !!.x),
-                                prediction_data_aggregated = tisefka_aggregated() %>%
-                                  dplyr::filter(all_columns == !!.x))
-          mod_basic_fcast_viewer_server(.x, fcast_inputs = fcast_inputs)
-          })
-    })
+
     #---------------------
     output$graphs_ui <- renderUI({
-      req(tisefka_tables())
+      req(fc_target_var())
       req(SA_div_width())
-      plots_list <- purrr::imap(tisefka_tables(), ~ {
-        bs4Dash::tabBox(
-          width = SA_div_width()[1], title = .y, status = "primary", solidHeader = TRUE,
-          tabPanel(
-            icon("fas fa-chart-bar"),
-            mod_basic_fcast_viewer_ui(ns(.y)),
-          ),
-          tabPanel(
-            icon("table"),
-            SaldaeModulesUI:::save_datatable_ui(ns(paste0("data_export_agg_", .y))),
-            DT::DTOutput(ns(paste0("tisefka_table_", .y)))
-          )
-        )
+      plots_list <- purrr::map(fc_target_var(), ~ {
+        mod_id <- th2product::generateID("fcast_view")
+        fcast_inputs2 <-  list(target_var = .x, date_var = input$fc_date_var,
+                            historical_data_aggregated = tisefka_iheggan(),
+                            prediction_data_aggregated = tisefka_aggregated())
+        mod_basic_fcast_viewer_server(mod_id, fcast_inputs2 = fcast_inputs2)
+        column(width = 4,
+               mod_basic_fcast_viewer_ui(ns(mod_id)))
       })
       fluidRow(plots_list)
     })
 
 
-    observeEvent(tisefka_tables(), {
-      req(tisefka_tables())
-      purrr::map(names(tisefka_tables()), ~ {
-        output_name_plot <- paste0("tisefka_plot_", .x)
-        output_name_table <- paste0("tisefka_table_", .x)
-        # output[[output_name_plot]] <- tisefka_yiwen_plots()[[.x]]
-        output[[output_name_table]] <- DT::renderDT(tisefka_tables()[[.x]])
-        SaldaeModulesUI:::save_datatable_server(paste0("data_export_agg_", .x), export_name = .x, data_table = reactive({
-          tisefka_aggregated()
-        }))
-      })
-    })
+    # observeEvent(tisefka_tables(), {
+    #   req(tisefka_tables())
+    #   purrr::map(names(tisefka_tables()), ~ {
+    #     output_name_plot <- paste0("tisefka_plot_", .x)
+    #     output_name_table <- paste0("tisefka_table_", .x)
+    #     output[[output_name_table]] <- DT::renderDT(tisefka_tables()[[.x]])
+    #     SaldaeModulesUI:::save_datatable_server(paste0("data_export_agg_", .x), export_name = .x, data_table = reactive({
+    #       tisefka_aggregated()
+    #     }))
+    #   })
+    # })
 
 
 
