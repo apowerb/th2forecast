@@ -131,22 +131,28 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
   x_var <- tolower(x_var)
   y_var <- tolower(y_var)
 
-  historical_data[[x_var]] <- as.Date(historical_data[[x_var]])
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
-    prediction_data[[x_var]] <- as.Date(prediction_data[[paste0("_",x_var)]])
-  } else {
-    prediction_data[[x_var]] <- as.Date(prediction_data[[x_var]])
+    prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
   }
-  historical_data <- historical_data[order(historical_data[[x_var]]), ]
-  prediction_data <- prediction_data[order(prediction_data[[x_var]]), ]
 
+  new_name <- paste0(y_var, "_hist")
+  historical_data <- historical_data%>%
+    dplyr::arrange(!!y_var)%>%
+    dplyr::rename(!!quo_name(new_name) := !!y_var)
 
-  combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c(".hist", ".pred"))
+  new_name <- paste0(y_var, "_pred")
+  prediction_data <- prediction_data%>%
+    dplyr::arrange(!!x_var)%>%
+    dplyr::rename(!!quo_name(new_name) := !!y_var)
+
+  combined_data <- historical_data%>%
+    dplyr::bind_rows(prediction_data)
+  # combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c(".hist", ".pred"))
 
   time_series_plot <- combined_data %>%
     echarts4r::e_charts_(x_var) %>%
-    echarts4r::e_line_(paste0(y_var, ".hist"), name = "Historical Values", color = "blue") %>%
-    echarts4r::e_line_(paste0(y_var, ".pred"), name = "Prediction Values", color = "orange") %>%
+    echarts4r::e_line_(paste0(y_var, "_hist"), name = "Historical Values", color = "blue") %>%
+    echarts4r::e_line_(paste0(y_var, "_pred"), name = "Prediction Values", color = "orange") %>%
     echarts4r::e_line_("_conf_lo", name = "Lower Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
     echarts4r::e_line_("_conf_hi", name = "High Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
     echarts4r::e_x_axis(name = "Date") %>%

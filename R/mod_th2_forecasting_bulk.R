@@ -410,7 +410,12 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     observeEvent(fc_target_var(),{
       fc_target_var() %>%
         purrr::map(~{
-          mod_basic_fcast_viewer_server(.x)
+          fcast_inputs <<- list(target_var = .x, date_var = input$fc_date_var,
+                                historical_data_aggregated = tisefka_iheggan()%>%
+                                  dplyr::select(!!input$fc_date_var, !!.x),
+                                prediction_data_aggregated = tisefka_aggregated() %>%
+                                  dplyr::filter(all_columns == !!.x))
+          mod_basic_fcast_viewer_server(.x, fcast_inputs = fcast_inputs)
           })
     })
     #---------------------
