@@ -56,8 +56,8 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs2 = list()) {
     })
 
     output$fcast_box <- renderUI({
-      bs4Dash::tabBox(title = fcast_inputs$target_var, width = 12, type = "primary", solidHeader = TRUE,
-                      tabPanel(icon = icon("chart-pie"), title = "",
+      bs4Dash::tabBox(title = fcast_inputs$target_var, width = 12, status = "primary", solidHeader = TRUE,
+                      tabPanel(icon = icon("chart-line"), title = "",
                         fluidPage(
                           uiOutput(ns("fcast_output_params")),
                           echarts4r::echarts4rOutput(ns("fcast_plot"))
