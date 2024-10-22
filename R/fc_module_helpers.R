@@ -5,8 +5,8 @@
 #'
 #' @export
 forecast_transform_data <- function(
-    fc_data = tisefka_tizegzawin(),
-    fc_meta_data = fc_meta_data
+    fc_data = NULL,
+    fc_meta_data = NULL
 ){
   fc_meta_data$target_var <- tolower(fc_meta_data$target_var)
   fc_meta_data$group_target <- tolower(fc_meta_data$group_target)
@@ -37,7 +37,7 @@ forecast_transform_data <- function(
     use_holidays <- NULL
   }
 
-  use_spark = fc_meta_data$use_spark
+  use_spark = ifelse(length(fc_meta_data$use_spark) == 0, FALSE, fc_meta_data$use_spark)
 
   if (use_spark == "TRUE"){
     spark_connection <- "spark://spark-1723119839-master-0.spark-1723119839-headless.th2mage.svc.cluster.local:7077"

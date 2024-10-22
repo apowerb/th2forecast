@@ -66,12 +66,14 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     )
   }
 
-  group_target_output <- group_target
+  group_target_output <- group_target <- ifelse(length(group_target) == 0 , "all_columns", group_target)
   if (group_target == "all_columns") {
     data_tbl <- train_data %>%
-      tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
+      dplyr::select(!!target_var, !!date_var)%>%
+      tidyr::pivot_longer(cols = !!target_var,  names_to = "id") %>%
       rename(date := !!date_var)
     group_target <- "id"
+    target_var <- "value"
   } else {
     if (!is.null(country_column) && (use_holidays == "in_data")) {
       select_vars <- c(group_target, date_var, target_var, country_column)

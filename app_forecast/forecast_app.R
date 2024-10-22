@@ -12,7 +12,7 @@ library(dplyr)
 library(glue)
 library(htmltools)
 ml_dir <<- "../data_connectors"
-
+init_envs_cluster()
 
 options(shiny.launch.browser = .rs.invokeShinyWindowExternal)
 
@@ -46,7 +46,7 @@ ui <- tagList(
         ),
         bs4Dash::tabItem(
           tabName = "forecsating_train",
-          forecast_train_mod_ui("forecsating_train")
+          forecast_train_mod_ui2("forecsating_train")
         )
       )
     ),
@@ -72,7 +72,7 @@ server <- function(input, output) {
     }
   })
 
-  forecast_train_mod_server("forecsating_train")
+  forecast_train_mod_server2("forecsating_train")
 
   output$clusterUI <- renderUI({
     th2blender::mod_cluster_manage_server("cluster")

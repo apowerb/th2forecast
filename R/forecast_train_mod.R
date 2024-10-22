@@ -34,8 +34,6 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
   moduleServer(id, function(input, output, session) {
   ns <- session$ns
 
-  # s3_bucket = "fairml"
-  # s3_prefix = "thaink2_data_pool/"
   ml_project_meta <- th2ml::th2_load_ml_project(ml_dir = ml_dir, action = "load")
   s3_bucket <-ifelse(Sys.getenv("WORKING_MODE") == "dev", paste0(ml_project_meta$company_name, "-dev"), ml_project_meta$company_name)
   s3_prefix <- ifelse(is.null(ml_project_meta$data_pool), "thaink2_data_pool/", paste0(ml_project_meta$data_pool, "/"))
