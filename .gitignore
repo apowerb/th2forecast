@@ -55,3 +55,4 @@ R/initializer.R
 logs/log4j.spark.log
 derby.log
 /app_forecast/images
+app_forecast/refresh/refresher_feature_engineering.rds

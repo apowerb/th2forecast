@@ -5,8 +5,8 @@
 #'
 #' @export
 forecast_transform_data <- function(
-    fc_data = tisefka_tizegzawin(),
-    fc_meta_data = fc_meta_data
+    fc_data = NULL,
+    fc_meta_data = NULL
 ){
   fc_meta_data$target_var <- tolower(fc_meta_data$target_var)
   fc_meta_data$group_target <- tolower(fc_meta_data$group_target)
@@ -37,19 +37,19 @@ forecast_transform_data <- function(
     use_holidays <- NULL
   }
 
-  use_spark = fc_meta_data$use_spark
+  use_spark = ifelse(length(fc_meta_data$use_spark) == 0, FALSE, fc_meta_data$use_spark)
 
   if (use_spark == "TRUE"){
     spark_connection <- "spark://spark-1723119839-master-0.spark-1723119839-headless.th2mage.svc.cluster.local:7077"
     result_bulk_f <- th2forecast::th2_forecast_spark(df,fc_meta_data$group_target, fc_meta_data$target_var, date_var, fc_meta_data$future_forecast, fc_meta_data$models_list, train_split = date_string, group_by_col = c("family"), master_spark = spark_connection)
 
-    names(result_bulk_f)[names(result_bulk_f) == '_value'] <- fc_meta_data$target_var
+    # names(result_bulk_f)[names(result_bulk_f) == '_value'] <- fc_meta_data$target_var
     names(result_bulk_f)[names(result_bulk_f) == '_index'] <- date_var_input
 
   }else{
     result_bulk_f <- th2forecast::th2_bulk_forecasting(df, fc_meta_data$group_target, fc_meta_data$target_var, date_var, fc_meta_data$future_forecast, fc_meta_data$models_list, train_split = date_string, use_holidays = use_holidays,country_column = calendar_column, path_driver = "/home/src/default_repo/utils/drivers")
 
-    names(result_bulk_f)[names(result_bulk_f) == '.value'] <- fc_meta_data$target_var
+    # names(result_bulk_f)[names(result_bulk_f) == '.value'] <- fc_meta_data$target_var
     names(result_bulk_f)[names(result_bulk_f) == '.index'] <- date_var_input
   }
 
