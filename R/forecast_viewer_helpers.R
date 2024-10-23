@@ -228,7 +228,7 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
 
   weekly_bar_chart <- weekly_data %>%
     echarts4r::e_charts_("week") %>%
-    echarts4r::e_bar_(paste0(y_var, "_hist"), name = "Historical Values", stack = "grp") %>%
+    echarts4r::e_bar_(paste0(y_var, "_hist"), name = "Historical Values", stack = "grp", color = "blue") %>%
     echarts4r::e_bar_(paste0(y_var, "_pred"), name = "Prediction Values", stack = "grp", color = "orange") %>%
     echarts4r::e_x_axis(name = "Week") %>%
     echarts4r::e_y_axis(name = "Value") %>%
