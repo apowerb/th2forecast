@@ -141,10 +141,6 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       return(var_granularity)
     })
 
-    # ts_time_units <- reactive({
-    #   tisefka()$ts_time_units
-    # })
-
     output$aggregator_board_box <- renderUI({
       fluidPage(
         fluidRow(
@@ -154,14 +150,13 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
           column(width = 2, uiOutput(ns("fc_target_var"))),
           column(width = 2, uiOutput(ns("var_granularity"))),
           column(width = 1, uiOutput(ns("aggregation_metric"))),
-          column(width = 2, uiOutput(ns("fc_chk_business_days"))),
+          column(width = 2, uiOutput(ns("fc_models_list"))),
           column(width = 2, uiOutput(ns("fc_future_forecast"))),
           column(width = 2, uiOutput(ns("fc_split_train_test"))),
-          column(width = 2, uiOutput(ns("fc_models_list"))),
+          column(width = 2,br(), uiOutput(ns("fc_chk_business_days"))),
           column(width = 1, br(), uiOutput(ns("submit")))
         ),
-        uiOutput(ns("non_numeric_variables_inputs")),
-        SaldaeReporting::add_to_report_ui(ns("add_aggregation"))
+        uiOutput(ns("non_numeric_variables_inputs"))
       )
     })
 
@@ -196,6 +191,8 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
     output$non_numeric_variables_inputs <- renderUI({
       req(non_numeric_variables())
+      req(input$fc_target_var)
+      req(input$fc_date_var)
       req(input$load_ml_data)
       fluidRow(
         purrr::map(non_numeric_variables(), ~ {
@@ -205,12 +202,20 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     })
 
     output$fc_models_list <- renderUI({
-      # req(input$data_source)
+      req(input$fc_date_var)
+      req(input$fc_target_var)
+      req(input$load_ml_data)
       shinyWidgets::pickerInput(
         inputId = ns("fc_models_list"),
         label = "Models",
         options = list(`actions-box` = TRUE),
-        choices = c("ARIMA" = "arima", "Prophet" = "prophet", "Mars" = "mars", "Linear regression" = "lr", "Random Forest" = "random_forest", "XGBoost" = "xgboost", "ARIMAX" = "arimax"),
+        choices = c("ARIMA" = "arima",
+                    "Prophet" = "prophet",
+                    "Mars" = "mars",
+                    "Linear regression" = "lr",
+                    "Random Forest" = "random_forest",
+                    "XGBoost" = "xgboost",
+                    "ARIMAX" = "arimax"),
         multiple = TRUE
       )
     })
@@ -234,6 +239,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
     output$fc_target_var <- renderUI({
       req(input$load_ml_data)
+      req(input$fc_date_var)
       req(data_diag())
       num_vars <- data_diag()$diagnosis%>%
         dplyr::filter(types %in% c("numeric", "integer"))%>%
@@ -249,6 +255,8 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     })
     output$var_granularity <- renderUI({
       req(input$load_ml_data)
+      req(input$fc_target_var)
+      req(input$fc_date_var)
       req(data_diag())
       var_granularity <- data_diag()$diagnosis%>%
         dplyr::filter(!types %in% c("numeric", "integer","Date","POSIXct"))%>%
@@ -327,6 +335,8 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     # })
     #----------------
     output$fc_split_train_test <- renderUI({
+      req(input$fc_date_var)
+      req(input$fc_target_var)
       dateInput(inputId = ns("fc_split_train_test"),label = "Split", value = Sys.Date())
     })
 
@@ -366,13 +376,18 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       return(fc_result)
     })
   output$fc_future_forecast <- renderUI({
+    req(input$fc_date_var)
+    req(input$fc_target_var)
     numericInput(
       inputId = ns("fc_future_forecast"),
-      label = "Duration", value = 50
+      label = "Horizon", value = 30
     )
   })
 
   output$fc_chk_business_days <- renderUI({
+    req(input$fc_date_var)
+    req(input$fc_target_var)
+    req(input$load_ml_data)
     checkboxInput(
       inputId = ns("fc_chk_business_days"),
       label = "B.H.",
@@ -396,98 +411,22 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       return(fc_target_var)
     })
 
-
-    # tisefka_tables <- reactive({
-    #   req(fc_target_var())
-    #   tisefka_tables <- fc_target_var() %>%
-    #     purrr::map(~ tisefka_aggregated() %>%
-    #                  dplyr::filter(all_columns == !!.x) %>%
-    #                  DT::datatable(.,
-    #                                extensions = c("Scroller"),
-    #                                options = list(dom = "Bfrtip", deferRender = TRUE, scrollY = 200, scroller = TRUE)
-    #                  ))
-    # })
-
-
-
     #---------------------
     output$graphs_ui <- renderUI({
       req(fc_target_var())
       req(SA_div_width())
       plots_list <- purrr::map(fc_target_var(), ~ {
         mod_id <- th2product::generateID("fcast_view")
-        fcast_inputs2 <-  list(target_var = .x, date_var = input$fc_date_var,
-                            historical_data_aggregated = tisefka_iheggan(),
-                            prediction_data_aggregated = tisefka_aggregated())
-        mod_basic_fcast_viewer_server(mod_id, fcast_inputs2 = fcast_inputs2)
+        fcast_inputs <-  list(target_var = .x, date_var = input$fc_date_var,
+                            historical_data_aggregated = tisefka_iheggan()%>%
+                              dplyr::select(!!input$fc_date_var, !!.x),
+                            prediction_data_aggregated = tisefka_aggregated()%>%
+                              dplyr::filter(all_columns == !!.x))
+        mod_basic_fcast_viewer_server(mod_id, fcast_inputs = fcast_inputs)
         column(width = 4,
                mod_basic_fcast_viewer_ui(ns(mod_id)))
       })
       fluidRow(plots_list)
     })
-
-
-    # observeEvent(tisefka_tables(), {
-    #   req(tisefka_tables())
-    #   purrr::map(names(tisefka_tables()), ~ {
-    #     output_name_plot <- paste0("tisefka_plot_", .x)
-    #     output_name_table <- paste0("tisefka_table_", .x)
-    #     output[[output_name_table]] <- DT::renderDT(tisefka_tables()[[.x]])
-    #     SaldaeModulesUI:::save_datatable_server(paste0("data_export_agg_", .x), export_name = .x, data_table = reactive({
-    #       tisefka_aggregated()
-    #     }))
-    #   })
-    # })
-
-
-
-    report_dir <- "./thaink2_report/"
-
-    report_details <- reactive({
-      list(
-        report_dir = report_dir,
-        report_id  = "0001"
-      )
-    })
-
-
-    output$item_elements <- reactive({
-      req(tisefka_aggregated())
-      # req(tisefka_yiwen_plots())
-
-      output_data <- fc_target_var() %>%
-        purrr::map(~ tisefka_aggregated())
-
-      data_result <- list(
-        output_data = output_data,
-        output_graph = tisefka_yiwen_plots(),
-        output_comment = "output_comment"
-      )
-
-      output_type <- c("data_viz")
-      time_frequency <- "hours"
-      input_objct <- get_input_objects(.input_objct = input,
-                                       target_vars = non_numeric_variables(),
-                                       input_id_stem = "non_numeric_variables_")
-
-      list(
-        data_result = data_result, # result to include into the report, can be table or graph or both
-        var_granularity = input$var_granularity, # NULL or a list of categoricals
-        aggregation_metric = input$aggregation_metric, # raw, max, min, mean,
-        time_unit_data = input$time_unit_data, # hours, days, weeks, months, quarters, years
-        graph_type = input$graph_type, # lines , markers, aread
-        fc_target_var = input$fc_target_var, # list of variables
-        non_numeric_variables = non_numeric_variables(),
-        data_source = tisefka()$data_source,
-        date_variable = tisefka()$date_variable,
-        categoricals = categoricals_unique_values(),
-        output_type = output_type, # c("exploration","forecast","growth_rate")
-        input_objct = input_objct
-      )
-    })
-
-    SaldaeReporting::add_to_report_server("add_aggregation", report_details = report_details(), item_elements = reactive({
-      item_elements()
-    }))
   })
 }
