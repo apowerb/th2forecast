@@ -262,10 +262,11 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         dplyr::filter(!types %in% c("numeric", "integer","Date","POSIXct"))%>%
         dplyr::pull(variables)
       var_granularity <- var_granularity[var_granularity != input$fc_date_var]
-      shinyWidgets::pickerInput(
+      if(length(var_granularity)==0)return(NULL)
+      selectInput(
         inputId = ns("var_granularity"),
         label = ("Granularity"),
-        multiple = TRUE,
+        multiple = FALSE,
         choices = var_granularity,
         selected = NULL
       )
@@ -289,6 +290,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       req(tisefka())
       req(input$fc_target_var)
       req(input$fc_date_var)
+      req(input$submit)
       tisefka_iheggan <- tisefka()
       if (length(non_numeric_variables()) > 0) {
         categ_input_filter <- non_numeric_variables() %>%
@@ -300,21 +302,20 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
           tisefka_iheggan <- tisefka_iheggan %>% dplyr::filter(!!rlang::sym(cat_input) %in% categ_input_filter[[cat_input]])
         }
       }
-      tisefka_iheggan <- tisefka_iheggan %>%
-        janitor::clean_names()
-      return(tisefka_iheggan)
-    })
 
-    SA_div_width <- reactive({
-      req(fc_target_var())
-      if (length(fc_target_var()) == 1) {
-        div_width <- c(12, 6)
-      } else if (length(fc_target_var()) == 2) {
-        div_width <- c(6, 6)
-      } else {
-        div_width <- c(4, 6)
+      if(!is.null(input$var_granularity)){
+        grouping_elements <- c( input$fc_date_var,input$var_granularity) %>%
+          unique()
+        tisefka_iheggan <- tisefka_iheggan %>%
+          dplyr::select(!!c(grouping_elements, input$fc_target_var))%>%
+          dplyr::group_by(dplyr::across(!!grouping_elements)) %>%
+          dplyr::summarise_all(SaldaeModulesUI:::th2_agg_func, "sum")
       }
-      return(div_width)
+
+      tisefka_iheggan <- tisefka_iheggan%>%
+        janitor::clean_names()
+      tisefka_iheggan2 <<- tisefka_iheggan
+      return(tisefka_iheggan)
     })
 
     #---------------------------------------
@@ -357,7 +358,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         }
       }
       fc_meta_data <- list(
-        group_target = input$fc_group_target,
+        # group_target = input$fc_group_target,
         target_var = input$fc_target_var,
         date_var = input$fc_date_var,
         future_forecast = 120,
@@ -366,13 +367,19 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         split_train_test = input$fc_split_train_test,
         calendar_country = calendar_country,
         calendar_column = calendar_column,
-        use_spark = input$fc_chk_spark
+        use_spark = input$fc_chk_spark,
+        group_target = input$var_granularity
       )
 
       fc_result <- forecast_transform_data(
         fc_data = tisefka_iheggan(),
         fc_meta_data = fc_meta_data
       )
+
+      if(!is.null(input$var_granularity)){
+        fc_result <- fc_result%>%
+          dplyr::rename(all_columns = !!input$var_granularity)
+      }
       return(fc_result)
     })
 
@@ -398,6 +405,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     fc_target_var <- reactive({
       req(tisefka_aggregated())
       fc_target_var <- unique(tisefka_aggregated()$all_columns)
+      fc_target_var <- fc_target_var[!fc_target_var %in% c(input$fc_date_var,input$var_granularity)]
       names(fc_target_var) <- fc_target_var
       fc_target_var <- head(fc_target_var, 15)
       return(fc_target_var)
@@ -406,11 +414,21 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     #---------------------
     output$graphs_ui <- renderUI({
       req(fc_target_var())
-      req(SA_div_width())
+      req(tisefka_aggregated_all())
+
+      if(!is.null(input$var_granularity)){
+        hist_data <- tisefka_iheggan()%>%
+          tidyr::pivot_wider(id_cols = input$fc_date_var,
+                             names_from = input$var_granularity,
+                             values_from = input$fc_target_var,
+                             values_fill  = 0)
+      }else{
+        hist_data <- tisefka_iheggan()
+      }
       plots_list <- purrr::map(fc_target_var(), ~ {
         mod_id <- th2product::generateID("fcast_view")
         fcast_inputs <-  list(target_var = .x, date_var = input$fc_date_var,
-                            historical_data_aggregated = tisefka_iheggan()%>%
+                            historical_data_aggregated = hist_data%>%
                               dplyr::select(!!input$fc_date_var, !!.x),
                             prediction_data_aggregated = tisefka_aggregated()%>%
                               dplyr::filter(all_columns == !!.x))
