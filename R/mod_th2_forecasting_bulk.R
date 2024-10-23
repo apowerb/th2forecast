@@ -263,10 +263,10 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         dplyr::pull(variables)
       var_granularity <- var_granularity[var_granularity != input$fc_date_var]
       if(length(var_granularity)==0)return(NULL)
-      selectInput(
+      shinyWidgets::pickerInput(
         inputId = ns("var_granularity"),
         label = ("Granularity"),
-        multiple = FALSE,
+        multiple = TRUE,
         choices = var_granularity,
         selected = NULL
       )
@@ -306,11 +306,13 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       if(!is.null(input$var_granularity)){
         grouping_elements <- c( input$fc_date_var,input$var_granularity) %>%
           unique()
-        tisefka_iheggan <- tisefka_iheggan %>%
-          dplyr::select(!!c(grouping_elements, input$fc_target_var))%>%
-          dplyr::group_by(dplyr::across(!!grouping_elements)) %>%
-          dplyr::summarise_all(SaldaeModulesUI:::th2_agg_func, "sum")
+      }else{
+        grouping_elements <- input$fc_date_var
       }
+      tisefka_iheggan <- tisefka_iheggan %>%
+        dplyr::select(!!c(grouping_elements, input$fc_target_var))%>%
+        dplyr::group_by(dplyr::across(!!grouping_elements)) %>%
+        dplyr::summarise_all(SaldaeModulesUI:::th2_agg_func, "sum")
 
       tisefka_iheggan <- tisefka_iheggan%>%
         janitor::clean_names()
