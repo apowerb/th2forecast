@@ -12,6 +12,8 @@ library(dplyr)
 library(glue)
 library(htmltools)
 ml_dir <<- "../data_connectors"
+
+source("C:/Users/Farid Azouaou/Downloads/initializer.R")
 init_envs_cluster()
 
 options(shiny.launch.browser = .rs.invokeShinyWindowExternal)

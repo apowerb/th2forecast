@@ -10,7 +10,8 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     output$fcast_output_params <- renderUI({
       fluidRow(
         column(width = 3, uiOutput(ns("agg_by"))),
-        column(width = 3, uiOutput(ns("fcast_model")))
+        column(width = 3, uiOutput(ns("fcast_model"))),
+        column(width = 3, uiOutput(ns("fcast_horizon")))
       )
     })
 
@@ -27,15 +28,12 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     fcast_plot <- reactive({
       req(input$agg_by)
       req(input$fcast_model)
-      print(paste("target var is", fcast_inputs$target_var))
-
-      fcast_inputs2 <<- fcast_inputs
-
+      req(input$fcast_model)
       prediction_data_aggregated <- fcast_inputs$prediction_data_aggregated%>%
-        dplyr::filter(`_model_desc` == !!input$fcast_model)
+        dplyr::filter(`_model_desc` == !!input$fcast_model)%>%
+        head(input$fcast_horizon)
       historical_data_aggregated <- fcast_inputs$historical_data_aggregated%>%
-        dplyr::select(!!fcast_inputs$target_var, !!fcast_inputs$date_var)%>%
-        tail(200)
+        dplyr::select(!!fcast_inputs$target_var, !!fcast_inputs$date_var)
 
       if(input$agg_by %in% c("days","hours")) {
         create_time_series_plot(historical_data = historical_data_aggregated,
@@ -47,8 +45,12 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
                                 prediction_data = prediction_data_aggregated,
                                 x_var = fcast_inputs$date_var,
                                 y_var = fcast_inputs$target_var,
-                                agg_type = input$agg_type)
+                                agg_type = "sum")
       }
+    })
+
+    output$fcast_horizon <- renderUI({
+      numericInput(inputId = ns("fcast_horizon"), label = "Horizon", value = 30, min = 5, max = 100)
     })
 
     output$fcast_plot <- echarts4r::renderEcharts4r({
@@ -61,17 +63,17 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
                       extensions = c("Scroller"),
                       options = list(dom = "Bfrtip",
                                      deferRender = TRUE,
-                                     scrollY = 200,
+                                     scrollY = 300,
                                      scroller = TRUE))
     })
 
 
     output$fcast_box <- renderUI({
-      # fcast_inputs <<- fcast_inputs
+
       exporter_mod_id <- th2product::generateID("exporter")
       SaldaeModulesUI:::save_datatable_server(exporter_mod_id, export_name = fcast_inputs$target_var, data_table = reactive({
         fcast_inputs$prediction_data_aggregated%>%
-          dplyr::select(-"all_columns",-"_model_id",-"_key")
+          dplyr::select(-`all_columns`,-`_model_id`,-`_key`)
       }))
 
       bs4Dash::tabBox(title = fcast_inputs$target_var, width = 12, status = "primary", solidHeader = TRUE,

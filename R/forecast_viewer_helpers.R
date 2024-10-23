@@ -127,7 +127,7 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
 
 # =========== #create plot (time series) function ==================================
 #' @export
-create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL) {
+create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_by = NULL) {
 
 
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
@@ -137,7 +137,8 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
   new_name <- paste0(y_var, "_hist")
   historical_data <- historical_data%>%
     dplyr::arrange(!!y_var)%>%
-    dplyr::rename(!!quo_name(new_name) := !!y_var)
+    dplyr::rename(!!quo_name(new_name) := !!y_var)%>%
+    tail(200)
 
   new_name <- paste0(y_var, "_pred")
   prediction_data <- prediction_data%>%
@@ -167,8 +168,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 # =========== #create bar chart (weekly time series) function ==================================
 #' @export
 create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = "sum") {
-
-
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
   }
@@ -176,7 +175,8 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
   new_name <- paste0(y_var, "_hist")
   historical_data <- historical_data%>%
     dplyr::arrange(!!y_var)%>%
-    dplyr::rename(!!quo_name(new_name) := !!y_var)
+    dplyr::rename(!!quo_name(new_name) := !!y_var)%>%
+    tail(1000)
 
   new_name <- paste0(y_var, "_pred")
   prediction_data <- prediction_data%>%
@@ -187,13 +187,16 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
     dplyr::bind_rows(prediction_data)
 
   combined_data <- combined_data %>%
-    mutate(week = lubridate::ceiling_date(as.Date(get(x_var)), unit = "week", week_start = 1))
+    dplyr::mutate(day = lubridate::date(get(x_var)),
+                  week = lubridate::ceiling_date(as.Date(get(x_var)), unit = "week", week_start = 1),
+                  month = lubridate::ceiling_date(as.Date(get(x_var)), unit = "month", week_start = 1),
+                  quarter = lubridate::ceiling_date(as.Date(get(x_var)), unit = "quarter", week_start = 1))
 
   if (agg_type == "sum") {
     weekly_data <- combined_data %>%
-      group_by(week) %>%
-      summarise(across(ends_with("_hist"), sum, na.rm = TRUE),
-        across(ends_with("_pred"), sum, na.rm = TRUE),
+      dplyr::group_by(week) %>%
+      dplyr::reframe(dplyr::across(dplyr::ends_with("_hist"), sum, na.rm = TRUE),
+                     dplyr::across(dplyr::ends_with("_pred"), sum, na.rm = TRUE),
         `_conf_lo` = sum(`_conf_lo`, na.rm = TRUE),
         `_conf_hi` = sum(`_conf_hi`, na.rm = TRUE)
       )
@@ -207,9 +210,9 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
       )
   } else if (agg_type == "max") {
     weekly_data <- combined_data %>%
-      group_by(week) %>%
-      summarise(across(ends_with("_hist"), max, na.rm = TRUE),
-        across(ends_with("_pred"), max, na.rm = TRUE),
+      dplyr::group_by(week) %>%
+      dplyr::reframe(dplyr::across(dplyr::ends_with("_hist"), max, na.rm = TRUE),
+                     dplyr::across(dplyr::ends_with("_pred"), max, na.rm = TRUE),
         `_conf_lo` = max(`_conf_lo`, na.rm = TRUE),
         `_conf_hi` = max(`_conf_hi`, na.rm = TRUE)
       )

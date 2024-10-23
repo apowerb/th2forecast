@@ -360,7 +360,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         group_target = input$fc_group_target,
         target_var = input$fc_target_var,
         date_var = input$fc_date_var,
-        future_forecast = input$fc_future_forecast,
+        future_forecast = 120,
         models_list = input$fc_models_list,
         business_days = input$fc_chk_business_days,
         split_train_test = input$fc_split_train_test,
@@ -375,14 +375,6 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       )
       return(fc_result)
     })
-  output$fc_future_forecast <- renderUI({
-    req(input$fc_date_var)
-    req(input$fc_target_var)
-    numericInput(
-      inputId = ns("fc_future_forecast"),
-      label = "Horizon", value = 30
-    )
-  })
 
   output$fc_chk_business_days <- renderUI({
     req(input$fc_date_var)
