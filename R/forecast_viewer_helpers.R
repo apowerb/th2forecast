@@ -128,38 +128,42 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
 # =========== #create plot (time series) function ==================================
 #' @export
 create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_by = NULL) {
-
-
+  historical_data2 <<- historical_data
+  prediction_data2 <<- prediction_data
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
   }
 
   new_name <- paste0(y_var, "_hist")
   historical_data <- historical_data%>%
-    dplyr::arrange(!!y_var)%>%
-    dplyr::rename(!!quo_name(new_name) := !!y_var)%>%
-    tail(200)
+    dplyr::arrange(.data[[x_var]])%>%
+    dplyr::rename(!!quo_name(new_name) := actuals)%>%
+    tail(100)
 
   new_name <- paste0(y_var, "_pred")
   prediction_data <- prediction_data%>%
-    dplyr::arrange(!!x_var)%>%
+    dplyr::arrange(.data[[x_var]])%>%
     dplyr::rename(!!quo_name(new_name) := `_value`)
-
-  combined_data <- historical_data%>%
-    dplyr::bind_rows(prediction_data)
-  # combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c("_hist", "_pred"))
 
   hist_var <- paste0(y_var, "_hist")
   pred_var <- paste0(y_var, "_pred")
+  prediction_data <- prediction_data%>%
+    # janitor::clean_names()%>%
+    dplyr::select(!!x_var,!!pred_var, `_conf_lo`, `_conf_hi`)
+  combined_data <- historical_data%>%
+    dplyr::full_join(prediction_data, by = c(x_var))%>%
+    dplyr::arrange(.data[[x_var]])
+  # combined_data <- dplyr::full_join(historical_data, prediction_data, by = x_var, suffix = c("_hist", "_pred"))
 
-  time_series_plot <- combined_data %>%
+
+  time_series_plot <- combined_data%>%
     echarts4r::e_charts_(x_var) %>%
-    echarts4r::e_line_(hist_var, name = "Historical Values", color = "blue") %>%
-    echarts4r::e_line_(pred_var, name = "Prediction Values", color = "orange") %>%
-    echarts4r::e_line_("_conf_lo", name = "Lower Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
-    echarts4r::e_line_("_conf_hi", name = "High Confidence", lineStyle = list(type = "dashed"), color = "green") %>%
+    echarts4r::e_line_(hist_var, name = "actuals", lineStyle = list(type = "normal"), color = "blue") %>%
+    echarts4r::e_line_(pred_var, name = "forecast", lineStyle = list(type = "normal"), color = "orange") %>%
+    # echarts4r::e_line_("_conf_lo", name = "Low Conf.", lineStyle = list(type = "dashed"), color = "green") %>%
+    # echarts4r::e_line_("_conf_hi", name = "Upper Conf.", lineStyle = list(type = "dashed"), color = "green") %>%
     echarts4r::e_x_axis(name = "Date") %>%
-    echarts4r::e_y_axis(name = "Value") %>%
+    echarts4r::e_y_axis_(name = y_var) %>%
     echarts4r::e_tooltip(trigger = "axis") %>%
     echarts4r::e_legend(show = TRUE)
 
@@ -167,15 +171,15 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 }
 # =========== #create bar chart (weekly time series) function ==================================
 #' @export
-create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = "sum") {
+create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = "sum", agg_freq = "weeks") {
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
   }
 
   new_name <- paste0(y_var, "_hist")
   historical_data <- historical_data%>%
-    dplyr::arrange(!!y_var)%>%
-    dplyr::rename(!!quo_name(new_name) := !!y_var)%>%
+    dplyr::arrange(!!x_var)%>%
+    dplyr::rename(!!quo_name(new_name) := actuals)%>%
     tail(1000)
 
   new_name <- paste0(y_var, "_pred")
@@ -183,18 +187,19 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
     dplyr::arrange(!!x_var)%>%
     dplyr::rename(!!quo_name(new_name) := `_value`)
 
+
   combined_data <- historical_data%>%
     dplyr::bind_rows(prediction_data)
 
   combined_data <- combined_data %>%
     dplyr::mutate(day = lubridate::date(get(x_var)),
-                  week = lubridate::ceiling_date(as.Date(get(x_var)), unit = "week", week_start = 1),
-                  month = lubridate::ceiling_date(as.Date(get(x_var)), unit = "month", week_start = 1),
-                  quarter = lubridate::ceiling_date(as.Date(get(x_var)), unit = "quarter", week_start = 1))
+                  weeks = lubridate::ceiling_date(as.Date(get(x_var)), unit = "week", week_start = 1),
+                  months = lubridate::ceiling_date(as.Date(get(x_var)), unit = "month", week_start = 1),
+                  quarters = lubridate::ceiling_date(as.Date(get(x_var)), unit = "quarter", week_start = 1))
 
   if (agg_type == "sum") {
     weekly_data <- combined_data %>%
-      dplyr::group_by(week) %>%
+      dplyr::group_by(.data[[agg_freq]]) %>%
       dplyr::reframe(dplyr::across(dplyr::ends_with("_hist"), sum, na.rm = TRUE),
                      dplyr::across(dplyr::ends_with("_pred"), sum, na.rm = TRUE),
         `_conf_lo` = sum(`_conf_lo`, na.rm = TRUE),
@@ -202,7 +207,7 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
       )
   } else if (agg_type == "mean") {
     weekly_data <- combined_data %>%
-      group_by(week) %>%
+      group_by(.data[[agg_freq]]) %>%
       summarise(across(ends_with("_hist"), mean, na.rm = TRUE),
         across(ends_with("_pred"), mean, na.rm = TRUE),
         `_conf_lo` = mean(`_conf_lo`, na.rm = TRUE),
@@ -210,7 +215,7 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
       )
   } else if (agg_type == "max") {
     weekly_data <- combined_data %>%
-      dplyr::group_by(week) %>%
+      dplyr::group_by(.data[[agg_freq]]) %>%
       dplyr::reframe(dplyr::across(dplyr::ends_with("_hist"), max, na.rm = TRUE),
                      dplyr::across(dplyr::ends_with("_pred"), max, na.rm = TRUE),
         `_conf_lo` = max(`_conf_lo`, na.rm = TRUE),
@@ -218,7 +223,7 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
       )
   } else if (agg_type == "min") {
     weekly_data <- combined_data %>%
-      group_by(week) %>%
+      group_by(.data[[agg_freq]]) %>%
       summarise(across(ends_with("_hist"), min, na.rm = TRUE),
         across(ends_with("_pred"), min, na.rm = TRUE),
         `_conf_lo` = min(`_conf_lo`, na.rm = TRUE),
@@ -227,7 +232,7 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
   }
 
   weekly_bar_chart <- weekly_data %>%
-    echarts4r::e_charts_("week") %>%
+    echarts4r::e_charts_(agg_freq) %>%
     echarts4r::e_bar_(paste0(y_var, "_hist"), name = "Historical Values", stack = "grp", color = "blue") %>%
     echarts4r::e_bar_(paste0(y_var, "_pred"), name = "Prediction Values", stack = "grp", color = "orange") %>%
     echarts4r::e_x_axis(name = "Week") %>%

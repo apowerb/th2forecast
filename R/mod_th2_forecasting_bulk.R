@@ -229,7 +229,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
       shinyWidgets::pickerInput(
         inputId = ns("fc_date_var"),
-        label = ("X Axis"),
+        label = ("Date"),
         multiple = FALSE,
         choices = fc_date_var,
         selected = NULL
@@ -316,7 +316,18 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
       tisefka_iheggan <- tisefka_iheggan%>%
         janitor::clean_names()
-      tisefka_iheggan2 <<- tisefka_iheggan
+
+      tisefka_iheggan <- tisefka_iheggan%>%
+        tidyr::pivot_longer(cols = input$fc_target_var,
+                            names_to = "target_vars",
+                            values_to = "actuals")
+      if(!is.null(input$var_granularity)){
+        tisefka_iheggan <- tisefka_iheggan%>%
+          dplyr::rename(kpi_granularity = !!input$var_granularity)%>%
+          tidyr::unite("target_vars", target_vars:kpi_granularity, remove = TRUE)
+      }
+      tisefka_iheggan <- tisefka_iheggan%>%
+        dplyr::arrange(.data[[input$fc_date_var]])
       return(tisefka_iheggan)
     })
 
@@ -361,7 +372,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       }
       fc_meta_data <- list(
         # group_target = input$fc_group_target,
-        target_var = input$fc_target_var,
+        target_var = "actuals",
         date_var = input$fc_date_var,
         future_forecast = 120,
         models_list = input$fc_models_list,
@@ -370,18 +381,13 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         calendar_country = calendar_country,
         calendar_column = calendar_column,
         use_spark = input$fc_chk_spark,
-        group_target = input$var_granularity
+        group_target = "target_vars"
       )
 
       fc_result <- forecast_transform_data(
         fc_data = tisefka_iheggan(),
         fc_meta_data = fc_meta_data
       )
-
-      if(!is.null(input$var_granularity)){
-        fc_result <- fc_result%>%
-          dplyr::rename(all_columns = !!input$var_granularity)
-      }
       return(fc_result)
     })
 
@@ -406,7 +412,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
     fc_target_var <- reactive({
       req(tisefka_aggregated())
-      fc_target_var <- unique(tisefka_aggregated()$all_columns)
+      fc_target_var <- unique(tisefka_aggregated()$target_vars)
       fc_target_var <- fc_target_var[!fc_target_var %in% c(input$fc_date_var,input$var_granularity)]
       names(fc_target_var) <- fc_target_var
       fc_target_var <- head(fc_target_var, 15)
@@ -417,25 +423,18 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     output$graphs_ui <- renderUI({
       req(fc_target_var())
       req(tisefka_aggregated_all())
-
-      if(!is.null(input$var_granularity)){
-        hist_data <- tisefka_iheggan()%>%
-          tidyr::pivot_wider(id_cols = input$fc_date_var,
-                             names_from = input$var_granularity,
-                             values_from = input$fc_target_var,
-                             values_fill  = 0)
-      }else{
-        hist_data <- tisefka_iheggan()
-      }
+      req(input$submit)
+      hist_data <- tisefka_iheggan()
       plots_list <- purrr::map(fc_target_var(), ~ {
         mod_id <- th2product::generateID("fcast_view")
         fcast_inputs <-  list(target_var = .x, date_var = input$fc_date_var,
                             historical_data_aggregated = hist_data%>%
-                              dplyr::select(!!input$fc_date_var, !!.x),
+                              dplyr::filter(target_vars == !!.x)%>%
+                              dplyr::select(!!input$fc_date_var, actuals),
                             prediction_data_aggregated = tisefka_aggregated()%>%
-                              dplyr::filter(all_columns == !!.x))
+                              dplyr::filter(target_vars == !!.x))
         mod_basic_fcast_viewer_server(mod_id, fcast_inputs = fcast_inputs)
-        column(width = 4,
+        column(width = 6,
                mod_basic_fcast_viewer_ui(ns(mod_id)))
       })
       fluidRow(plots_list)
