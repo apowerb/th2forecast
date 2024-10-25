@@ -149,12 +149,12 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
           column(width = 2, uiOutput(ns("fc_date_var"))),
           column(width = 2, uiOutput(ns("fc_target_var"))),
           column(width = 2, uiOutput(ns("var_granularity"))),
-          column(width = 1, uiOutput(ns("aggregation_metric"))),
+          # column(width = 1, uiOutput(ns("aggregation_metric"))),
+          column(width = 1, br(), uiOutput(ns("submit"))),
           column(width = 2, uiOutput(ns("fc_models_list"))),
           column(width = 2, uiOutput(ns("fc_future_forecast"))),
           column(width = 2, uiOutput(ns("fc_split_train_test"))),
-          column(width = 2,br(), uiOutput(ns("fc_chk_business_days"))),
-          column(width = 1, br(), uiOutput(ns("submit")))
+          column(width = 2,br(), uiOutput(ns("fc_chk_business_days")))
         ),
         uiOutput(ns("non_numeric_variables_inputs"))
       )
@@ -166,7 +166,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       req(input$fc_target_var)
       req(input$load_ml_data)
       req(input$fc_models_list)
-      bs4Dash::actionButton(inputId = ns("submit"), label = ("Start"), icon = icon("play"), status = "primary")
+      bs4Dash::actionButton(inputId = ns("submit"), label = ("Start"), icon = icon("play"), style = th2utils::add_button_theme())
     })
 
     observeEvent(eventExpr = non_numeric_variables(), handlerExpr = {
@@ -209,12 +209,12 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         inputId = ns("fc_models_list"),
         label = "Models",
         options = list(`actions-box` = TRUE),
-        choices = c("ARIMA" = "arima",
+        choices = c("XGBoost" = "xgboost",
+                    "ARIMA" = "arima",
                     "Prophet" = "prophet",
-                    "Mars" = "mars",
                     "Linear regression" = "lr",
                     "Random Forest" = "random_forest",
-                    "XGBoost" = "xgboost",
+                    "Mars" = "mars",
                     "ARIMAX" = "arimax"),
         multiple = TRUE
       )
@@ -351,6 +351,8 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     output$fc_split_train_test <- renderUI({
       req(input$fc_date_var)
       req(input$fc_target_var)
+      # req(tisefka_iheggan())
+      # split_value <- tisefka_iheggan()%>%dplyr::pull(!!input$fc_date_var)%>%max()
       dateInput(inputId = ns("fc_split_train_test"),label = "Split", value = Sys.Date())
     })
 

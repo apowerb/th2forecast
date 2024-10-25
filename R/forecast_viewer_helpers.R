@@ -229,8 +229,8 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
 
   fcast_chart <- aggregated_data %>%
     echarts4r::e_charts_(agg_freq) %>%
-    echarts4r::e_bar_(hist_var, name = "Historical Values", stack = NULL, color = "#013DFF") %>%
-    echarts4r::e_bar_(pred_var, name = "Prediction Values", stack = NULL, color = "#00FFC5") %>%
+    echarts4r::e_bar_(hist_var, name = "Actuals", stack = NULL, color = "#013DFF") %>%
+    echarts4r::e_bar_(pred_var, name = "Forecast", stack = NULL, color = "#00FFC5") %>%
     echarts4r::e_x_axis(name = "Week") %>%
     echarts4r::e_y_axis(name = "Value") %>%
     echarts4r::e_tooltip(trigger = "axis") %>%
