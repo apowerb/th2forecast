@@ -28,18 +28,14 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     fcast_plot <- reactive({
       req(input$agg_by)
       req(input$fcast_model)
-      req(input$fcast_model)
       prediction_data_aggregated <- fcast_inputs$prediction_data_aggregated%>%
-        dplyr::filter(`_model_desc` == !!input$fcast_model)%>%
-        head(input$fcast_horizon)
-      # historical_data_aggregated <- fcast_inputs$historical_data_aggregated%>%
-      #   dplyr::select(actuals, !!fcast_inputs$date_var)
-
+        dplyr::filter(`_model_desc` == !!input$fcast_model)
       if(input$agg_by %in% c("days","hours")) {
         create_time_series_plot(historical_data = fcast_inputs$historical_data_aggregated,
                                 prediction_data = prediction_data_aggregated,
                                 x_var = fcast_inputs$date_var,
-                                y_var = fcast_inputs$target_var)
+                                y_var = fcast_inputs$target_var,
+                                fcast_horizon = input$fcast_horizon)
       } else if(input$agg_by %in% c("months","weeks","quarters")) {
         create_weekly_bar_chart(historical_data = fcast_inputs$historical_data_aggregated,
                                 prediction_data = prediction_data_aggregated,
