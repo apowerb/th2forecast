@@ -129,6 +129,10 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
 #' @export
 create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_by = NULL,fcast_horizon = 30) {
 
+  historical_data2 <<- historical_data
+  prediction_data2 <<- prediction_data
+  y_var2 <<- y_var
+  x_var2 <<- x_var
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
   }
@@ -164,8 +168,18 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
     dplyr::select(-extra_hist)
 
 
+  date_helper <- data.frame(datum = seq.Date(min(as.Date(combined_data[[x_var]])), max(as.Date(combined_data[[x_var]])), by= "day"))
+
+  # ggplot2::economics%>%
+  #   head(30)%>%
+  #   echarts4r::e_charts(date) %>%
+  #   echarts4r::e_line(pce, name = "actuals", lineStyle = list(type = "normal"))
+  combined_data <- combined_data%>%dplyr::mutate(datum = as.Date(.data[[x_var]]))
+  combined_data <- date_helper%>%
+    dplyr::left_join(combined_data, by = c("datum"))
+
   time_series_plot <- combined_data%>%
-    echarts4r::e_charts_(x_var) %>%
+    echarts4r::e_charts(datum) %>%
     echarts4r::e_line_(hist_var, name = "actuals", lineStyle = list(type = "normal"), color = "#013DFF") %>%
     echarts4r::e_line_(pred_var, name = "forecast", lineStyle = list(type = "normal"), color = "#00FFC5") %>%
     echarts4r::e_line_("_conf_lo", name = "Low Conf.", lineStyle = list(type = "dashed"), color = "#B3FFE5") %>%
@@ -181,8 +195,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 #' @export
 create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = "sum", agg_freq = "weeks") {
 
-  historical_data2 <<- historical_data
-  prediction_data2 <<- prediction_data
 
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
@@ -192,7 +204,7 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
   historical_data <- historical_data%>%
     dplyr::arrange(.data[[x_var]])%>%
     dplyr::rename(!!quo_name(new_name) := actuals)%>%
-    tail(1000)
+    tail(200)
 
   new_name <- paste0(y_var, "_pred")
   prediction_data <- prediction_data%>%

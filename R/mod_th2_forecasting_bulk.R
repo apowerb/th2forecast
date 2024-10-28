@@ -286,11 +286,11 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       )
     })
 
-    tisefka_iheggan <- reactive({
+    tisefka_iheggan <- eventReactive(input$submit,{
       req(tisefka())
       req(input$fc_target_var)
       req(input$fc_date_var)
-      req(input$submit)
+      # req(input$submit)
       tisefka_iheggan <- tisefka()
       if (length(non_numeric_variables()) > 0) {
         categ_input_filter <- non_numeric_variables() %>%
