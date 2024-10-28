@@ -352,7 +352,8 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       req(input$fc_date_var)
       req(input$fc_target_var)
       req(tisefka())
-      split_value <- tisefka()%>%dplyr::pull(!!input$fc_date_var)%>%max()
+      # split_value <- tisefka()%>%dplyr::pull(!!input$fc_date_var)%>%max()
+      split_value <- Sys.Date()
       dateInput(inputId = ns("fc_split_train_test"),label = "Split", value = split_value)
     })
 
