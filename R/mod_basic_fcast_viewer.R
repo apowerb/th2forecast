@@ -11,9 +11,13 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
       fluidRow(
         column(width = 3, uiOutput(ns("agg_by"))),
         column(width = 3, uiOutput(ns("fcast_model"))),
-        column(width = 3, uiOutput(ns("fcast_horizon")))
+        column(width = 3, uiOutput(ns("fcast_horizon"))),
+        column(width = 3, br(), mod_expand_graph_ui(ns("expand_graph")))
       )
     })
+
+
+    mod_expand_graph_server("expand_graph", interactive_graph = fcast_plot)
 
     output$agg_by <- renderUI({
       date_freq <- fcast_inputs$historical_data_aggregated%>%

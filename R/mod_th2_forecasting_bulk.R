@@ -351,9 +351,9 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     output$fc_split_train_test <- renderUI({
       req(input$fc_date_var)
       req(input$fc_target_var)
-      # req(tisefka_iheggan())
-      # split_value <- tisefka_iheggan()%>%dplyr::pull(!!input$fc_date_var)%>%max()
-      dateInput(inputId = ns("fc_split_train_test"),label = "Split", value = Sys.Date())
+      req(tisefka())
+      split_value <- tisefka()%>%dplyr::pull(!!input$fc_date_var)%>%max()
+      dateInput(inputId = ns("fc_split_train_test"),label = "Split", value = split_value)
     })
 
     tisefka_aggregated_all <- eventReactive(input$submit,{
