@@ -152,11 +152,11 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
   hist_var <- paste0(y_var, "_hist")
   pred_var <- paste0(y_var, "_pred")
   prediction_data <- prediction_data%>%
-    # janitor::clean_names()%>%
     dplyr::select(!!x_var,!!pred_var, `_conf_lo`, `_conf_hi`)
   combined_data <- historical_data%>%
     dplyr::full_join(prediction_data, by = c(x_var))%>%
     dplyr::arrange(.data[[x_var]])
+
 
   fcast_date <- combined_data%>%
     dplyr::filter(!is.na(.data[[pred_var]]))%>%
@@ -167,13 +167,8 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
     dplyr::filter(extra_hist)%>%
     dplyr::select(-extra_hist)
 
-
   date_helper <- data.frame(datum = seq.Date(min(as.Date(combined_data[[x_var]])), max(as.Date(combined_data[[x_var]])), by= "day"))
 
-  # ggplot2::economics%>%
-  #   head(30)%>%
-  #   echarts4r::e_charts(date) %>%
-  #   echarts4r::e_line(pce, name = "actuals", lineStyle = list(type = "normal"))
   combined_data <- combined_data%>%dplyr::mutate(datum = as.Date(.data[[x_var]]))
   combined_data <- date_helper%>%
     dplyr::left_join(combined_data, by = c("datum"))
@@ -193,8 +188,7 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 }
 # =========== #create bar chart (weekly time series) function ==================================
 #' @export
-create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = "sum", agg_freq = "weeks") {
-
+create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = "sum", agg_freq = "weeks", fcast_horizon = 10) {
 
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
@@ -228,9 +222,9 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
     dplyr::filter(extra_hist)%>%
     dplyr::select(-extra_hist)%>%
     dplyr::mutate(day = lubridate::date(get(x_var)),
-                  weeks = lubridate::ceiling_date(as.Date(get(x_var)), unit = "week", week_start = 1),
-                  months = lubridate::ceiling_date(as.Date(get(x_var)), unit = "month", week_start = 1),
-                  quarters = lubridate::ceiling_date(as.Date(get(x_var)), unit = "quarter", week_start = 1))%>%
+                  weeks = lubridate::floor_date(as.Date(get(x_var)), unit = "week", week_start = 1),
+                  months = lubridate::floor_date(as.Date(get(x_var)), unit = "month", week_start = 1),
+                  quarters = lubridate::floor_date(as.Date(get(x_var)), unit = "quarter", week_start = 1))%>%
     dplyr::mutate(pred_hist = dplyr::case_when(is.na(.data[[pred_var]]) ~ .data[[hist_var]],.default = .data[[pred_var]]))
 
     aggregated_data <- combined_data %>%

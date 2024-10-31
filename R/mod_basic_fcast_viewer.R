@@ -19,39 +19,61 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
 
     mod_expand_graph_server("expand_graph", interactive_graph = fcast_plot)
 
-    output$agg_by <- renderUI({
+    date_freqs <- reactive({
       date_freq <- fcast_inputs$historical_data_aggregated%>%
         dplyr::pull(!!fcast_inputs$date_var)%>%
         SaldaeDataExplorer::possible_units_for_summary(time_vect = .)
-      selectInput(inputId = ns("agg_by"), label = "By", choices = date_freq)
+      return(date_freq)
+    })
+    output$agg_by <- renderUI({
+      req(date_freqs())
+      selectInput(inputId = ns("agg_by"), label = "By", choices = date_freqs())
     })
     output$fcast_model <- renderUI({
       list_of_models <- unique(fcast_inputs$prediction_data_aggregated$`_model_desc`)
       selectInput(inputId = ns("fcast_model"), label = "Model", choices = list_of_models)
     })
+
+    output$fcast_horizon <- renderUI({
+      req(input$agg_by)
+      fcast_horizon <- 60
+      if(input$agg_by == "days"){
+        fcast_horizon <- 30
+      }else if(input$agg_by == "weeks"){
+        fcast_horizon <- 8
+      }else if(input$agg_by == "months"){
+        fcast_horizon <- 4
+      }else if(input$agg_by == "years"){
+        fcast_horizon <- 2
+      }
+      numericInput(inputId = ns("fcast_horizon"),
+                   label = "Horizon",
+                   value = fcast_horizon,
+                   min = 5,
+                   max = 100)
+    })
+
     fcast_plot <- reactive({
       req(input$agg_by)
+      req(date_freqs())
       req(input$fcast_model)
       prediction_data_aggregated <- fcast_inputs$prediction_data_aggregated%>%
         dplyr::filter(`_model_desc` == !!input$fcast_model)
-      if(input$agg_by %in% c("days","hours")) {
+      if(input$agg_by == date_freqs()[1]) {
         create_time_series_plot(historical_data = fcast_inputs$historical_data_aggregated,
                                 prediction_data = prediction_data_aggregated,
                                 x_var = fcast_inputs$date_var,
                                 y_var = fcast_inputs$target_var,
                                 fcast_horizon = input$fcast_horizon)
-      } else if(input$agg_by %in% c("months","weeks","quarters")) {
+      } else {
         create_weekly_bar_chart(historical_data = fcast_inputs$historical_data_aggregated,
                                 prediction_data = prediction_data_aggregated,
                                 x_var = fcast_inputs$date_var,
                                 y_var = fcast_inputs$target_var,
                                 agg_freq = input$agg_by,
+                                fcast_horizon = input$fcast_horizon,
                                 agg_type = "sum")
       }
-    })
-
-    output$fcast_horizon <- renderUI({
-      numericInput(inputId = ns("fcast_horizon"), label = "Horizon", value = 30, min = 5, max = 100)
     })
 
     output$fcast_plot <- echarts4r::renderEcharts4r({
