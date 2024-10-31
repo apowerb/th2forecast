@@ -41,12 +41,12 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     button_theme <- th2utils::add_button_theme()
 
 
-    mod_refresh_file <- th2product::create_refresh_helper_file(mod_id = "feature_engineering")
+    mod_refresh_file <- th2product::create_refresh_helper_file(mod_id = "th2forecasting")
 
     refresh_statement <- shiny::reactiveFileReader(intervalMillis = 1000, session = session, filePath = mod_refresh_file, readFunc = readRDS)
 
     observeEvent(input$refresh, {
-      mod_refresh_file <- th2product::create_refresh_helper_file(mod_id = "feature_engineering")
+      mod_refresh_file <- th2product::create_refresh_helper_file(mod_id = "th2forecasting")
     })
 
 
@@ -143,16 +143,20 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
     output$aggregator_board_box <- renderUI({
       fluidPage(
+        actionButton(ns("refresh"),
+                     label= "",
+                     icon = icon("arrows-rotate"),
+                     style = th2utils::add_button_theme()
+                     ),
         fluidRow(
-          column(width = 3,  uiOutput(ns("selected_bi_data"))),
+          column(width = 2,  uiOutput(ns("selected_bi_data"))),
           column(width = 2, br(), uiOutput(ns("load_ml_data"))),
           column(width = 2, uiOutput(ns("fc_date_var"))),
           column(width = 2, uiOutput(ns("fc_target_var"))),
           column(width = 2, uiOutput(ns("var_granularity"))),
-          # column(width = 1, uiOutput(ns("aggregation_metric"))),
+          column(width = 1, uiOutput(ns("input_time_freq"))),
           column(width = 1, br(), uiOutput(ns("submit"))),
           column(width = 2, uiOutput(ns("fc_models_list"))),
-          column(width = 2, uiOutput(ns("fc_future_forecast"))),
           column(width = 2, uiOutput(ns("fc_split_train_test"))),
           column(width = 2,br(), uiOutput(ns("fc_chk_business_days")))
         ),
@@ -290,63 +294,37 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       req(tisefka())
       req(input$fc_target_var)
       req(input$fc_date_var)
-      # req(input$submit)
-      tisefka_iheggan <- tisefka()
-      if (length(non_numeric_variables()) > 0) {
-        categ_input_filter <- non_numeric_variables() %>%
-          purrr::map(~ input[[paste0("non_numeric_variables_", .x)]]) %>%
-          stats::setNames(non_numeric_variables())
-        categ_input_filter <- categ_input_filter[!unlist(lapply(categ_input_filter, is.null))]
-        for (cat_input in names(categ_input_filter)) {
-          if ("NA" %in% categ_input_filter[[cat_input]]) categ_input_filter[[cat_input]] <- c(categ_input_filter[[cat_input]], NA)
-          tisefka_iheggan <- tisefka_iheggan %>% dplyr::filter(!!rlang::sym(cat_input) %in% categ_input_filter[[cat_input]])
-        }
-      }
-
-      if(!is.null(input$var_granularity)){
-        grouping_elements <- c( input$fc_date_var,input$var_granularity) %>%
-          unique()
-      }else{
-        grouping_elements <- input$fc_date_var
-      }
-      tisefka_iheggan <- tisefka_iheggan %>%
-        dplyr::select(!!c(grouping_elements, input$fc_target_var))%>%
-        dplyr::group_by(dplyr::across(!!grouping_elements)) %>%
-        dplyr::summarise_all(SaldaeModulesUI:::th2_agg_func, "sum")
-
-      tisefka_iheggan <- tisefka_iheggan%>%
-        janitor::clean_names()
-
-      tisefka_iheggan <- tisefka_iheggan%>%
-        tidyr::pivot_longer(cols = input$fc_target_var,
-                            names_to = "target_vars",
-                            values_to = "actuals")
-      if(!is.null(input$var_granularity)){
-        tisefka_iheggan <- tisefka_iheggan%>%
-          dplyr::rename(kpi_granularity = !!input$var_granularity)%>%
-          tidyr::unite("target_vars", target_vars:kpi_granularity, remove = TRUE)
-      }
-      tisefka_iheggan <- tisefka_iheggan%>%
-        dplyr::arrange(.data[[input$fc_date_var]])
+      req(input$input_time_freq)
+      tisefka_iheggan <- tisefka()%>%
+        prepare_input_fcast_data(
+        raw_data = .,
+        non_numeric_variables = non_numeric_variables(),
+        input_object = input,
+        input_time_freq = input$input_time_freq,
+        var_granularity = input$var_granularity,
+        fc_target_var = input$fc_target_var,
+        fc_date_var = input$fc_date_var)
       return(tisefka_iheggan)
     })
 
+
+    ts_time_units <- reactive({
+      req(tisefka())
+      req(input$fc_date_var)
+      date_freq <- tisefka()%>%
+        dplyr::pull(!!input$fc_date_var)%>%
+        SaldaeDataExplorer::possible_units_for_summary(time_vect = .)
+      return(date_freq)
+    })
     #---------------------------------------
-    # output$time_unit_data <- renderUI({
-    #   req(ts_time_units())
-    #   shinyWidgets::radioGroupButtons(
-    #     inputId = ns("time_unit_data"),
-    #     label = ("Aggregate by"),
-    #     choices = ts_time_units(),
-    #     status = "primary",
-    #     justified = FALSE,
-    #     checkIcon = list(
-    #       yes = shiny::icon("ok",
-    #                         lib = "glyphicon"
-    #       )
-    #     )
-    #   )
-    # })
+    output$input_time_freq <- renderUI({
+      req(ts_time_units())
+      selectInput(
+        inputId = ns("input_time_freq"),
+        label = ("Input freq"),
+        choices = ts_time_units()
+      )
+    })
     #----------------
     output$fc_split_train_test <- renderUI({
       req(input$fc_date_var)
