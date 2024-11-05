@@ -57,6 +57,7 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
       req(input$agg_by)
       req(date_freqs())
       req(input$fcast_model)
+      req(input$fcast_horizon)
       prediction_data_aggregated <- fcast_inputs$prediction_data_aggregated%>%
         dplyr::filter(`_model_desc` == !!input$fcast_model)
       if(input$agg_by == date_freqs()[1]) {

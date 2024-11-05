@@ -173,6 +173,27 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
   combined_data <- date_helper%>%
     dplyr::left_join(combined_data, by = c("datum"))
 
+  combined_data2 <<- combined_data
+
+  is_empty_row <- function(x, y){
+    dt_row <- c(x, y)
+    # dt_row2 <<- dt_row
+    data.frame(is_empty = all(is.na(dt_row)))
+  }
+  combined_data <- combined_data%>%
+    dplyr::rowwise()%>%
+    dplyr::mutate(is_empty_row(.data[[hist_var]], .data[[pred_var]]))%>%
+    dplyr::filter(is_empty == FALSE)%>%
+    dplyr::select(-is_empty)
+  # time_series_plot <- combined_data%>%
+  #   janitor::remove_empty(which = "rows")%>%
+  #   plotly::plot_ly()%>%
+  #   plotly::add_lines(x = ~datum, y = ~get(hist_var), color = I("#013DFF"))%>%
+  #   plotly::add_lines(x = ~datum, y = ~get(pred_var), color = I("#00FFC5"))%>%
+  #   plotly::layout(legend = list(orientation = "h"),
+  #                  xaxis = list(title = x_var),
+  #                  yaxis = list(title = y_var))
+
   time_series_plot <- combined_data%>%
     echarts4r::e_charts(datum) %>%
     echarts4r::e_line_(hist_var, name = "actuals", lineStyle = list(type = "normal"), color = "#013DFF") %>%
