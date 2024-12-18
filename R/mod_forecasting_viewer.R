@@ -268,8 +268,8 @@ mod_forecasting_viewer_server <- function(id) {
       date_var <- tolower(selected_info()$date_var)
       target_var <- tolower(selected_info()$target_var)
       historical_data_aggregated <- historical_data_filtred_result %>%
-        dplyr::group_by_at(vars(date_var)) %>%
-        dplyr::summarise_at(vars(target_var), sum)
+        dplyr::group_by_at(dplyr::vars(date_var)) %>%
+        dplyr::summarise_at(dplyr::vars(target_var), sum)
 
 
 
@@ -319,8 +319,8 @@ mod_forecasting_viewer_server <- function(id) {
 
       # if (input$agg_type == "sum") {
       historical_data_aggregated <- historical_data_filtred_result %>%
-        dplyr::group_by_at(vars(selected_info()$date_var)) %>%
-        dplyr::summarise_at(vars(selected_info()$target_var), sum)
+        dplyr::group_by_at(dplyr::vars(selected_info()$date_var)) %>%
+        dplyr::summarise_at(dplyr::vars(selected_info()$target_var), sum)
       # }
 
       benchmarking_models_test <- th2_benchmarking(historical_data_aggregated, prediction_data_filtred_result, group_target = NULL, group_value = NULL, target_var = selected_info()$target_var, as_of = input$as_of)

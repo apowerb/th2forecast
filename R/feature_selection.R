@@ -92,7 +92,7 @@ feature_selection <- function(
     }
 
     data_signature <- timetk::tk_get_timeseries_signature(data_features[[var_date_feature]]) %>%
-      janitor::remove_empty() %>%
+      janitor::remove_empty(which = c("cols")) %>%
       # janitor::remove_constant() %>%
       dplyr::select(-c(index, diff, wday.lbl, month.lbl, minute, second, hour12, am.pm))
 

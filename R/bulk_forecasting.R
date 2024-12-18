@@ -71,7 +71,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     data_tbl <- train_data %>%
       dplyr::select(!!target_var, !!date_var)%>%
       tidyr::pivot_longer(cols = !!target_var,  names_to = "id") %>%
-      rename(date := !!date_var)
+      dplyr::rename(date := !!date_var)
     group_target <- "id"
     target_var <- "value"
   } else {
@@ -83,7 +83,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
     data_tbl <- train_data %>%
       dplyr::select(all_of(select_vars)) %>%
-      rename(id := !!group_target, date := !!date_var)
+      dplyr::rename(id := !!group_target, date := !!date_var)
     group_target <- "id"
     # data_tbl <- data_tbl %>%
     #   mutate(id_group = paste(store_nbr, family, sep = "_"))
@@ -95,12 +95,12 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
 
     data_tbl <- data_tbl %>%
-      dplyr::group_by_at(vars("date", group_target, country_column)) %>%
-      dplyr::summarise_at(vars(target_var), sum)
+      dplyr::group_by_at(dplyr::vars("date", group_target, country_column)) %>%
+      dplyr::summarise_at(dplyr::vars(target_var), sum)
   } else {
     data_tbl <- data_tbl %>%
-      dplyr::group_by_at(vars("date", group_target)) %>%
-      dplyr::summarise_at(vars(target_var), sum)
+      dplyr::group_by_at(dplyr::vars("date", group_target)) %>%
+      dplyr::summarise_at(dplyr::vars(target_var), sum)
   }
 
   count_data <- table(data_tbl[[group_target]])

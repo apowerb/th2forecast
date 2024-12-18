@@ -492,8 +492,8 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
     target_var <- tolower(input$fc_target_var)
     prediction_data_aggregated <- prediction_data_filtred_result
     historical_data_aggregated <- historical_data_filtred_result %>%
-      dplyr::group_by_at(vars(date_var)) %>%
-      dplyr::summarise_at(vars(target_var), sum)
+      dplyr::group_by_at(dplyr::vars(date_var)) %>%
+      dplyr::summarise_at(dplyr::vars(target_var), sum)
 
 
 

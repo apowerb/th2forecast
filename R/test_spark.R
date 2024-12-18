@@ -63,7 +63,7 @@ th2_forecast_spark <- function(input_data, group_target, target_var, date_var, f
   #   tidyr::unite(!!group_target, all_of(group_by_col), sep = "_", remove = TRUE)
 
   for (e in names(result_forecast)[substr(names(result_forecast), 1, 2) == "X_"]) {
-    result_forecast <- rename(result_forecast, !!sub("^..", "_", e) := !!e)
+    result_forecast <- dplyr::rename(result_forecast, !!sub("^..", "_", e) := !!e)
   }
 
   spark_disconnect(sc)

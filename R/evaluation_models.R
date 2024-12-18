@@ -91,8 +91,8 @@ th2_metric_test <- function(test_data, forecasting_data, date_var = NULL, target
   for (kpi_bench in list_kpi)
   {
     test_data_bench <- test_data %>%
-      dplyr::group_by_at(vars(date_var, "column_kpi")) %>%
-      dplyr::summarise_at(vars(target_var), sum)
+      dplyr::group_by_at(dplyr::vars(date_var, "column_kpi")) %>%
+      dplyr::summarise_at(dplyr::vars(target_var), sum)
 
     test_data_bench <- test_data_bench %>%
       dplyr::filter(column_kpi == kpi_bench)
@@ -130,8 +130,8 @@ th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var
 
 
   dataframe_input <- dataframe_input %>%
-    dplyr::group_by_at(vars(date_var, group_target)) %>%
-    dplyr::summarise_at(vars(target_var), sum)
+    dplyr::group_by_at(dplyr::vars(date_var, group_target)) %>%
+    dplyr::summarise_at(dplyr::vars(target_var), sum)
 
   data_clean <- preprocessing_data(dataframe_input %>% dplyr::select(target_var, date_var))$dataset_clean # [["dataset_clean"]]
 
@@ -153,14 +153,14 @@ th2_benchmark_timegpt <- function(input_data, group_target, target_var, date_var
   if (group_target == "all_columns") {
     train_data <- train_data %>%
       tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
-      rename(date := !!date_var)
+      dplyr::rename(date := !!date_var)
     group_target <- "id"
   } else {
     select_vars <- c(group_target, date_var, target_var)
 
     train_data <- train_data %>%
       dplyr::select(all_of(select_vars)) %>%
-      rename(id := !!group_target, date := !!date_var)
+      dplyr::rename(id := !!group_target, date := !!date_var)
     group_target <- "id"
   }
 
@@ -300,8 +300,8 @@ th2_rolling_forecast_stablizer <- function(input_data, var_date, var_target, kpi
     dplyr::select(-c(`type`))
 
   input_data <- input_data %>%
-    dplyr::group_by_at(vars(var_date, "column_kpi")) %>%
-    dplyr::summarise_at(vars(var_target), sum)
+    dplyr::group_by_at(dplyr::vars(var_date, "column_kpi")) %>%
+    dplyr::summarise_at(dplyr::vars(var_target), sum)
 
   input_data <- input_data %>%
     dplyr::filter(.data[[var_date]] >= as.Date(last_date) - (10 * horizon) & .data[[var_date]] <= as.Date(last_date) - 1)
