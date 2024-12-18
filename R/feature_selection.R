@@ -98,7 +98,7 @@ feature_selection <- function(
 
     data_features <- cbind(data_features, data_signature)
 
-    data_features <- as_tibble(data_features)
+    data_features <- tibble::as_tibble(data_features)
 
 
     if (lags != FALSE) {

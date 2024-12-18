@@ -129,9 +129,9 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
 #' @export
 create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_by = NULL,fcast_horizon = 30) {
 
-  historical_data2 <<- historical_data
-  prediction_data2 <<- prediction_data
-  y_var2 <<- y_var
+  # historical_data2 <<- historical_data
+  # prediction_data2 <<- prediction_data
+  # y_var2 <<- y_var
   x_var2 <<- x_var
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
@@ -173,7 +173,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
   combined_data <- date_helper%>%
     dplyr::left_join(combined_data, by = c("datum"))
 
-  combined_data2 <<- combined_data
 
   is_empty_row <- function(x, y){
     dt_row <- c(x, y)
@@ -185,14 +184,6 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
     dplyr::mutate(is_empty_row(.data[[hist_var]], .data[[pred_var]]))%>%
     dplyr::filter(is_empty == FALSE)%>%
     dplyr::select(-is_empty)
-  # time_series_plot <- combined_data%>%
-  #   janitor::remove_empty(which = "rows")%>%
-  #   plotly::plot_ly()%>%
-  #   plotly::add_lines(x = ~datum, y = ~get(hist_var), color = I("#013DFF"))%>%
-  #   plotly::add_lines(x = ~datum, y = ~get(pred_var), color = I("#00FFC5"))%>%
-  #   plotly::layout(legend = list(orientation = "h"),
-  #                  xaxis = list(title = x_var),
-  #                  yaxis = list(title = y_var))
 
   time_series_plot <- combined_data%>%
     echarts4r::e_charts(datum) %>%

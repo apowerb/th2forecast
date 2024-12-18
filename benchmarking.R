@@ -25,7 +25,7 @@ compare_th2_vs_nixtlar <- function(main_dataset = NULL, fcast_horizon = 200, tar
                                                 target_var = 'y',
                                                 date_var = 'ds',
                                                 future_forecast = fcast_horizon,
-                                                models_list = c("xgboost"))
+                                                models_list = c("random_forest"))
 
   th2fcast_short2 <- th2fcast%>%
     dplyr::rename(thaink2 = .value, ds = .index)
@@ -101,3 +101,22 @@ perf_table_dt <- perf_table%>%
   )
 
 perf_table_dt
+
+
+
+#===============
+
+source("C:/TEMP/thaink2/Dive2ML/th2forecast/R/th2forecast_api_helpers.R")
+base_url <- "http://127.0.0.1:3838/"
+# base_url <- "https://apis-dev.thaink2.fr/"
+fcast_res <- th2forecast_forecast_api(
+  input_data = main_dataset2,
+  base_url = base_url,
+  fcast_horizon = 30,
+  target_var = "y",
+  date_var = "ds",
+  group_target = "unique_id",
+  models_list = c("xgboost")
+)
+fcast_res <- fcast_res%>%
+  do.call(dplyr::bind_rows, . )

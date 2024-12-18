@@ -25,22 +25,9 @@ th2forecast_forecast_api <- function(input_data,group_target = NULL,base_url ,fc
     httr2::req_method("POST")
 
   forecast_resp <- forecast_req%>%
-    httr2::req_perform(verbosity = 0)
+    httr2::req_perform(verbosity = 2)
 
   forecast_result <- forecast_resp%>%
     httr2::resp_body_json()
   return(forecast_result)
 }
-
-
-# base_url <- "http://127.0.0.1:3838/"
-# base_url <- "https://apis-dev.thaink2.fr/"
-# fcast_res <- th2forecast_forecast_api(
-#   input_data = main_dataset2,
-#   base_url = base_url,
-#   fcast_horizon = 30,
-#   target_var = "y",
-#   date_var = "ds",
-#   group_target = "unique_id",
-#   models_list = c("arima")
-# )

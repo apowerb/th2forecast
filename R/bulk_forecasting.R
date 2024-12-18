@@ -200,7 +200,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       } else {
         res_bh <- use_holidays
       }
-
       training_model <- th2_random_forest_engine(nested_data, target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
       label_model <- "model_random_forest"
     } else if (model == "xgboost") {
@@ -209,7 +208,6 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       } else {
         res_bh <- use_holidays
       }
-
       training_model <- th2_xgboost_engine(nested_data, "date", target_var, use_holidays = res_bh, use_meteo = use_meteo, fit_model = "bulk", all_data = nested_data_tbl, lags = lags, db_conn = db_conn)$fit
       label_model <- "model_xgboost"
     } else if (model == "arimax") {
@@ -226,11 +224,13 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     modeltime::modeltime_nested_fit,
     c(
       list(nested_data = nested_data_tbl),
-      list_output_models,
+      model_list = list_output_models,
       list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
     )
   )
-
+  # hey <- modeltime::modeltime_nested_fit(nested_data = nested_data_tbl,
+  #                                 model_list =  list_output_models,
+  #                                 control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
   # nested_modeltime_tbl <- modeltime::modeltime_nested_fit
 
   best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
