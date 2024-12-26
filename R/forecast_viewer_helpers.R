@@ -128,11 +128,13 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
 # =========== #create plot (time series) function ==================================
 #' @export
 create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_by = NULL,fcast_horizon = 30) {
+#
+#   historical_data2 <<- historical_data
+#   prediction_data2 <<- prediction_data
+#   y_var2 <<- y_var
+#   x_var2 <<- x_var
+#   fcast_horizon2 <<- fcast_horizon
 
-  # historical_data2 <<- historical_data
-  # prediction_data2 <<- prediction_data
-  # y_var2 <<- y_var
-  x_var2 <<- x_var
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
     prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
   }
@@ -140,8 +142,7 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
   new_name <- paste0(y_var, "_hist")
   historical_data <- historical_data%>%
     dplyr::arrange(.data[[x_var]])%>%
-    dplyr::rename(!!quo_name(new_name) := actuals)%>%
-    tail(100)
+    dplyr::rename(!!quo_name(new_name) := actuals)
 
   new_name <- paste0(y_var, "_pred")
   prediction_data <- prediction_data%>%
@@ -183,7 +184,8 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
     dplyr::rowwise()%>%
     dplyr::mutate(is_empty_row(.data[[hist_var]], .data[[pred_var]]))%>%
     dplyr::filter(is_empty == FALSE)%>%
-    dplyr::select(-is_empty)
+    dplyr::select(-is_empty)%>%
+    tail(fcast_horizon + 100)
 
   time_series_plot <- combined_data%>%
     echarts4r::e_charts(datum) %>%
@@ -209,8 +211,7 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
   new_name <- paste0(y_var, "_hist")
   historical_data <- historical_data%>%
     dplyr::arrange(.data[[x_var]])%>%
-    dplyr::rename(!!quo_name(new_name) := actuals)%>%
-    tail(200)
+    dplyr::rename(!!quo_name(new_name) := actuals)
 
   new_name <- paste0(y_var, "_pred")
   prediction_data <- prediction_data%>%
@@ -243,7 +244,8 @@ create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NU
       dplyr::group_by(.data[[agg_freq]]) %>%
       dplyr::reframe(dplyr::across(dplyr::ends_with("_hist"), sum, na.rm = TRUE),
                      dplyr::across(dplyr::ends_with("_pred"), sum, na.rm = TRUE)
-      )
+      )%>%
+      tail(fcast_horizon + 100)
 
   fcast_chart <- aggregated_data %>%
     echarts4r::e_charts_(agg_freq) %>%
