@@ -210,8 +210,8 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
   model_rf <- parsnip::rand_forest(
     # min_n = ifelse(fit_model, min_n, tune()),
     # trees = ifelse(fit_model, trees, tune())
-    min_n = ifelse(fit_model == FALSE, tune(), min_n),
-    trees = ifelse(fit_model == FALSE, tune(), trees)
+    min_n = ifelse(fit_model == FALSE, parsnip::tune(), min_n),
+    trees = ifelse(fit_model == FALSE, parsnip::tune(), trees)
   ) %>%
     parsnip::set_engine("randomForest") %>%
     parsnip::set_mode("regression")
@@ -271,8 +271,8 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
   model_xgboost <-
     parsnip::boost_tree(
       # mtry = ifelse(fit_model == FALSE, tune(), mtry),
-      trees = ifelse(fit_model == FALSE, tune(), trees),
-      min_n = ifelse(fit_model == FALSE, tune(), min_n),
+      trees = ifelse(fit_model == FALSE, parsnip::tune(), trees),
+      min_n = ifelse(fit_model == FALSE, parsnip::tune(), min_n),
       learn_rate = ifelse(fit_model == FALSE, tune(), learn_rate)
     ) %>%
     parsnip::set_mode("regression") %>%

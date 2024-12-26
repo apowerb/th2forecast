@@ -24,12 +24,12 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
       dplyr::mutate(!!group_target := paste(dataframe_input[[group_target]], "_", dataframe_input[[country_column]], sep = ""))
 
     dataframe_input <- dataframe_input %>%
-      dplyr::group_by_at(vars(date_var, group_target, country_column)) %>%
-      dplyr::summarise_at(vars(target_var), sum)
+      dplyr::group_by_at(dplyr::vars(date_var, group_target, country_column)) %>%
+      dplyr::summarise_at(dplyr::vars(target_var), sum)
   } else {
     dataframe_input <- dataframe_input %>%
-      dplyr::group_by_at(vars(date_var, group_target)) %>%
-      dplyr::summarise_at(vars(target_var), sum)
+      dplyr::group_by_at(dplyr::vars(date_var, group_target)) %>%
+      dplyr::summarise_at(dplyr::vars(target_var), sum)
   }
 
   data_clean <- preprocessing_data(dataframe_input %>% dplyr::select(target_var, date_var))$dataset_clean # [["dataset_clean"]]
@@ -66,7 +66,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
   if (group_target == "all_columns") {
     train_data <- train_data %>%
       tidyr::pivot_longer(!date_var, names_to = "id", values_to = target_var) %>%
-      rename(date := !!date_var)
+      dplyr::rename(date := !!date_var)
     group_target <- "id"
   } else {
     if (!is.null(country_column) && (use_holidays == "in_data")) {
@@ -77,7 +77,7 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
 
     train_data <- train_data %>%
       dplyr::select(all_of(select_vars)) %>%
-      rename(id := !!group_target, date := !!date_var)
+      dplyr::rename(id := !!group_target, date := !!date_var)
     group_target <- "id"
     # data_tbl <- data_tbl %>%
     #   mutate(id_group = paste(store_nbr, family, sep = "_"))
@@ -86,8 +86,8 @@ th2_bulk_forecasting_spark <- function(input_data, group_target, target_var, dat
 
 
   # train_data <- train_data %>%
-  #   dplyr::group_by_at(vars("date", group_target)) %>%
-  #   dplyr::summarise_at(vars(target_var), sum)
+  #   dplyr::group_by_at(dplyr::vars("date", group_target)) %>%
+  #   dplyr::summarise_at(dplyr::vars(target_var), sum)
 
 
   if (tuning == TRUE) {
