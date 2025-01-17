@@ -53,8 +53,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
     object_creator <- Sys.getenv("SHINYPROXY_USERNAME")
     if (object_creator == "") object_creator <- "thaink2"
-    list_of_users <- th2utils::get_list_of_users()
-    list_of_users <- list_of_users[list_of_users != object_creator]
+
     user_permissions <- reactive({
       req(refresh_statement())
       # user_permissions <- grant_ml_permission(s3_bucket = s3_bucket, s3_prefix = s3_prefix, permission_action = "get", object_creator = object_creator)
@@ -76,7 +75,13 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
     available_data <- reactive({
       req(refresh_statement())
-      saved_data_meta <- th2ml::get_ml_model_metadata(s3_bucket, s3_prefix, pin_object = "data")
+      saved_data_meta <- th2ml::get_ml_model_metadata(
+        s3_bucket = s3_bucket,
+        s3_prefix = s3_prefix,
+        pin_object = "data",
+        target_items = unique(user_permissions()$OBJECT_ID),
+        meta_details = "only_names"
+        )
       if (nrow(saved_data_meta) == 0) {
         return(NULL)
       }
