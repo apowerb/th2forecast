@@ -14,8 +14,8 @@ library(htmltools)
 
 ml_dir <<- "../data_connectors"
 
-source("C:/Users/Farid Azouaou/Downloads/initializer.R")
-init_envs_cluster()
+# source("C:/Users/Farid Azouaou/Downloads/initializer.R")
+# init_envs_cluster()
 
 options(shiny.launch.browser = .rs.invokeShinyWindowExternal)
 
@@ -64,9 +64,8 @@ ui <- tagList(
   )
 )
 
-if (file.exists("../R/initializer.R")) th2forecast:::init_envs()
 server <- function(input, output) {
-  if (file.exists("../R/initializer.R")) th2forecast:::init_envs_cluster(cluster = Sys.getenv("CURRENT_CLUSTER"))
+  initialize_envs()
   observe({
     tabName <- input$sidebarMenuID
 
@@ -94,5 +93,12 @@ server <- function(input, output) {
   })
 }
 
+#' @export
+initialize_envs <- function(cluster = "scaleway"){
+  if (file.exists("C:/temp/Repos/temp_vars/initializer.R")){
+    source("C:/temp/Repos/temp_vars/initializer.R")
+    init_envs_cluster(cluster)
+  }
+}
 shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE, java.parameters = "-Xss3m"))
 
