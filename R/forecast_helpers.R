@@ -24,7 +24,7 @@ prepare_input_fcast_data <- function(raw_data , non_numeric_variables = NULL,
   raw_data <- raw_data %>%
     dplyr::select(!!c(grouping_elements, fc_target_var))%>%
     dplyr::group_by(dplyr::across(!!grouping_elements)) %>%
-    dplyr::summarise_all(SaldaeModulesUI:::th2_agg_func, "sum")
+    dplyr::summarise_all(th2reporting:::th2_agg_func, "sum")
   raw_data <- raw_data%>%
     janitor::clean_names()
   raw_data <- raw_data%>%
@@ -50,7 +50,7 @@ prepare_input_fcast_data <- function(raw_data , non_numeric_variables = NULL,
       dplyr::rename(!!quo_name(fc_date_var) := !!input_time_freq)%>%
       dplyr::select(!!grouping_elements, actuals)%>%
       dplyr::group_by(dplyr::across(!!grouping_elements))%>%
-      dplyr::summarise_all(SaldaeModulesUI:::th2_agg_func, "sum")
+      dplyr::summarise_all(th2reporting:::th2_agg_func, "sum")
   }
   # raw_data2 <<- raw_data
   return(raw_data)

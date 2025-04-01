@@ -128,7 +128,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     data_diag <- reactive({
       req(tisefka())
       req(input$load_ml_data)
-      dt_diag <- SaldaeDataExplorer::data_diagnosis_f(tisefka())
+      dt_diag <- th2reporting::data_diagnosis_f(tisefka())
       dt_diag2 <<- dt_diag
       return(dt_diag)
     })
@@ -321,7 +321,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       req(input$fc_date_var)
       date_freq <- tisefka()%>%
         dplyr::pull(!!input$fc_date_var)%>%
-        SaldaeDataExplorer::possible_units_for_summary(time_vect = .)
+        th2reporting::possible_units_for_summary(time_vect = .)
       return(date_freq)
     })
     #---------------------------------------

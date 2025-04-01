@@ -22,7 +22,7 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     date_freqs <- reactive({
       date_freq <- fcast_inputs$historical_data_aggregated%>%
         dplyr::pull(!!fcast_inputs$date_var)%>%
-        SaldaeDataExplorer::possible_units_for_summary(time_vect = .)
+        th2reporting::possible_units_for_summary(time_vect = .)
       return(date_freq)
     })
     output$agg_by <- renderUI({
@@ -96,7 +96,7 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     output$fcast_box <- renderUI({
 
       exporter_mod_id <- th2product::generateID("exporter")
-      SaldaeModulesUI:::save_datatable_server(exporter_mod_id, export_name = fcast_inputs$target_var, data_table = reactive({
+      th2reporting:::save_datatable_server(exporter_mod_id, export_name = fcast_inputs$target_var, data_table = reactive({
         fcast_inputs$prediction_data_aggregated%>%
           dplyr::select(-`_model_id`, -start_date, -end_date)
       }))
@@ -109,7 +109,7 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
                         )
                       ),
                       tabPanel(icon = icon("table"),title = "",
-                               SaldaeModulesUI:::save_datatable_ui(id = ns(exporter_mod_id)),
+                               th2reporting:::save_datatable_ui(id = ns(exporter_mod_id)),
                                DT::dataTableOutput(ns("fcast_table"))
                                )
                       )

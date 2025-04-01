@@ -264,7 +264,7 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
 
   dates_yellan <- reactive({
     req(tisefka_tizegzawin())
-    dates_yellan <- SaldaeDataExplorer::detect_possible_date_var(tisefka_tizegzawin())
+    dates_yellan <- th2reporting::detect_possible_date_var(tisefka_tizegzawin())
     if (length(dates_yellan) == 0) {
       th2product::th_shinyalert("Data Upload",
                                 text = "Date variable not available", type = "error",
