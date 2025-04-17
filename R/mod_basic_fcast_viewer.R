@@ -27,11 +27,11 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     })
     output$agg_by <- renderUI({
       req(date_freqs())
-      selectInput(inputId = ns("agg_by"), label = "By", choices = date_freqs())
+      shinyWidgets::pickerInput(inputId = ns("agg_by"), label = "By", choices = date_freqs())
     })
     output$fcast_model <- renderUI({
       list_of_models <- unique(fcast_inputs$prediction_data_aggregated$`_model_desc`)
-      selectInput(inputId = ns("fcast_model"), label = "Model", choices = list_of_models)
+      shinyWidgets::pickerInput(inputId = ns("fcast_model"), label = "Model", choices = list_of_models)
     })
 
     output$fcast_horizon <- renderUI({

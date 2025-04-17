@@ -118,7 +118,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     })
     output$selected_bi_data <- renderUI({
       req(available_data())
-      selectInput(inputId = ns("selected_bi_data"), label = "Select Data", choices = available_data(), multiple = FALSE)
+      shinyWidgets::pickerInput(inputId = ns("selected_bi_data"), label = "Select Data", choices = available_data(), multiple = FALSE)
     })
 
 
@@ -327,7 +327,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
     #---------------------------------------
     output$input_time_freq <- renderUI({
       req(ts_time_units())
-      selectInput(
+      shinyWidgets::pickerInput(
         inputId = ns("input_time_freq"),
         label = ("Input freq"),
         choices = ts_time_units()

@@ -226,7 +226,7 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
   })
   output$selected_ml_data <- renderUI({
     req(available_data())
-    selectInput(inputId = ns("selected_ml_data"), label = "Select Data", choices = available_data(), multiple = FALSE)
+    shinyWidgets::pickerInput(inputId = ns("selected_ml_data"), label = "Select Data", choices = available_data(), multiple = FALSE)
   })
 
   observeEvent(input$selected_ml_data, {
@@ -332,7 +332,7 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
 
     if (chk_columns == TRUE) {
       output$fc_calendar_list <- renderUI({
-        selectInput(
+        shinyWidgets::pickerInput(
           inputId = ns("fc_calendar_list"),
           label = "Calendar",
           choices = c("Peru" = "PE", "France" = "FR", "Deutschland" = "DE", "Belgium" = "BE", "In data" = "in_data")
@@ -443,23 +443,23 @@ forecast_train_mod_server <- function(id, div_width = "col-xs-6 col-sm-12 col-md
 
     group_target_var <- input$fc_group_target
     kpi_values <- base::unique(tisefka_tizegzawin()[group_target_var])
-    selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
+    shinyWidgets::pickerInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
   })
 
   output$model <- renderUI({
     req(result_forecast())
     model_names <- base::unique(result_forecast()$`.model_desc`)
-    selectInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
+    shinyWidgets::pickerInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
   })
 
   output$aggregate_by <- renderUI({
-    selectInput(inputId = ns("agg_by"), "Aggregate by", choices = c("days", "weeks"))
+    shinyWidgets::pickerInput(inputId = ns("agg_by"), "Aggregate by", choices = c("days", "weeks"))
   })
 
   output$aggregation <- renderUI({
     req(input$agg_by)
     if (input$agg_by == "weeks") {
-      selectInput(inputId = ns("agg_type"), "Aggregation", choices = c("Sum" = "sum", "Mean" = "mean", "Max" = "max", "Min" = "min"))
+      shinyWidgets::pickerInput(inputId = ns("agg_type"), "Aggregation", choices = c("Sum" = "sum", "Mean" = "mean", "Max" = "max", "Min" = "min"))
     } else {
       NULL
     }

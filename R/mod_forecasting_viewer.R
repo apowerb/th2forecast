@@ -167,7 +167,7 @@ mod_forecasting_viewer_server <- function(id) {
       req(output_data_result())
       req(selected_info())
       execution_dates <- base::unique(output_data_result()$execution_date)
-      selectInput(inputId = ns("as_of"), label = "As Of", choices = c("", format(execution_dates, "%Y-%m-%d %H:%M:%S")))
+      shinyWidgets::pickerInput(inputId = ns("as_of"), label = "As Of", choices = c("", format(execution_dates, "%Y-%m-%d %H:%M:%S")))
     })
 
     observeEvent(input$as_of, {
@@ -210,27 +210,27 @@ mod_forecasting_viewer_server <- function(id) {
       group_target_var <- selected_info()$group_target_var
       group_target_var <- tolower(group_target_var)
       kpi_values <- base::unique(input_data_result()[group_target_var])
-      selectInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
+      shinyWidgets::pickerInput(inputId = ns("kpi_value"), label = "KPIs", choices = kpi_values, multiple = FALSE)
     })
 
     output$model <- renderUI({
       req(input$as_of)
       req(output_data_result())
       model_names <- base::unique(output_data_result()$`_model_desc`)
-      selectInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
+      shinyWidgets::pickerInput(inputId = ns("model"), label = "Model", choices = model_names, multiple = FALSE)
     })
 
 
     output$aggregate_by <- renderUI({
       req(input$as_of)
-      selectInput(inputId = ns("agg_by"), "Aggregate by", choices = c("days", "weeks"))
+      shinyWidgets::pickerInput(inputId = ns("agg_by"), "Aggregate by", choices = c("days", "weeks"))
     })
 
     output$aggregation <- renderUI({
       req(input$as_of)
       req(input$agg_by)
       if (input$agg_by == "weeks") {
-        selectInput(inputId = ns("agg_type"), "Aggregation", choices = c("Sum" = "sum", "Mean" = "mean", "Max" = "max", "Min" = "min"))
+        shinyWidgets::pickerInput(inputId = ns("agg_type"), "Aggregation", choices = c("Sum" = "sum", "Mean" = "mean", "Max" = "max", "Min" = "min"))
       } else {
         NULL
       }

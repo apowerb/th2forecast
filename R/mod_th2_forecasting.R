@@ -10,7 +10,7 @@ mod_th2_forecasting_ui <- function(id) {
       # Inputs
       column(width = 2, fileInput(ns("dataset"), "Upload your data file:", accept = c(".csv"))),
       column(width = 2, uiOutput(ns("feature_target"))),
-      column(width = 2, selectInput(ns("models"), "Select Model", choices = c("ARIMA" = "arima", "Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest", "XGBoost" = "xgboost"), multiple = TRUE)),
+      column(width = 2, shinyWidgets::pickerInput(ns("models"), "Select Model", choices = c("ARIMA" = "arima", "Prophet" = "prophet", "Mars" = "mars", "Linear regresion" = "lr", "Random Forest" = "random_forest", "XGBoost" = "xgboost"), multiple = TRUE)),
       column(width = 2, uiOutput(ns("conditional_features"))),
       column(width = 2, uiOutput(ns("cond_start_date"))),
       column(width = 2, uiOutput(ns("cond_end_date"))),
@@ -88,7 +88,7 @@ mod_th2_forecasting_server <- function(id) {
 
       # Update of inputs
       output$feature_target <- renderUI({
-        selectInput(ns("features"), "Target variable", choices = list_features)
+        shinyWidgets::pickerInput(ns("features"), "Target variable", choices = list_features)
       })
 
       output$cond_start_date <- renderUI({
@@ -106,7 +106,7 @@ mod_th2_forecasting_server <- function(id) {
       output$conditional_features <- renderUI({
         if (any(input$models %in% c("xgboost", "random_forest")) && length(input$models) != 0) {
           tagList(
-            selectInput(ns("features_variables"), "Features variables:", choices = list_features, multiple = TRUE),
+            shinyWidgets::pickerInput(ns("features_variables"), "Features variables:", choices = list_features, multiple = TRUE),
             actionButton(inputId = ns("feature_engineering"), label = "Feature engineering", value = NULL),
             hr()
           )
