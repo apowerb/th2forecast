@@ -74,8 +74,9 @@ mod_forecasting_viewer_server <- function(id) {
           group by tb1.created_at, tb1.calendar_country, tb1.business_days, tb1.id, tb1.date_var, tb1.forecast_duration, tb1.group_target_var, tb1.input_id, tb1.output_id, tb1.pipeline_uuid, tb1.project_name, tb1.split_train_test, tb1.target_var, tb1.use_spark, tb1.group_by_columns,  tb_in.param1, tb_in.data_source, tb_out.param1, tb_out.data_source"
       )
 
-      pipelines_metadata <- th2product::fetch_data_from_db_by_sql(sql)
-      pipelines_metadata
+      # pipelines_metadata <- th2product::fetch_data_from_db_by_sql(sql)
+      pipelines_metadata <- NULL
+      return(NULL)
     })
 
     output$forecast_pipeline_boxes <- renderUI({
