@@ -114,7 +114,7 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
 
     output$aggregator_board_box <- renderUI({
       current_data_meta <- available_data()
-      if (is.null(current_data_meta) || nrow(current_data_meta) == 0) {
+      if (is.null(current_data_meta) || length(current_data_meta) == 0) {
         tags$div(
           class = "alert alert-danger",
           style = "margin: 15px;",
