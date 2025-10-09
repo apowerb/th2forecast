@@ -279,9 +279,9 @@ preprocessing_data <- function(input_data) {
     if (nrow(input_data) == 0 || ncol(input_data) == 0) {
       return(warning("The *input_date* variable is empty."))
     }
-    input_data <- input_data%>%
-      janitor::clean_names()%>%
-      na.omit()%>%
+    input_data <- input_data %>%
+      janitor::clean_names() %>%
+      na.omit() %>%
       janitor::remove_empty(which = c("cols"))
 
     output_data <- unique(input_data)

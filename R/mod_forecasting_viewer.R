@@ -291,10 +291,12 @@ mod_forecasting_viewer_server <- function(id) {
       fcast_meta <<- selected_info()
       if (!is.null(historical_data_aggregated) && !is.null(prediction_data_aggregated)) {
         if (input$agg_by == "days") {
-          create_time_series_plot(historical_data = historical_data_aggregated,
-                                  prediction_data = prediction_data_aggregated,
-                                  x_var = selected_info()$date_var,
-                                  y_var = selected_info()$target_var)
+          create_time_series_plot(
+            historical_data = historical_data_aggregated,
+            prediction_data = prediction_data_aggregated,
+            x_var = selected_info()$date_var,
+            y_var = selected_info()$target_var
+          )
         } else {
           create_weekly_bar_chart(historical_data = historical_data_aggregated, prediction_data = prediction_data_aggregated, x_var = selected_info()$date_var, y_var = selected_info()$target_var, agg_type = input$agg_type)
         }

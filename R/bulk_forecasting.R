@@ -11,7 +11,6 @@
 #' @export
 #' @examples
 th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL) {
-
   allow_par <- FALSE
 
   list_output_models <- list()
@@ -66,11 +65,11 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     )
   }
 
-  group_target_output <- group_target <- ifelse(length(group_target) == 0 , "all_columns", group_target)
+  group_target_output <- group_target <- ifelse(length(group_target) == 0, "all_columns", group_target)
   if (group_target == "all_columns") {
     data_tbl <- train_data %>%
-      dplyr::select(!!target_var, !!date_var)%>%
-      tidyr::pivot_longer(cols = !!target_var,  names_to = "id") %>%
+      dplyr::select(!!target_var, !!date_var) %>%
+      tidyr::pivot_longer(cols = !!target_var, names_to = "id") %>%
       dplyr::rename(date := !!date_var)
     group_target <- "id"
     target_var <- "value"

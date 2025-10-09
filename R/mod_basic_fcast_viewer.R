@@ -1,4 +1,4 @@
-mod_basic_fcast_viewer_ui <- function(id){
+mod_basic_fcast_viewer_ui <- function(id) {
   ns <- NS(id)
   uiOutput(ns("fcast_box"))
 }
@@ -20,8 +20,8 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     mod_expand_graph_server("expand_graph", interactive_graph = fcast_plot)
 
     date_freqs <- reactive({
-      date_freq <- fcast_inputs$historical_data_aggregated%>%
-        dplyr::pull(!!fcast_inputs$date_var)%>%
+      date_freq <- fcast_inputs$historical_data_aggregated %>%
+        dplyr::pull(!!fcast_inputs$date_var) %>%
         th2reporting::possible_units_for_summary(time_vect = .)
       return(date_freq)
     })
@@ -37,20 +37,22 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     output$fcast_horizon <- renderUI({
       req(input$agg_by)
       fcast_horizon <- 60
-      if(input$agg_by == "days"){
+      if (input$agg_by == "days") {
         fcast_horizon <- 30
-      }else if(input$agg_by == "weeks"){
+      } else if (input$agg_by == "weeks") {
         fcast_horizon <- 8
-      }else if(input$agg_by == "months"){
+      } else if (input$agg_by == "months") {
         fcast_horizon <- 4
-      }else if(input$agg_by == "years"){
+      } else if (input$agg_by == "years") {
         fcast_horizon <- 2
       }
-      numericInput(inputId = ns("fcast_horizon"),
-                   label = "Horizon",
-                   value = fcast_horizon,
-                   min = 5,
-                   max = 100)
+      numericInput(
+        inputId = ns("fcast_horizon"),
+        label = "Horizon",
+        value = fcast_horizon,
+        min = 5,
+        max = 100
+      )
     })
 
     fcast_plot <- reactive({
@@ -58,22 +60,26 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
       req(date_freqs())
       req(input$fcast_model)
       req(input$fcast_horizon)
-      prediction_data_aggregated <- fcast_inputs$prediction_data_aggregated%>%
+      prediction_data_aggregated <- fcast_inputs$prediction_data_aggregated %>%
         dplyr::filter(`_model_desc` == !!input$fcast_model)
-      if(input$agg_by == date_freqs()[1]) {
-        create_time_series_plot(historical_data = fcast_inputs$historical_data_aggregated,
-                                prediction_data = prediction_data_aggregated,
-                                x_var = fcast_inputs$date_var,
-                                y_var = fcast_inputs$target_var,
-                                fcast_horizon = input$fcast_horizon)
+      if (input$agg_by == date_freqs()[1]) {
+        create_time_series_plot(
+          historical_data = fcast_inputs$historical_data_aggregated,
+          prediction_data = prediction_data_aggregated,
+          x_var = fcast_inputs$date_var,
+          y_var = fcast_inputs$target_var,
+          fcast_horizon = input$fcast_horizon
+        )
       } else {
-        create_weekly_bar_chart(historical_data = fcast_inputs$historical_data_aggregated,
-                                prediction_data = prediction_data_aggregated,
-                                x_var = fcast_inputs$date_var,
-                                y_var = fcast_inputs$target_var,
-                                agg_freq = input$agg_by,
-                                fcast_horizon = input$fcast_horizon,
-                                agg_type = "sum")
+        create_weekly_bar_chart(
+          historical_data = fcast_inputs$historical_data_aggregated,
+          prediction_data = prediction_data_aggregated,
+          x_var = fcast_inputs$date_var,
+          y_var = fcast_inputs$target_var,
+          agg_freq = input$agg_by,
+          fcast_horizon = input$fcast_horizon,
+          agg_type = "sum"
+        )
       }
     })
 
@@ -82,38 +88,43 @@ mod_basic_fcast_viewer_server <- function(id, fcast_inputs = list()) {
     })
 
     output$fcast_table <- DT::renderDataTable({
-      fcast_inputs$prediction_data_aggregated%>%
-        dplyr::select(-`_model_id`, -start_date, -end_date)%>%
-        DT::datatable(data = . ,
-                      extensions = c("Scroller"),
-                      options = list(dom = "Bfrtip",
-                                     deferRender = TRUE,
-                                     scrollY = 300,
-                                     scroller = TRUE))
+      fcast_inputs$prediction_data_aggregated %>%
+        dplyr::select(-`_model_id`, -start_date, -end_date) %>%
+        DT::datatable(
+          data = .,
+          extensions = c("Scroller"),
+          options = list(
+            dom = "Bfrtip",
+            deferRender = TRUE,
+            scrollY = 300,
+            scroller = TRUE
+          )
+        )
     })
 
 
     output$fcast_box <- renderUI({
-
       exporter_mod_id <- th2product::generateID("exporter")
       th2reporting:::save_datatable_server(exporter_mod_id, export_name = fcast_inputs$target_var, data_table = reactive({
-        fcast_inputs$prediction_data_aggregated%>%
+        fcast_inputs$prediction_data_aggregated %>%
           dplyr::select(-`_model_id`, -start_date, -end_date)
       }))
 
-      bs4Dash::tabBox(title = fcast_inputs$target_var, width = 12, status = "primary", solidHeader = TRUE,
-                      tabPanel(icon = icon("chart-line"), title = "",
-                        fluidPage(
-                          uiOutput(ns("fcast_output_params")),
-                          echarts4r::echarts4rOutput(ns("fcast_plot"))
-                        )
-                      ),
-                      tabPanel(icon = icon("table"),title = "",
-                               th2reporting:::save_datatable_ui(id = ns(exporter_mod_id)),
-                               DT::dataTableOutput(ns("fcast_table"))
-                               )
-                      )
-
+      bs4Dash::tabBox(
+        title = fcast_inputs$target_var, width = 12, status = "primary", solidHeader = TRUE,
+        tabPanel(
+          icon = icon("chart-line"), title = "",
+          fluidPage(
+            uiOutput(ns("fcast_output_params")),
+            echarts4r::echarts4rOutput(ns("fcast_plot"))
+          )
+        ),
+        tabPanel(
+          icon = icon("table"), title = "",
+          th2reporting:::save_datatable_ui(id = ns(exporter_mod_id)),
+          DT::dataTableOutput(ns("fcast_table"))
+        )
+      )
     })
   })
 }
