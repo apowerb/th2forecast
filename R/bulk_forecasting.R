@@ -47,7 +47,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
         return(warning("The dates of the external data must be greater than the training data."))
       } else {
         future_data <- external_data %>%
-          filter(external_data[[date_var]] > max_date_input) %>%
+          dplyr::filter(external_data[[date_var]] > max_date_input) %>%
           nrow()
         if (future_data < future_forecast) {
           future_forecast <- future_data
@@ -81,17 +81,14 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     }
 
     data_tbl <- train_data %>%
-      dplyr::select(all_of(select_vars)) %>%
+      dplyr::select(dplyr::all_of(select_vars)) %>%  # [PATCH] safe select
       dplyr::rename(id := !!group_target, date := !!date_var)
     group_target <- "id"
-    # data_tbl <- data_tbl %>%
-    #   mutate(id_group = paste(store_nbr, family, sep = "_"))
   }
 
   if (!is.null(country_column) && use_holidays == "in_data") {
     data_tbl <- data_tbl %>%
       dplyr::mutate(!!group_target := paste(data_tbl[[group_target]], "_", data_tbl[[country_column]], sep = ""))
-
 
     data_tbl <- data_tbl %>%
       dplyr::group_by_at(dplyr::vars("date", group_target, country_column)) %>%
@@ -108,6 +105,7 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
 
   train_size <- round((nrow(data_tbl) / num_ids) * 0.8)
   test_size <- column_value - train_size
+  if (is.na(test_size) || test_size < 1) test_size <- 1L  # [PATCH] éviter length_test <= 0
 
   nested_data_tbl <- data_tbl %>%
     modeltime::extend_timeseries(
@@ -152,8 +150,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       max_date <- max(list_nestede_data[[date_var]])
 
       exogen_data <- external_data %>%
-        filter(external_data[[date_var]] >= min_date & external_data[[date_var]] <= max_date) %>%
-        select(exogenous_var)
+        dplyr::filter(external_data[[date_var]] >= min_date & external_data[[date_var]] <= max_date) %>%
+        dplyr::select(dplyr::all_of(exogenous_var))  # [PATCH] safe select
 
       data_output_t[exogenous_var] <- exogen_data
       nested_data_tbl[i, ]$.actual_data[[1]] <- data_output_t
@@ -162,8 +160,8 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       max_date_f <- max(future_data[[date_var]])
 
       future_exogen_data <- external_data %>%
-        filter(external_data[[date_var]] >= min_date_f & external_data[[date_var]] <= max_date_f) %>%
-        select(exogenous_var)
+        dplyr::filter(external_data[[date_var]] >= min_date_f & external_data[[date_var]] <= max_date_f) %>%
+        dplyr::select(dplyr::all_of(exogenous_var))  # [PATCH] safe select
 
       future_data[exogenous_var] <- future_exogen_data
       nested_data_tbl[i, ]$.future_data[[1]] <- future_data
@@ -173,10 +171,10 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
   nested_data <- modeltime::extract_nested_train_split(nested_data_tbl)
 
   target_var <- tolower(target_var)
-  # browser()
+  # [PATCH] initialiser res_bh pour arimax au cas où
+  res_bh <- if (!is.null(use_holidays)) { if (use_holidays != "in_data") use_holidays else country_column } else { NULL }
 
   for (model in models_list) {
-    # tune -- for
     tuning_param <- ""
     training_model <- NULL
     label_model <- ""
@@ -227,38 +225,48 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
       list(control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
     )
   )
-  # hey <- modeltime::modeltime_nested_fit(nested_data = nested_data_tbl,
-  #                                 model_list =  list_output_models,
-  #                                 control = modeltime::control_nested_fit(allow_par = allow_par, verbose = TRUE, cores = -1, packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"))
-  # nested_modeltime_tbl <- modeltime::modeltime_nested_fit
 
-  best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
-    modeltime::modeltime_nested_select_best(
-      metric                = "rmse",
-      minimize              = TRUE,
+  # [PATCH] métriques dynamiques si rmse/mae/rsq absentes
+  acc_all <- modeltime::extract_nested_test_accuracy(nested_modeltime_tbl)
+  if (nrow(acc_all) == 0) {
+    warning("No test accuracy computed (empty test set or model failures).")
+    best_nested_modeltime_tbl <- nested_modeltime_tbl
+    mae_best_nested_modeltime_tbl <- NULL
+    rsq_nested_modeltime_tbl <- NULL
+  } else {
+    if (".metric" %in% names(acc_all)) {
+      metrics_avail <- unique(acc_all$.metric)
+    } else {
+      metrics_avail <- intersect(c("rmse","mae","rsq"), names(acc_all))
+    }
+    metric_main <- if ("rmse" %in% metrics_avail) "rmse" else (metrics_avail[1])
+    minimize_main <- metric_main != "rsq"
+
+    best_nested_modeltime_tbl <- modeltime::modeltime_nested_select_best(
+      nested_modeltime_tbl,
+      metric                = metric_main,
+      minimize              = minimize_main,
       filter_test_forecasts = TRUE
     )
 
-  mae_best_nested_modeltime_tbl <- nested_modeltime_tbl %>%
-    modeltime::modeltime_nested_select_best(
-      metric                = "mae",
-      minimize              = TRUE,
-      filter_test_forecasts = TRUE
-    )
+    mae_best_nested_modeltime_tbl <- if ("mae" %in% metrics_avail)
+      modeltime::modeltime_nested_select_best(nested_modeltime_tbl, metric = "mae", minimize = TRUE,  filter_test_forecasts = TRUE) else NULL
 
-  rsq_nested_modeltime_tbl <- nested_modeltime_tbl %>%
-    modeltime::modeltime_nested_select_best(
-      metric                = "rsq",
-      minimize              = FALSE,
-      filter_test_forecasts = TRUE
-    )
+    rsq_nested_modeltime_tbl <- if ("rsq" %in% metrics_avail)
+      modeltime::modeltime_nested_select_best(nested_modeltime_tbl, metric = "rsq", minimize = FALSE, filter_test_forecasts = TRUE) else NULL
+  }
 
   nested_modeltime_refit_tbl <- nested_modeltime_tbl %>%
     modeltime::modeltime_nested_refit()
 
   accuracy_test <- best_nested_modeltime_tbl %>%
-    modeltime::extract_nested_test_accuracy() %>%
-    dplyr::select(id, .model_id, .model_desc, .type, mae, rmse, rsq)
+    modeltime::extract_nested_test_accuracy()
+
+  # [PATCH] select tolérant (colonnes présentes seulement)
+  cols_keep <- intersect(c("id", ".model_id", ".model_desc", ".type", "mae", "rmse", "rsq", ".metric", ".estimate"), names(accuracy_test))
+  if (length(cols_keep) > 0) {
+    accuracy_test <- dplyr::select(accuracy_test, dplyr::all_of(cols_keep))
+  }
 
   forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(
@@ -270,18 +278,17 @@ th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var,
     dplyr::rename(!!group_target_output := id)
 
   forecast_result <- forecast_result %>%
-    dplyr::mutate(accuracy = list(accuracy_test)) # %>%
-  #   dplyr::mutate(best_rmse = list(best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-  #   dplyr::mutate(best_mae = list(mae_best_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc)) %>%
-  #   dplyr::mutate(best_rsq = list(rsq_nested_modeltime_tbl$.modeltime_tables[[1]]$.model_desc))
+    dplyr::mutate(accuracy = list(accuracy_test))
 
   if (!is.null(use_holidays)) DBI::dbDisconnect(db_conn)
 
-  if (all(input_data[[target_var]] == as.integer(input_data[[target_var]]))) {
-    forecast_result$.value <- round(forecast_result$.value)
-    forecast_result$.conf_lo <- round(forecast_result$.conf_lo)
-    forecast_result$.conf_hi <- round(forecast_result$.conf_hi)
+  # [PATCH] garde-fou si nom de target changé par tolower()
+  if (!is.null(input_data[[target_var]]) && all(input_data[[target_var]] == as.integer(input_data[[target_var]]))) {
+    if (".value"   %in% names(forecast_result)) forecast_result$.value   <- round(forecast_result$.value)
+    if (".conf_lo" %in% names(forecast_result)) forecast_result$.conf_lo <- round(forecast_result$.conf_lo)
+    if (".conf_hi" %in% names(forecast_result)) forecast_result$.conf_hi <- round(forecast_result$.conf_hi)
   }
 
   return(forecast_result)
 }
+
