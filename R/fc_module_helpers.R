@@ -7,6 +7,7 @@
 forecast_transform_data <- function(
     fc_data = NULL,
     fc_meta_data = NULL) {
+  library(modeltime)
   fc_meta_data$target_var <- tolower(fc_meta_data$target_var)
   fc_meta_data$group_target <- tolower(fc_meta_data$group_target)
   fc_meta_data$date_var <- tolower(fc_meta_data$date_var)
