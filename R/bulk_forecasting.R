@@ -297,7 +297,7 @@ th2_bulk_forecasting <- function(input_data,
       model_list = list_output_models,
       list(control = modeltime::control_nested_fit(
         allow_par = allow_par, verbose = TRUE, cores = -1,
-        packages = "tidymodels, parsnip, modeltime, dplyr, stats, lubridate, timetk"
+        packages = "tidymodels, parsnip, modeltime, forecast, dplyr, stats, lubridate, timetk"
       ))
     )
   )

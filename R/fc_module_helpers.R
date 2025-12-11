@@ -51,8 +51,11 @@ forecast_transform_data <- function(
     names(result_bulk_f)[names(result_bulk_f) == ".index"] <- date_var_input
   }
 
-  result_bulk_f <- result_bulk_f %>%
-    dplyr::select(-accuracy)
+  # Supprimer la colonne accuracy seulement si elle existe
+  if ("accuracy" %in% colnames(result_bulk_f)) {
+    result_bulk_f <- result_bulk_f %>%
+      dplyr::select(-accuracy)
+  }
 
   return(result_bulk_f)
 }
