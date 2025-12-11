@@ -366,13 +366,32 @@ th2_bulk_forecasting <- function(input_data,
     accuracy_test <- dplyr::select(accuracy_test, dplyr::all_of(cols_keep))
   }
 
-  forecast_result <- nested_modeltime_refit_tbl %>%
+forecast_result <- nested_modeltime_refit_tbl %>%
     modeltime::extract_nested_future_forecast(.include_actual = FALSE) %>%
     dplyr::mutate(as_of = Sys.Date()) %>%
     dplyr::mutate(start_date = min(input_data[[date_var]], na.rm = TRUE)) %>%
-    dplyr::mutate(end_date   = max(input_data[[date_var]], na.rm = TRUE)) %>%
-    dplyr::rename(!!group_target_output := id) %>%
-    dplyr::mutate(accuracy = list(accuracy_test))
+    dplyr::mutate(end_date   = max(input_data[[date_var]], na.rm = TRUE))
+  
+  # Vérifier si la colonne 'id' existe avant de renommer
+  if ("id" %in% colnames(forecast_result)) {
+    forecast_result <- forecast_result %>%
+      dplyr::rename(!!group_target_output := id) %>%
+      dplyr::mutate(accuracy = list(accuracy_test))
+  } else {
+    # Si tous les modèles ont échoué, retourner un dataframe vide avec la structure attendue
+    warning("All models failed during training. No forecasts were generated.")
+    forecast_result <- tibble::tibble(
+      !!group_target_output := character(0),
+      .model_id = integer(0),
+      .model_desc = character(0),
+      .key = character(0),
+      .index = as.POSIXct(character(0)),
+      .value = numeric(0),
+      as_of = as.Date(character(0)),
+      start_date = as.POSIXct(character(0)),
+      end_date = as.POSIXct(character(0))
+    )
+  }
 
   # Arrondi si la cible est entière (garde-fou: après tolower)
   if (!is.null(input_data[[target_var]]) &&
