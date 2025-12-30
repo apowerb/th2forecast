@@ -14,7 +14,6 @@ db_conn_function <- function(dbms = NULL, server = NULL, user = NULL, password =
 # ===================== output data function ( prediction data)==================
 #' @export
 output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL, target_var = NULL, group_target_var = NULL, date_var = NULL) {
-
   if (!startsWith(date_var, "_")) {
     date_var <- paste0("_", date_var)
   }
@@ -25,7 +24,7 @@ output_data_fetch <- function(db_conn = NULL, target_table = NULL, schema = NULL
     {
       query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,execution_date, start_date, end_date
                                         FROM {schema}.{target_table}")
-      if(schema == "" || is.null(schema)){
+      if (schema == "" || is.null(schema)) {
         query_statement_output <- glue::glue("SELECT DISTINCT {group_target_var},{target_var}, {date_var} , _model_desc, _conf_lo, _conf_hi,execution_date, start_date, end_date
                                         FROM {target_table}")
       }
@@ -100,7 +99,7 @@ prediction_data_filtred <- function(prediction_data = NULL, model = NULL, kpi_va
   model <- toupper(model)
   # kpi_value <- toupper(kpi_value)
   colnames(prediction_data) <- lapply(colnames(prediction_data), function(x) {
-    if(startsWith(x, ".")){
+    if (startsWith(x, ".")) {
       # remplacer les . par _
       x <- gsub("\\.", "_", x)
     } else {
@@ -116,7 +115,6 @@ prediction_data_filtred <- function(prediction_data = NULL, model = NULL, kpi_va
 }
 
 historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, group_target_var = NULL) {
-
   if (!is.null(kpi_value)) {
     historical_data_filtred <- historical_data %>% dplyr::filter(historical_data[[group_target_var]] == !!kpi_value)
   }
@@ -127,67 +125,68 @@ historical_data_filtred <- function(historical_data = NULL, kpi_value = NULL, gr
 
 # =========== #create plot (time series) function ==================================
 #' @export
-create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_by = NULL,fcast_horizon = 30) {
-#
-#   historical_data2 <<- historical_data
-#   prediction_data2 <<- prediction_data
-#   y_var2 <<- y_var
-#   x_var2 <<- x_var
-#   fcast_horizon2 <<- fcast_horizon
+create_time_series_plot <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_by = NULL, fcast_horizon = 30) {
+  #
+  #   historical_data2 <<- historical_data
+  #   prediction_data2 <<- prediction_data
+  #   y_var2 <<- y_var
+  #   x_var2 <<- x_var
+  #   fcast_horizon2 <<- fcast_horizon
 
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
-    prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
+    prediction_data[[x_var]] <- prediction_data[[paste0("_", x_var)]]
   }
 
   new_name <- paste0(y_var, "_hist")
-  historical_data <- historical_data%>%
-    dplyr::arrange(.data[[x_var]])%>%
+  historical_data <- historical_data %>%
+    dplyr::arrange(.data[[x_var]]) %>%
     dplyr::rename(!!quo_name(new_name) := actuals)
 
   new_name <- paste0(y_var, "_pred")
-  prediction_data <- prediction_data%>%
-    dplyr::arrange(.data[[x_var]])%>%
-    dplyr::rename(!!quo_name(new_name) := `_value`)%>%
+  prediction_data <- prediction_data %>%
+    dplyr::arrange(.data[[x_var]]) %>%
+    dplyr::rename(!!quo_name(new_name) := `_value`) %>%
     head(fcast_horizon)
 
   hist_var <- paste0(y_var, "_hist")
   pred_var <- paste0(y_var, "_pred")
-  prediction_data <- prediction_data%>%
-    dplyr::select(!!x_var,!!pred_var, `_conf_lo`, `_conf_hi`)
-  combined_data <- historical_data%>%
-    dplyr::full_join(prediction_data, by = c(x_var))%>%
+  prediction_data <- prediction_data %>%
+    dplyr::select(!!x_var, !!pred_var, `_conf_lo`, `_conf_hi`)
+  combined_data <- historical_data %>%
+    dplyr::full_join(prediction_data, by = c(x_var)) %>%
     dplyr::arrange(.data[[x_var]])
 
 
-  fcast_date <- combined_data%>%
-    dplyr::filter(!is.na(.data[[pred_var]]))%>%
-    dplyr::pull(!!x_var)%>%head(1)
+  fcast_date <- combined_data %>%
+    dplyr::filter(!is.na(.data[[pred_var]])) %>%
+    dplyr::pull(!!x_var) %>%
+    head(1)
 
   combined_data <- combined_data %>%
-    dplyr::mutate(extra_hist = dplyr::case_when(.data[[x_var]] > fcast_date & is.na(.data[[pred_var]])~ FALSE, .default = TRUE))%>%
-    dplyr::filter(extra_hist)%>%
+    dplyr::mutate(extra_hist = dplyr::case_when(.data[[x_var]] > fcast_date & is.na(.data[[pred_var]]) ~ FALSE, .default = TRUE)) %>%
+    dplyr::filter(extra_hist) %>%
     dplyr::select(-extra_hist)
 
-  date_helper <- data.frame(datum = seq.Date(min(as.Date(combined_data[[x_var]])), max(as.Date(combined_data[[x_var]])), by= "day"))
+  date_helper <- data.frame(datum = seq.Date(min(as.Date(combined_data[[x_var]])), max(as.Date(combined_data[[x_var]])), by = "day"))
 
-  combined_data <- combined_data%>%dplyr::mutate(datum = as.Date(.data[[x_var]]))
-  combined_data <- date_helper%>%
+  combined_data <- combined_data %>% dplyr::mutate(datum = as.Date(.data[[x_var]]))
+  combined_data <- date_helper %>%
     dplyr::left_join(combined_data, by = c("datum"))
 
 
-  is_empty_row <- function(x, y){
+  is_empty_row <- function(x, y) {
     dt_row <- c(x, y)
     # dt_row2 <<- dt_row
     data.frame(is_empty = all(is.na(dt_row)))
   }
-  combined_data <- combined_data%>%
-    dplyr::rowwise()%>%
-    dplyr::mutate(is_empty_row(.data[[hist_var]], .data[[pred_var]]))%>%
-    dplyr::filter(is_empty == FALSE)%>%
-    dplyr::select(-is_empty)%>%
+  combined_data <- combined_data %>%
+    dplyr::rowwise() %>%
+    dplyr::mutate(is_empty_row(.data[[hist_var]], .data[[pred_var]])) %>%
+    dplyr::filter(is_empty == FALSE) %>%
+    dplyr::select(-is_empty) %>%
     tail(fcast_horizon + 100)
 
-  time_series_plot <- combined_data%>%
+  time_series_plot <- combined_data %>%
     echarts4r::e_charts(datum) %>%
     echarts4r::e_line_(hist_var, name = "actuals", lineStyle = list(type = "normal"), color = "#013DFF") %>%
     echarts4r::e_line_(pred_var, name = "forecast", lineStyle = list(type = "normal"), color = "#00FFC5") %>%
@@ -203,49 +202,52 @@ create_time_series_plot <- function(historical_data = NULL, prediction_data = NU
 # =========== #create bar chart (weekly time series) function ==================================
 #' @export
 create_weekly_bar_chart <- function(historical_data = NULL, prediction_data = NULL, x_var = NULL, y_var = NULL, agg_type = "sum", agg_freq = "weeks", fcast_horizon = 10) {
-
   if (!startsWith(x_var, "_") && is.null(prediction_data[[x_var]])) {
-    prediction_data[[x_var]] <- prediction_data[[paste0("_",x_var)]]
+    prediction_data[[x_var]] <- prediction_data[[paste0("_", x_var)]]
   }
 
   new_name <- paste0(y_var, "_hist")
-  historical_data <- historical_data%>%
-    dplyr::arrange(.data[[x_var]])%>%
+  historical_data <- historical_data %>%
+    dplyr::arrange(.data[[x_var]]) %>%
     dplyr::rename(!!quo_name(new_name) := actuals)
 
   new_name <- paste0(y_var, "_pred")
-  prediction_data <- prediction_data%>%
-    dplyr::arrange(.data[[x_var]])%>%
+  prediction_data <- prediction_data %>%
+    dplyr::arrange(.data[[x_var]]) %>%
     dplyr::rename(!!quo_name(new_name) := `_value`)
 
   hist_var <- paste0(y_var, "_hist")
   pred_var <- paste0(y_var, "_pred")
-  combined_data <- historical_data%>%
-    dplyr::full_join(prediction_data, by = c(x_var))%>%
-    dplyr::select(!!x_var,!!pred_var,!!hist_var)%>%
+  combined_data <- historical_data %>%
+    dplyr::full_join(prediction_data, by = c(x_var)) %>%
+    dplyr::select(!!x_var, !!pred_var, !!hist_var) %>%
     dplyr::arrange(.data[[x_var]])
 
 
-  fcast_date <- combined_data%>%
-    dplyr::filter(!is.na(.data[[pred_var]]))%>%
-    dplyr::pull(!!x_var)%>%head(1)
+  fcast_date <- combined_data %>%
+    dplyr::filter(!is.na(.data[[pred_var]])) %>%
+    dplyr::pull(!!x_var) %>%
+    head(1)
 
   combined_data <- combined_data %>%
-    dplyr::mutate(extra_hist = dplyr::case_when(.data[[x_var]] > fcast_date & is.na(.data[[pred_var]])~ FALSE, .default = TRUE))%>%
-    dplyr::filter(extra_hist)%>%
-    dplyr::select(-extra_hist)%>%
-    dplyr::mutate(day = lubridate::date(get(x_var)),
-                  weeks = lubridate::floor_date(as.Date(get(x_var)), unit = "week", week_start = 1),
-                  months = lubridate::floor_date(as.Date(get(x_var)), unit = "month", week_start = 1),
-                  quarters = lubridate::floor_date(as.Date(get(x_var)), unit = "quarter", week_start = 1))%>%
-    dplyr::mutate(pred_hist = dplyr::case_when(is.na(.data[[pred_var]]) ~ .data[[hist_var]],.default = .data[[pred_var]]))
+    dplyr::mutate(extra_hist = dplyr::case_when(.data[[x_var]] > fcast_date & is.na(.data[[pred_var]]) ~ FALSE, .default = TRUE)) %>%
+    dplyr::filter(extra_hist) %>%
+    dplyr::select(-extra_hist) %>%
+    dplyr::mutate(
+      day = lubridate::date(get(x_var)),
+      weeks = lubridate::floor_date(as.Date(get(x_var)), unit = "week", week_start = 1),
+      months = lubridate::floor_date(as.Date(get(x_var)), unit = "month", week_start = 1),
+      quarters = lubridate::floor_date(as.Date(get(x_var)), unit = "quarter", week_start = 1)
+    ) %>%
+    dplyr::mutate(pred_hist = dplyr::case_when(is.na(.data[[pred_var]]) ~ .data[[hist_var]], .default = .data[[pred_var]]))
 
-    aggregated_data <- combined_data %>%
-      dplyr::group_by(.data[[agg_freq]]) %>%
-      dplyr::reframe(dplyr::across(dplyr::ends_with("_hist"), sum, na.rm = TRUE),
-                     dplyr::across(dplyr::ends_with("_pred"), sum, na.rm = TRUE)
-      )%>%
-      tail(fcast_horizon + 100)
+  aggregated_data <- combined_data %>%
+    dplyr::group_by(.data[[agg_freq]]) %>%
+    dplyr::reframe(
+      dplyr::across(dplyr::ends_with("_hist"), sum, na.rm = TRUE),
+      dplyr::across(dplyr::ends_with("_pred"), sum, na.rm = TRUE)
+    ) %>%
+    tail(fcast_horizon + 100)
 
   fcast_chart <- aggregated_data %>%
     echarts4r::e_charts_(agg_freq) %>%

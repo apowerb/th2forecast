@@ -1,4 +1,4 @@
-mod_expand_graph_ui <- function(id){
+mod_expand_graph_ui <- function(id) {
   ns <- NS(id)
   uiOutput(ns("expand_graph"))
 }
@@ -13,11 +13,12 @@ mod_expand_graph_server <- function(id, interactive_graph = NULL) {
     output$expanded_graph <- renderUI({
       interactive_graph()
     })
-    observeEvent(input$expand_graph,{
+    observeEvent(input$expand_graph, {
       showModal(
-        modalDialog(title = "View", size = "xl",
-                    uiOutput(ns("expanded_graph"))
-                    )
+        modalDialog(
+          title = "View", size = "xl",
+          uiOutput(ns("expanded_graph"))
+        )
       )
     })
   })
