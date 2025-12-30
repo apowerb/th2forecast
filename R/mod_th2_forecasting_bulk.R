@@ -76,7 +76,6 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       data <- th2ml::load_ml_models_for_api_s3(target_model_name = input$selected_bi_data, s3_bucket = s3_bucket, s3_prefix = s3_prefix) %>%
         janitor::clean_names()
       data_is_loaded(input$selected_bi_data)
-      data2 <<- data
       return(data)
     })
     output$selected_bi_data <- renderUI({
@@ -92,14 +91,12 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       req(tisefka())
       req(input$load_ml_data)
       dt_diag <- th2reporting::data_diagnosis_f(tisefka())
-      dt_diag2 <<- dt_diag
       return(dt_diag)
     })
 
     categoricals_unique_values <- reactive({
       req(input$load_ml_data)
       req(data_diag())
-
       data_diag()$categoricals_unique_values
     })
 

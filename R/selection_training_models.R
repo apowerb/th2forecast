@@ -19,9 +19,9 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine = "auto_ar
 
     set.seed(1234)
     model_arima <- modeltime::arima_reg(
-      non_seasonal_ar = ifelse(fit_model == FALSE, tune(), p),
-      non_seasonal_differences = ifelse(fit_model == FALSE, tune(), d),
-      non_seasonal_ma = ifelse(fit_model == FALSE, tune(), q)
+      non_seasonal_ar = ifelse(fit_model == FALSE,parsnip::tune(), p),
+      non_seasonal_differences = ifelse(fit_model == FALSE,parsnip::tune(), d),
+      non_seasonal_ma = ifelse(fit_model == FALSE,parsnip::tune(), q)
     ) %>%
       parsnip::set_engine(engine = engine)
 
@@ -74,8 +74,8 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
     }
 
     model_prophet <- modeltime::prophet_reg(
-      changepoint_num = ifelse(fit_model == FALSE, tune(), changepoint_num),
-      changepoint_range = ifelse(fit_model == FALSE, tune(), changepoint_range)
+      changepoint_num = ifelse(fit_model == FALSE,parsnip::tune(), changepoint_num),
+      changepoint_range = ifelse(fit_model == FALSE,parsnip::tune(), changepoint_range)
     ) %>%
       parsnip::set_engine(engine = engine, holidays = holidays_df)
 
@@ -166,8 +166,8 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
     formula <- as.formula(paste(var_target, "~", var_date))
 
     model_mars <- parsnip::mars(
-      num_terms = ifelse(fit_model == FALSE, tune(), num_terms),
-      prod_degree = ifelse(fit_model == FALSE, tune(), prod_degree)
+      num_terms = ifelse(fit_model == FALSE,parsnip::tune(), num_terms),
+      prod_degree = ifelse(fit_model == FALSE,parsnip::tune(), prod_degree)
     ) %>%
       parsnip::set_engine(engine) %>%
       parsnip::set_mode("regression")
@@ -208,8 +208,8 @@ th2_mars_engine <- function(input_data, var_target, var_date, engine = "earth", 
 #' @examples
 th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 500, use_holidays = TRUE, use_meteo = FALSE, fit_model = TRUE, all_data = "", lags = FALSE, db_conn = NULL) {
   model_rf <- parsnip::rand_forest(
-    # min_n = ifelse(fit_model, min_n, tune()),
-    # trees = ifelse(fit_model, trees, tune())
+    # min_n = ifelse(fit_model, min_n,parsnip::tune()),
+    # trees = ifelse(fit_model, trees,parsnip::tune())
     min_n = ifelse(fit_model == FALSE, parsnip::tune(), min_n),
     trees = ifelse(fit_model == FALSE, parsnip::tune(), trees)
   ) %>%
@@ -271,10 +271,11 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
   input_data2 <<- input_data
   var_date2 <<- var_date
   var_target2 <<- var_target
+  all_data2 <<- all_data
 
   model_xgboost <-
     parsnip::boost_tree(
-      # mtry = ifelse(fit_model == FALSE, tune(), mtry),
+      # mtry = ifelse(fit_model == FALSE,parsnip::tune(), mtry),
       trees = ifelse(fit_model == FALSE, parsnip::tune(), trees),
       min_n = ifelse(fit_model == FALSE, parsnip::tune(), min_n),
       learn_rate = ifelse(fit_model == FALSE, parsnip::tune(), learn_rate)
@@ -306,7 +307,6 @@ th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees
     model_xgboost_fit <- workflows::workflow() %>%
       workflows::add_recipe(recipe_xgboost) %>%
       workflows::add_model(model_xgboost)
-
     model_xgboost_fit <- list("fit" = model_xgboost_fit, "model" = model_xgboost)
   } else {
     recipe_xgboost <- recipes::recipe(formula, data = input_data) %>%

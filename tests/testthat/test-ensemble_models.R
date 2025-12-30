@@ -24,9 +24,9 @@ test_that("test th2_tune_model function", {
 
   # Generate model
   model_test <- modeltime::arima_reg(
-    non_seasonal_ar = tune(),
-    non_seasonal_differences = tune(),
-    non_seasonal_ma = tune()
+    non_seasonal_ar =parsnip::tune(),
+    non_seasonal_differences =parsnip::tune(),
+    non_seasonal_ma =parsnip::tune()
   ) %>%
     parsnip::set_engine(engine = "auto_arima")
 
