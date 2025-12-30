@@ -20,7 +20,7 @@ ml_dir <<- "../data_connectors"
 options(shiny.launch.browser = .rs.invokeShinyWindowExternal)
 
 ui <- tagList(
-  shiny.info::powered_by("thaink²", link = "https://www.thaink2.com/", position = "bottom right"),
+  # shiny.info::powered_by("thaink²", link = "https://www.thaink2.com/", position = "bottom right"),
   shinybusy::add_busy_spinner(spin = "cube-grid", position = "bottom-left", color = "#013DFF"),
   dashboardPage(
     header = th2reporting:::prepare_bi_app_header("Forecasting"),

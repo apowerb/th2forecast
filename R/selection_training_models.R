@@ -268,12 +268,16 @@ th2_random_forest_engine <- function(input_data, var_target, min_n = 5, trees = 
 #' @export
 #' @examples
 th2_xgboost_engine <- function(input_data, var_date, var_target, mtry = 2, trees = 200, min_n = 5, learn_rate = 0.1, use_holidays = TRUE, use_meteo = FALSE, fit_model = TRUE, all_data = "", lags = FALSE, db_conn = NULL) {
+  input_data2 <<- input_data
+  var_date2 <<- var_date
+  var_target2 <<- var_target
+
   model_xgboost <-
     parsnip::boost_tree(
       # mtry = ifelse(fit_model == FALSE, tune(), mtry),
       trees = ifelse(fit_model == FALSE, parsnip::tune(), trees),
       min_n = ifelse(fit_model == FALSE, parsnip::tune(), min_n),
-      learn_rate = ifelse(fit_model == FALSE, tune(), learn_rate)
+      learn_rate = ifelse(fit_model == FALSE, parsnip::tune(), learn_rate)
     ) %>%
     parsnip::set_mode("regression") %>%
     parsnip::set_engine("xgboost")

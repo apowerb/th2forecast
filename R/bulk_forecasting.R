@@ -10,7 +10,16 @@
 #' @return forecast_result - renvoie un tableau de données contenant des informations sur les prévisions
 #' @export
 #' @examples
-th2_bulk_forecasting <- function(input_data, group_target, target_var, date_var, future_forecast, models_list, train_split = NULL, external_data = NULL, exogenous_var = NULL, use_holidays = NULL, country_column = NULL, lags = FALSE, path_driver = NULL, use_meteo = NULL) {
+th2_bulk_forecasting <- function(input_data,
+                                 group_target,
+                                 target_var, date_var,
+                                 future_forecast, models_list, train_split = NULL,
+                                 external_data = NULL,
+                                 exogenous_var = NULL,
+                                 use_holidays = NULL,
+                                 country_column = NULL,
+                                 lags = FALSE, path_driver = NULL,
+                                 use_meteo = NULL) {
 
   allow_par <- FALSE
 
