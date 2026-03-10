@@ -64,6 +64,22 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       saved_data_meta %>% dplyr::pull(name)
     })
 
+    #### UI ####
+    rmd_help_file <- system.file("infos_and_help/th2_insights.md", package = "th2utils")
+    th2utils::mod_th2_infos_and_help_server(id = "info_forecasting_help", rmd_help_file = rmd_help_file)
+
+    output$infos_and_help <- renderUI({
+      fluidRow(
+        column(width = 10, uiOutput(ns("void_object"))),
+        column(width = 1, th2utils::mod_th2_infos_and_help_ui(ns("info_forecasting_help")))
+      )
+    })
+
+    output$selected_bi_data <- renderUI({
+      req(available_data())
+      shinyWidgets::pickerInput(inputId = ns("selected_bi_data"), label = "Select Data", choices = available_data(), multiple = FALSE)
+    })
+
     output$load_ml_data <- renderUI({
       req(available_data())
       req(input$selected_bi_data)
@@ -78,10 +94,6 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       data_is_loaded(input$selected_bi_data)
       data2 <<- data
       return(data)
-    })
-    output$selected_bi_data <- renderUI({
-      req(available_data())
-      shinyWidgets::pickerInput(inputId = ns("selected_bi_data"), label = "Select Data", choices = available_data(), multiple = FALSE)
     })
 
 
@@ -122,14 +134,18 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
         )
       } else {
         fluidPage(
-          actionButton(ns("refresh"),
-            label = "",
-            icon = icon("arrows-rotate"),
-            style = th2utils::add_button_theme()
+          fluidRow(
+            column(width = 11, uiOutput(ns("infos_and_help"))),
+            column(
+              width = 1,
+              actionButton(ns("refresh"), "", icon = icon("arrows-rotate"), style = th2utils::add_button_theme(), class = "btn-primary")
+            )
           ),
           fluidRow(
-            column(width = 2, uiOutput(ns("selected_bi_data"))),
-            column(width = 2, br(), uiOutput(ns("load_ml_data"))),
+            column(width = 4, uiOutput(ns("selected_bi_data"))),
+            column(width = 3, br(), uiOutput(ns("load_ml_data")))
+          ),
+          fluidRow(
             column(width = 2, uiOutput(ns("fc_date_var"))),
             column(width = 2, uiOutput(ns("fc_target_var"))),
             column(width = 2, uiOutput(ns("var_granularity"))),
@@ -157,7 +173,6 @@ forecast_train_mod_server2 <- function(id, div_width = "col-xs-6 col-sm-12 col-m
       non_numeric_variables() %>% purrr::imap(~ {
         output_name_app <- paste0("non_numeric_variables_", .x)
         output[[output_name_app]] <- renderUI({
-          ml_choices <- tisefka()$var_factors[[.x]]
           shinyWidgets::pickerInput(
             inputId = ns(output_name_app),
             label = gsub("_", " ", .x),
