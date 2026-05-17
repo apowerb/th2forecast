@@ -1,3 +1,5 @@
+^renv$
+^renv\.lock$
 ^th2Forecast\.Rproj$
 ^\.Rproj\.user$
 ^\.dockerignore$

@@ -31,4 +31,7 @@ Imports:
     tidyr,
     timetk,
     tsoutliers,
-    tune
+    tune,
+    plumber2,
+    jsonlite,
+    base64enc
