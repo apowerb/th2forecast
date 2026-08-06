@@ -8,7 +8,6 @@ ADD . /build_zone
 WORKDIR /build_zone
 ENV UVR_INSTALL_SYSREQS=1
 RUN uvr sync
-# RUN uvr run R -e 'devtools::test(stop_on_failure = TRUE)'
 EXPOSE 8000
-CMD ["uvr", "run", "serve_api.R "]
+CMD ["uvr", "run", "serve_api.R"]
 RUN rm -rf /build_zone
