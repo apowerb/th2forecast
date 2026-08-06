@@ -1,4 +1,4 @@
-FROM rocker/r-ver:4.5.5
+FROM rocker/r-ver:latest
 RUN apt-get update && apt-get install -y libcurl4-openssl-dev libfribidi-dev libharfbuzz-dev libicu-dev libpng-dev libssl-dev libtiff-dev libv8-dev libxml2-dev make pandoc zlib1g-dev curl && rm -rf /var/lib/apt/lists/*
 RUN curl -fsSL https://raw.githubusercontent.com/nbafrank/uvr/main/install.sh | UVR_INSTALL_DIR=/usr/local/bin sh
 RUN mkdir -p /usr/local/lib/R/etc/ /usr/lib/R/etc/
