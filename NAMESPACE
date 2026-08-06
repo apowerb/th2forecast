@@ -36,7 +36,6 @@ export(output_data_fetch)
 export(prediction_data_filtred)
 export(prediction_forecast)
 export(preprocessing_data)
-export(run_app)
 export(split_dataset)
 export(step_th2_feature_engineering)
 export(step_th2_feature_engineering_new)
@@ -62,13 +61,11 @@ export(th2_rolling_forecast_stablizer)
 export(th2_tsfeatures)
 export(th2_tune_model)
 export(th2_xgboost_engine)
-importFrom(golem,with_golem_options)
 importFrom(recipes,
   bake,
   prep
 )
 importFrom(shiny,
   NS,
-  shinyApp,
   tagList
 )
