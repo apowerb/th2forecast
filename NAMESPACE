@@ -13,9 +13,8 @@ export(create_time_series_plot)
 export(create_weekly_bar_chart)
 export(db_conn_function)
 export(feature_selection)
-export(forecast_train_mod_server)
+export(forecast)
 export(forecast_train_mod_server2)
-export(forecast_train_mod_ui)
 export(forecast_train_mod_ui2)
 export(forecast_transform_data)
 export(generate_report_forecast)
@@ -63,14 +62,13 @@ export(th2_rolling_forecast_stablizer)
 export(th2_tsfeatures)
 export(th2_tune_model)
 export(th2_xgboost_engine)
-import(shiny)
-importFrom(golem,activate_js)
-importFrom(golem,add_resource_path)
-importFrom(golem,bundle_resources)
-importFrom(golem,favicon)
 importFrom(golem,with_golem_options)
-importFrom(recipes,bake)
-importFrom(recipes,prep)
-importFrom(shiny,NS)
-importFrom(shiny,shinyApp)
-importFrom(shiny,tagList)
+importFrom(recipes,
+  bake,
+  prep
+)
+importFrom(shiny,
+  NS,
+  shinyApp,
+  tagList
+)

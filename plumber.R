@@ -1,8 +1,8 @@
 library(plumber2)
 library(th2forecast)
 
-#* @apiTitle TH2 Forecasting API
-#* @apiDescription API for th2Forecast package
+#* TH2 Forecasting API
+#* API for th2Forecast package
 
 #* Run a bulk forecast
 #* @post /forecast

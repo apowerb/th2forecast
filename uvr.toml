@@ -5,12 +5,10 @@ description = "Framework for the forecasting models"
 [dependencies]
 anomalize = "*"
 base64enc = "*"
-bizdays = "*"
 caTools = "*"
 caret = "*"
 changepoint = "*"
 dplyr = "*"
-echarts4r = "*"
 janitor = "*"
 jsonlite = "*"
 knitr = "*"
@@ -31,7 +29,9 @@ tidyverse = "*"
 timetk = "*"
 tsoutliers = "*"
 tune = "*"
-"apowerb.th2forecast" = "*"
+
+[dependencies.th2forecast]
+git = "apowerb/th2forecast"
 
 [dev-dependencies]
 knitr = "*"
