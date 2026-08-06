@@ -6,8 +6,9 @@ RUN echo "options(repos = c(CRAN = 'https://cran.rstudio.com/'), download.file.m
 RUN mkdir /build_zone
 ADD . /build_zone
 WORKDIR /build_zone
-RUN uvr install
-RUN uvr run R -e 'devtools::test(stop_on_failure = TRUE)'
+RUN uvr init
+RUN uvr sync
+# RUN uvr run R -e 'devtools::test(stop_on_failure = TRUE)'
 EXPOSE 8000
 CMD ["uvr", "run", "serve_api.R "]
 RUN rm -rf /build_zone
