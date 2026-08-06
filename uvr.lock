@@ -3,7 +3,7 @@ version = "4.5.2"
 
 [[package]]
 name = "AsioHeaders"
-version = "1.30.2-4.1"
+version = "1.30.2-4.4.1"
 source = "cran"
 raw_version = "1.30.2-1"
 url = "https://cran.r-project.org/src/contrib/AsioHeaders_1.30.2-1.tar.gz"
@@ -11,7 +11,7 @@ checksum = "md5:5c4346bc1746a3b55e0fdf1608460b55"
 
 [[package]]
 name = "BH"
-version = "1.90.0-4.1"
+version = "1.90.0-4.4.1"
 source = "cran"
 raw_version = "1.90.0-1"
 url = "https://cran.r-project.org/src/contrib/BH_1.90.0-1.tar.gz"
@@ -80,7 +80,7 @@ requires = ["lattice"]
 
 [[package]]
 name = "ModelMetrics"
-version = "1.2.2-4.2"
+version = "1.2.2-4.4.2"
 source = "cran"
 raw_version = "1.2.2.2"
 url = "https://cran.r-project.org/src/contrib/ModelMetrics_1.2.2.2.tar.gz"
@@ -125,7 +125,7 @@ checksum = "md5:353d35176db9c570705a0a324c06fdca"
 
 [[package]]
 name = "RcppArmadillo"
-version = "15.4.2-4.1"
+version = "15.4.2-4.4.1"
 source = "cran"
 raw_version = "15.4.2-1"
 url = "https://cran.r-project.org/src/contrib/RcppArmadillo_15.4.2-1.tar.gz"
@@ -137,7 +137,7 @@ requires = [
 
 [[package]]
 name = "RcppEigen"
-version = "0.3.4-4.0.2"
+version = "0.3.4-4.4.0.2"
 source = "cran"
 raw_version = "0.3.4.0.2"
 url = "https://cran.r-project.org/src/contrib/RcppEigen_0.3.4.0.2.tar.gz"
@@ -815,7 +815,7 @@ requires = [
 
 [[package]]
 name = "dygraphs"
-version = "1.1.1-4.6"
+version = "1.1.1-4.4.6"
 source = "cran"
 raw_version = "1.1.1.6"
 url = "https://cran.r-project.org/src/contrib/dygraphs_1.1.1.6.tar.gz"
@@ -873,7 +873,7 @@ checksum = "md5:64d96fee3845fd96d1eafaba37adf00e"
 
 [[package]]
 name = "extraDistr"
-version = "1.10.0-4.5"
+version = "1.10.0-4.4.5"
 source = "cran"
 raw_version = "1.10.0.5"
 url = "https://cran.r-project.org/src/contrib/extraDistr_1.10.0.5.tar.gz"
@@ -1635,7 +1635,7 @@ requires = ["rlang"]
 
 [[package]]
 name = "lbfgs"
-version = "1.2.1-4.2"
+version = "1.2.1-4.4.2"
 source = "cran"
 raw_version = "1.2.1.2"
 url = "https://cran.r-project.org/src/contrib/lbfgs_1.2.1.2.tar.gz"
@@ -1985,7 +1985,7 @@ checksum = "md5:63b195beb45883dd357387ee29164607"
 
 [[package]]
 name = "norm"
-version = "1.0.11-4.1"
+version = "1.0.11-4.4.1"
 source = "cran"
 raw_version = "1.0-11.1"
 url = "https://cran.r-project.org/src/contrib/norm_1.0-11.1.tar.gz"
@@ -1993,7 +1993,7 @@ checksum = "md5:727b4fa17f06231ab8368630d40d2609"
 
 [[package]]
 name = "numDeriv"
-version = "2016.8.1-4.1"
+version = "2016.8.1-4.4.1"
 source = "cran"
 raw_version = "2016.8-1.1"
 url = "https://cran.r-project.org/src/contrib/numDeriv_2016.8-1.1.tar.gz"
@@ -2018,7 +2018,7 @@ checksum = "md5:cecd0f434a6327dcf5ca0bc2da494d06"
 
 [[package]]
 name = "pROC"
-version = "1.19.0-4.1"
+version = "1.19.0-4.4.1"
 source = "cran"
 raw_version = "1.19.0.1"
 url = "https://cran.r-project.org/src/contrib/pROC_1.19.0.1.tar.gz"
@@ -2852,7 +2852,7 @@ requires = [
 
 [[package]]
 name = "shape"
-version = "1.4.6-4.1"
+version = "1.4.6-4.4.1"
 source = "cran"
 raw_version = "1.4.6.1"
 url = "https://cran.r-project.org/src/contrib/shape_1.4.6.1.tar.gz"
@@ -2925,7 +2925,7 @@ checksum = "md5:aed7815417272ea515eab83ef1868ea6"
 
 [[package]]
 name = "sourcetools"
-version = "0.1.7-4.2"
+version = "0.1.7-4.4.2"
 source = "cran"
 raw_version = "0.1.7-2"
 url = "https://cran.r-project.org/src/contrib/sourcetools_0.1.7-2.tar.gz"
@@ -3106,7 +3106,7 @@ requires = [
 
 [[package]]
 name = "tensorA"
-version = "0.36.2-4.1"
+version = "0.36.2-4.4.1"
 source = "cran"
 raw_version = "0.36.2.1"
 url = "https://cran.r-project.org/src/contrib/tensorA_0.36.2.1.tar.gz"
@@ -3131,8 +3131,8 @@ requires = [
 name = "th2forecast"
 version = "0.0.48"
 source = "github"
-url = "https://api.github.com/repos/apowerb/th2forecast/tarball/1c739b453ad789a212c3be0de3a187f6d101c5e8"
-checksum = "git:1c739b453ad789a212c3be0de3a187f6d101c5e8"
+url = "https://api.github.com/repos/apowerb/th2forecast/tarball/fcb522c87c7291d9bcb56421b46bff393407fe34"
+checksum = "git:fcb522c87c7291d9bcb56421b46bff393407fe34"
 requires = [
     "anomalize",
     "bizdays",
@@ -3483,7 +3483,7 @@ requires = ["nlme"]
 
 [[package]]
 name = "urltools"
-version = "1.7.3-4.1"
+version = "1.7.3-4.4.1"
 source = "cran"
 raw_version = "1.7.3.1"
 url = "https://cran.r-project.org/src/contrib/urltools_1.7.3.1.tar.gz"
@@ -3704,7 +3704,7 @@ checksum = "md5:1bea9ab58602d9b6eac3b5823a95e5e6"
 
 [[package]]
 name = "xgboost"
-version = "3.2.1-4.1"
+version = "3.2.1-4.4.1"
 source = "cran"
 raw_version = "3.2.1.1"
 url = "https://cran.r-project.org/src/contrib/xgboost_3.2.1.1.tar.gz"
