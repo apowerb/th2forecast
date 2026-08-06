@@ -1,0 +1,11 @@
+{
+  "positron.r.customBinaries": [
+    "C:\\Users\\Farid Azouaou\\AppData\\Local\\Programs\\R\\R-4.5.2\\bin\\R.exe"
+  ],
+  "positron.r.customRootFolders": [
+    "C:\\Users\\Farid Azouaou\\.uvr\\r-versions"
+  ],
+  "positron.r.interpreters.default": "C:\\Users\\Farid Azouaou\\AppData\\Local\\Programs\\R\\R-4.5.2\\bin\\R.exe",
+  "r.rpath.windows": "C:\\Users\\Farid Azouaou\\AppData\\Local\\Programs\\R\\R-4.5.2\\bin\\R.exe",
+  "r.rterm.windows": "C:\\Users\\Farid Azouaou\\AppData\\Local\\Programs\\R\\R-4.5.2\\bin\\R.exe"
+}

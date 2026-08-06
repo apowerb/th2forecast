@@ -3,3 +3,6 @@
 ^th2Forecast\.Rproj$
 ^\.Rproj\.user$
 ^\.dockerignore$
+^uvr\.toml$
+^uvr\.lock$
+^\.uvr$
