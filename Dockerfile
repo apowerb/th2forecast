@@ -9,5 +9,4 @@ WORKDIR /build_zone
 ENV UVR_INSTALL_SYSREQS=1
 RUN uvr sync
 EXPOSE 8000
-CMD ["uvr", "run", "serve_api.R"]
-# RUN rm -rf /build_zone
+CMD ["Rscript", "-e", "plumber2::api('plumber.R') |> plumber2::api_run(port=8000, host='0.0.0.0')"]
