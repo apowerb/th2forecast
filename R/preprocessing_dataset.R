@@ -84,11 +84,26 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
 
         indexes_cpt <- c(1, cpt@cpts, length(y))
 
-        fixed_series <- numeric(length(y))
+        fixed_series <- as.numeric(y)
 
+        # changepoint::cpt.meanvar decoupe la serie en segments homogenes en
+        # moyenne/variance : a l'interieur de chaque segment, les points qui
+        # s'ecartent de plus de 3 ecarts-types de la moyenne du segment sont
+        # des outliers et sont ramenes a cette moyenne. Auparavant ce bloc
+        # recopiait le segment tel quel dans fixed_series : aucune valeur
+        # n'etait jamais corrigee (bug, cf. test-preprocessing_dataset.R).
         for (i in 1:(length(indexes_cpt) - 1)) {
-          segment <- y[(indexes_cpt[i]):indexes_cpt[i + 1]]
-          fixed_series[(indexes_cpt[i]):indexes_cpt[i + 1]] <- segment
+          idx <- (indexes_cpt[i]):indexes_cpt[i + 1]
+          segment <- as.numeric(y[idx])
+          segment_mean <- mean(segment)
+          segment_sd <- stats::sd(segment)
+
+          if (!is.na(segment_sd) && segment_sd > 0) {
+            is_outlier <- abs(segment - segment_mean) > 3 * segment_sd
+            segment[is_outlier] <- segment_mean
+          }
+
+          fixed_series[idx] <- segment
         }
 
         # cpt <- fastcpd::fastcpd.meanvariance(input_data[[variable]])
@@ -134,7 +149,16 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
     list_holidays <- holidays_resp %>%
       httr2::resp_body_json()
   } else {
-    tryCatch(
+    # tryCatch() renvoie la valeur de son bloc (succes) ou celle du handler
+    # `error` (echec) : il faut recuperer ce resultat dans `list_holidays`.
+    # Auparavant le retour du tryCatch etait jete (appel en instruction nue) et
+    # le handler d'erreur se contentait d'un print() + return(NULL) qui ne
+    # sort que de la closure du handler, pas de holidays_detection() : en cas
+    # d'echec (ex. pas de connexion DB), `list_holidays` n'etait alors jamais
+    # defini et le `names(list_holidays)` plus bas plantait avec
+    # "object 'list_holidays' not found" au lieu de degrader proprement vers
+    # une liste de jours feries vide.
+    list_holidays <- tryCatch(
       {
         # list_holidays_years <- list()
         #
@@ -156,16 +180,18 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
         #   list_holidays_years <- c(list_holidays_years, list_holidays)
         # }
         calendar_country_bh <- calendars_businness_days(db_conn = db_conn, country_code = calendar)
-        list_holidays <- list()
+        result_holidays <- list()
 
         for (i in 1:nrow(calendar_country_bh)) {
-          list_holidays[calendar_country_bh[i, "_date"]] <- calendar_country_bh[i, "_name"]
+          result_holidays[calendar_country_bh[i, "_date"]] <- calendar_country_bh[i, "_name"]
         }
+
+        result_holidays
       },
       error = function(error) {
         print(error)
         print("Error returning output business holidays. Please check the input datasource configuration.")
-        return(NULL)
+        list()
       }
     )
   }
