@@ -11,15 +11,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Build Docker Image
         run: docker build -t apowerb/th2forecast:${{ github.sha }} .
-      
+
+      - name: Run unit tests (testthat) in the built image
+        run: docker run --rm apowerb/th2forecast:${{ github.sha }} Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'
+
+      - name: Start container for smoke test
+        run: |
+          docker run -d --name th2forecast-ci -p 127.0.0.1:18000:8000 \
+            -e TH2FORECAST_API_TOKEN=ci-smoke-token \
+            apowerb/th2forecast:${{ github.sha }}
+
+      - name: Run end-to-end smoke test
+        env:
+          TH2FORECAST_BASE_URL: http://127.0.0.1:18000
+          TH2FORECAST_API_TOKEN: ci-smoke-token
+        run: bash tests/e2e/smoke.sh
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs th2forecast-ci || true
+
+      - name: Stop smoke test container
+        if: always()
+        run: docker rm -f th2forecast-ci || true
+
       - name: Log in to Docker Hub
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push Docker Image
+        if: github.event_name == 'push'
         run: docker push apowerb/th2forecast:${{ github.sha }}
