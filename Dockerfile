@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://raw.githubusercontent.com/nbafrank/uvr/v0.4.6/install.sh \
-      | UVR_INSTALL_DIR=/usr/local/bin sh
+      | UVR_VERSION=v0.4.6 UVR_INSTALL_DIR=/usr/local/bin sh
 
 RUN mkdir -p /usr/local/lib/R/etc/ /usr/lib/R/etc/ \
     && echo "options(repos = c(CRAN = 'https://cran.rstudio.com/'), download.file.method = 'libcurl', Ncpus = 4)" \
