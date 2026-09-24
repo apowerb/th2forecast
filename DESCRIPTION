@@ -4,12 +4,13 @@ Version: 0.0.48
 Authors@R: 
     person("Harold", "Villafuerte", , "harold.villafuerte@thaink2.com", role = c("aut", "cre"))
 Description: Implements all the functions necessary to apply the complete forecasting pipeline.
-License: GLP-3
+License: Apache License (== 2.0)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Suggests: 
     knitr,
-    rmarkdown
+    rmarkdown,
+    testthat (>= 3.0.0)
 Imports: 
     anomalize,
     bizdays,
@@ -19,19 +20,25 @@ Imports:
     dplyr,
     echarts4r,
     janitor,
+    magrittr,
+    jsonlite,
     lubridate,
+    mirai,
     modeltime,
     modeltime.ensemble,
     modeltime.resample,
     naniar,
+    parsnip,
+    plumber2,
     recipes,
+    rlang,
     rsample,
     sparklyr,
+    tibble,
     tidyr,
     timetk,
     tsoutliers,
     tune,
-    plumber2,
-    jsonlite,
-    base64enc
+    workflows
 Config/roxygen2/version: 8.1.0
+Config/testthat/edition: 3
