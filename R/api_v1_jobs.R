@@ -68,7 +68,7 @@ api_v1_job_get <- function(job_id) {
     outcome <- job$mirai$data
     if (mirai::is_mirai_error(outcome) || inherits(outcome, "error")) {
       job$status <- "failed"
-      job$error <- api_v1_error_body(list(api_v1_error(NULL, "Échec inattendu du calcul de prévision.")))
+      job$error <- "Échec inattendu du calcul de prévision."
       job$result <- NULL
     } else {
       job$status <- "succeeded"
