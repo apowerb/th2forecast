@@ -150,3 +150,17 @@ cette série plutôt que de faire échouer toute la requête.
 Une ligne JSON par requête sur `stdout` (`api_v1_log_request()`) :
 `ts, id, route, status, duration_ms, n_rows, n_series, models`. Aucune
 donnée utilisateur (pas de valeurs de `data`, pas d'IP, pas de token).
+
+## Limite connue (contournement documenté)
+
+`modeltime` enregistre ses implémentations de modèles personnalisés
+(`naive_reg`, `arima_reg`, `exp_smoothing`, `prophet_reg`, ...) auprès de
+`parsnip` d'une manière qui exige, en pratique, que le namespace `modeltime`
+soit **attaché** (`library(modeltime)`) et pas seulement chargé via
+`modeltime::...` : sans cela, `parsnip::fit()` échoue avec
+`could not find function '..._fit_impl'`. Vérifié par reproduction directe
+(appel identique avec et sans `library(modeltime)` préalable). `entrypoint.R`
+et `tests/testthat/setup.R` attachent donc explicitement `modeltime` et
+`parsnip` (y compris dans les daemons `mirai` via `mirai::everywhere()`).
+Ce comportement affecte toutes les fonctions `th2_*_engine()` du package,
+pas seulement le code de l'API v1.
