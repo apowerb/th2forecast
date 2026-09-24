@@ -7,4 +7,5 @@
 suppressPackageStartupMessages({
   library(modeltime)
   library(parsnip)
+  library(th2forecast)
 })
