@@ -26,6 +26,14 @@ jobs:
             -e TH2FORECAST_API_TOKEN=ci-smoke-token \
             apowerb/th2forecast:${{ github.sha }}
 
+      - name: Wait for the API to be ready
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:18000/health && exit 0
+            sleep 2
+          done
+          echo "API not ready after 120 s"; exit 1
+
       - name: Run end-to-end smoke test
         env:
           TH2FORECAST_BASE_URL: http://127.0.0.1:18000
