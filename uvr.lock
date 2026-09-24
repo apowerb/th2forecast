@@ -1165,11 +1165,11 @@ requires = [
 
 [[package]]
 name = "glmnet"
-version = "5.0.0"
+version = "5.1.0"
 source = "cran"
-raw_version = "5.0"
-url = "https://cran.r-project.org/src/contrib/glmnet_5.0.tar.gz"
-checksum = "md5:094cffb05ba0a8685aae3e1bb8cf2c9d"
+raw_version = "5.1"
+url = "https://cran.r-project.org/src/contrib/glmnet_5.1.tar.gz"
+checksum = "md5:9ff5a9e4f2a2ceded081005bea78cbd3"
 requires = [
     "Matrix",
     "foreach",
