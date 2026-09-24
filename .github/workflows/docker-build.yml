@@ -15,10 +15,8 @@ jobs:
       - name: Build Docker Image
         run: docker build -t apowerb/th2forecast:${{ github.sha }} .
 
-      # Only the API v1 tests gate CI: the legacy model tests (ensemble, feature
-      # selection, preprocessing, model selection) fail on main and were never run in CI.
       - name: Run unit tests (testthat) in the built image
-        run: docker run --rm apowerb/th2forecast:${{ github.sha }} Rscript -e 'testthat::test_dir("tests/testthat", filter = "api_v1", stop_on_failure = TRUE)'
+        run: docker run --rm apowerb/th2forecast:${{ github.sha }} Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'
 
       - name: Start container for smoke test
         run: |

@@ -1,5 +1,11 @@
 library(modeltime)
 library(rsample)
+# tune::tune_grid() doit pouvoir retrouver time_series_cv() par son nom dans
+# le search path (rsample::.get_split_args() -> .find_resampling_function()) :
+# un simple modeltime.resample::time_series_cv() dans R/ensemble_models.R ne
+# suffit pas, il faut que le package soit attache ici (meme contrainte que
+# modeltime/parsnip, voir tests/testthat/setup.R).
+library(modeltime.resample)
 
 test_that("test th2_resamples function", {
   # Create a test data set
@@ -51,20 +57,25 @@ test_that("test th2_tune_model function", {
 
 
 test_that("test th2_ensemble_engine function", {
-  # Create a test data set
-  data_test <- m750
-
-  data_features <- feature_selection(data_test, "value", c())
-  data_features <- data_features[complete.cases(data_features), ]
-
-  split_data <- split_dataset(data_features, "date", "value")$traintest
+  # Create a test data set ; `id` (facteur constant ici) n'est pas reconnu
+  # par step_th2_feature_engineering (cf. test-selection_training_models.R) :
+  # on le retire avant de fournir les donnees a th2_ensemble_engine.
+  data_test <- m750 %>% dplyr::select(-id)
 
   # Define the models and type of assembly
   models_test <- c("prophet", "random_forest")
   ensamble_type_test <- "mean"
 
-  # Applies the function to data, models and assembly type
-  res <- th2_ensemble_engine(data_features, split_data, "date", "value", models_test, ensamble_type_test)
+  # th2_ensemble_engine(dataset_input, var_date, var_target, models,
+  # list_features = c(), ensamble_type = "mean", use_holidays = NULL) fait
+  # elle-meme feature_selection() + split_dataset() en interne (voir
+  # R/ensemble_models.R) : elle attend les donnees brutes, pas un dataset deja
+  # feature-engineere ni un split precalcule. L'appel precedent passait un
+  # split rsample en 2e position (var_date) et la liste de modeles en
+  # list_features, ce qui faisait echouer feature_selection() en cherchant des
+  # colonnes "prophet"/"random_forest" inexistantes : signature obsolete
+  # depuis le refactor qui a interiorise le split.
+  res <- th2_ensemble_engine(data_test, "date", "value", models_test, ensamble_type = ensamble_type_test)
 
   # Checks that the function returns an object of the correct class
   expect_s3_class(res, c("modeltime_table", "tbl_df", "tbl", "data.frame"))

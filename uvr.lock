@@ -34,6 +34,14 @@ url = "https://cran.r-project.org/src/contrib/DiceDesign_1.10.tar.gz"
 checksum = "md5:1006a4bae25c296e3ad5a60a62ed719c"
 
 [[package]]
+name = "Formula"
+version = "1.2.6"
+source = "cran"
+raw_version = "1.2-6"
+url = "https://cran.r-project.org/src/contrib/Formula_1.2-6.tar.gz"
+checksum = "md5:230a93c95eaabdfc7a2e958efbbe25db"
+
+[[package]]
 name = "GauPro"
 version = "0.2.17"
 source = "cran"
@@ -843,6 +851,18 @@ checksum = "md5:7e8d521ac6b3a92c7e1888dbb8e59c47"
 requires = [
     "class",
     "proxy",
+]
+
+[[package]]
+name = "earth"
+version = "5.3.6"
+source = "cran"
+raw_version = "5.3.6"
+url = "https://cran.r-project.org/src/contrib/earth_5.3.6.tar.gz"
+checksum = "md5:fe89999f1d4d2fe74dfd682c82b315f3"
+requires = [
+    "Formula",
+    "plotmo",
 ]
 
 [[package]]
@@ -2187,6 +2207,26 @@ requires = [
 ]
 
 [[package]]
+name = "plotmo"
+version = "3.7.1"
+source = "cran"
+raw_version = "3.7.1"
+url = "https://cran.r-project.org/src/contrib/plotmo_3.7.1.tar.gz"
+checksum = "md5:26f6079e76c4175b8e3a89629107a85c"
+requires = [
+    "Formula",
+    "plotrix",
+]
+
+[[package]]
+name = "plotrix"
+version = "3.8.14"
+source = "cran"
+raw_version = "3.8-14"
+url = "https://cran.r-project.org/src/contrib/plotrix_3.8-14.tar.gz"
+checksum = "md5:2f854b315816ce240d89ad895c57e291"
+
+[[package]]
 name = "plumber2"
 version = "0.2.0"
 source = "cran"
@@ -2435,6 +2475,14 @@ requires = [
     "systemfonts",
     "textshaping",
 ]
+
+[[package]]
+name = "randomForest"
+version = "4.7.1-4.2"
+source = "cran"
+raw_version = "4.7-1.2"
+url = "https://cran.r-project.org/src/contrib/randomForest_4.7-1.2.tar.gz"
+checksum = "md5:31fe6885dccafec29a9315b771c25971"
 
 [[package]]
 name = "rapidoc"

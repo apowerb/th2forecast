@@ -390,7 +390,11 @@ th2_ets_engine <- function(input_data, var_date, var_target, fit_model = TRUE) {
 #'
 #' @examples model_selection_train(input_data, c("arima", "prophet", "lr", "mars"), "value", "datetime")
 model_selection_train <- function(input_data, list_models, var_target, var_date, input_feature_data) {
-  if (any(class(input_data) %in% c("tbl_df", "tbl", "data.frame")) || class(input_data) == "data.frame") {
+  # inherits() est la maniere sure de tester le type : l'ancienne condition
+  # comparait class(input_data) == "data.frame" avec ==, ce qui plante des que
+  # class(input_data) a plus d'un element (ex. un objet rsplit
+  # c("mc_split", "rsplit")) avec 'length = 2' in coercion to 'logical(1)'.
+  if (inherits(input_data, "data.frame")) {
     error_models <- NULL
 
     if (length(list_models) > 0 && is.character(list_models)) {
