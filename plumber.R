@@ -5,7 +5,7 @@ library(th2forecast)
 #* API pour le service th2forecast (prevision de series temporelles)
 
 #* @get /health
-#* @serializer unboxedJSON
+#* @serializer application/json;charset=utf-8 reqres::format_json(auto_unbox=TRUE, null="null")
 function() {
   th2forecast::api_v1_health()
 }
@@ -13,13 +13,13 @@ function() {
 #* Lance une prevision synchrone
 #* @post /v1/forecast
 #* @parser json
-#* @serializer unboxedJSON
+#* @serializer application/json;charset=utf-8 reqres::format_json(auto_unbox=TRUE, null="null")
 function(body, request, response) {
   t0 <- Sys.time()
   if (!th2forecast::api_v1_check_auth(request$get_header("Authorization"))) {
     response$status <- 401L
     return(th2forecast::api_v1_error_body(list(
-      th2forecast::api_v1_error(NULL, "Authentification requise : en-tete 'Authorization: Bearer <token>' manquant ou invalide.")
+      th2forecast::api_v1_error(NULL, "Authentification requise : en-tête 'Authorization: Bearer <token>' manquant ou invalide.")
     )))
   }
 
@@ -41,13 +41,13 @@ function(body, request, response) {
 #* Cree un job de prevision asynchrone
 #* @post /v1/jobs
 #* @parser json
-#* @serializer unboxedJSON
+#* @serializer application/json;charset=utf-8 reqres::format_json(auto_unbox=TRUE, null="null")
 function(body, request, response) {
   t0 <- Sys.time()
   if (!th2forecast::api_v1_check_auth(request$get_header("Authorization"))) {
     response$status <- 401L
     return(th2forecast::api_v1_error_body(list(
-      th2forecast::api_v1_error(NULL, "Authentification requise : en-tete 'Authorization: Bearer <token>' manquant ou invalide.")
+      th2forecast::api_v1_error(NULL, "Authentification requise : en-tête 'Authorization: Bearer <token>' manquant ou invalide.")
     )))
   }
 
@@ -66,12 +66,12 @@ function(body, request, response) {
 
 #* Recupere l'etat/resultat d'un job
 #* @get /v1/jobs/<id:string>
-#* @serializer unboxedJSON
+#* @serializer application/json;charset=utf-8 reqres::format_json(auto_unbox=TRUE, null="null")
 function(id, request, response) {
   if (!th2forecast::api_v1_check_auth(request$get_header("Authorization"))) {
     response$status <- 401L
     return(th2forecast::api_v1_error_body(list(
-      th2forecast::api_v1_error(NULL, "Authentification requise : en-tete 'Authorization: Bearer <token>' manquant ou invalide.")
+      th2forecast::api_v1_error(NULL, "Authentification requise : en-tête 'Authorization: Bearer <token>' manquant ou invalide.")
     )))
   }
 

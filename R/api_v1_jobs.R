@@ -36,7 +36,7 @@ api_v1_job_create <- function(body, limits) {
     # Repli synchrone documente : pas de daemon mirai disponible.
     res <- tryCatch(api_v1_run_forecast(body, limits), error = function(e) NULL)
     if (is.null(res)) {
-      assign(job_id, list(status = "failed", mirai = NULL, result = NULL, error = "Echec inattendu du calcul."), envir = .api_v1_job_store)
+      assign(job_id, list(status = "failed", mirai = NULL, result = NULL, error = "Échec inattendu du calcul."), envir = .api_v1_job_store)
     } else {
       assign(job_id, list(status = "succeeded", mirai = NULL, result = res$body, error = NULL), envir = .api_v1_job_store)
     }
@@ -68,7 +68,7 @@ api_v1_job_get <- function(job_id) {
     outcome <- job$mirai$data
     if (mirai::is_mirai_error(outcome) || inherits(outcome, "error")) {
       job$status <- "failed"
-      job$error <- api_v1_error_body(list(api_v1_error(NULL, "Echec inattendu du calcul de prevision.")))
+      job$error <- api_v1_error_body(list(api_v1_error(NULL, "Échec inattendu du calcul de prévision.")))
       job$result <- NULL
     } else {
       job$status <- "succeeded"
