@@ -66,7 +66,10 @@ test_that("api_v1_validate_request rejette un horizon trop grand pour le nombre 
 
   expect_false(res$ok)
   expect_equal(res$errors[[1]]$field, "horizon")
-  expect_match(res$errors[[1]]$message, "Trop peu de points")
+  expect_match(res$errors[[1]]$message, "Historique trop court")
+  expect_match(res$errors[[1]]$message, "5 points pour un horizon de 12")
+  expect_match(res$errors[[1]]$message, "au moins 13 points")
+  expect_match(res$errors[[1]]$message, "réduire l'horizon à 4 au plus")
 })
 
 test_that("api_v1_validate_request renvoie 413 quand l'horizon depasse la limite", {

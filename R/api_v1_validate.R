@@ -60,7 +60,7 @@ api_v1_validate_request <- function(body, limits) {
 
   horizon <- body[["horizon"]]
   if (is.null(horizon) || !is.numeric(horizon) || length(horizon) != 1 || horizon <= 0 || horizon != as.integer(horizon)) {
-    add_error("horizon", "Le champ 'horizon' doit etre un entier strictement positif.")
+    add_error("horizon", "Le champ 'horizon' doit être un entier strictement positif.")
     horizon <- NA_integer_
   } else {
     horizon <- as.integer(horizon)
@@ -76,7 +76,7 @@ api_v1_validate_request <- function(body, limits) {
     add_error(
       "models",
       sprintf(
-        "Modele(s) inconnu(s) : %s ; modeles disponibles : %s.",
+        "Modèle(s) inconnu(s) : %s ; modèles disponibles : %s.",
         paste(unknown_models, collapse = ", "),
         paste(ALLOWED_MODELS, collapse = ", ")
       )
@@ -88,7 +88,7 @@ api_v1_validate_request <- function(body, limits) {
     add_error(
       "frequency",
       sprintf(
-        "Frequence '%s' inconnue ; valeurs acceptees : %s (ou null pour detection automatique).",
+        "Fréquence '%s' inconnue ; valeurs acceptées : %s (ou null pour détection automatique).",
         frequency, paste(ALLOWED_FREQUENCIES, collapse = ", ")
       )
     )
@@ -102,7 +102,7 @@ api_v1_validate_request <- function(body, limits) {
   } else {
     confidence_levels <- unlist(confidence_levels, use.names = FALSE)
     if (!is.numeric(confidence_levels) || any(confidence_levels <= 0 | confidence_levels >= 1)) {
-      add_error("confidence_levels", "Les niveaux de confiance doivent etre des nombres dans l'intervalle ouvert (0, 1).")
+      add_error("confidence_levels", "Les niveaux de confiance doivent être des nombres dans l'intervalle ouvert (0, 1).")
       confidence_levels <- c(0.8, 0.95)
     }
   }
@@ -116,7 +116,7 @@ api_v1_validate_request <- function(body, limits) {
   if (!is.na(horizon) && horizon > limits$max_horizon) {
     return(list(ok = FALSE, status = 413L, errors = list(
       api_v1_error("horizon", sprintf(
-        "Horizon demande (%d) superieur a la limite autorisee (%d).", horizon, limits$max_horizon
+        "Horizon demandé (%d) supérieur à la limite autorisée (%d).", horizon, limits$max_horizon
       ))
     )))
   }
@@ -127,14 +127,14 @@ api_v1_validate_request <- function(body, limits) {
   )
   if (is.null(df) || nrow(df) == 0) {
     return(list(ok = FALSE, status = 400L, errors = list(
-      api_v1_error("data", "Impossible d'interpreter 'data' comme un tableau de lignes homogenes.")
+      api_v1_error("data", "Impossible d'interpréter 'data' comme un tableau de lignes homogènes.")
     )))
   }
 
   if (nrow(df) > limits$max_rows) {
     return(list(ok = FALSE, status = 413L, errors = list(
       api_v1_error("data", sprintf(
-        "Nombre de lignes (%d) superieur a la limite autorisee (%d).", nrow(df), limits$max_rows
+        "Nombre de lignes (%d) supérieur à la limite autorisée (%d).", nrow(df), limits$max_rows
       ))
     )))
   }
@@ -187,7 +187,7 @@ api_v1_validate_request <- function(body, limits) {
   if (any(is.na(target_numeric) & !is.na(target_raw))) {
     return(list(ok = FALSE, status = 400L, errors = list(
       api_v1_error("target_var", sprintf(
-        "La colonne cible '%s' doit etre numerique.", target_var
+        "La colonne cible '%s' doit être numérique.", target_var
       ))
     )))
   }
@@ -199,7 +199,7 @@ api_v1_validate_request <- function(body, limits) {
   if (n_series > limits$max_series) {
     return(list(ok = FALSE, status = 413L, errors = list(
       api_v1_error("group_var", sprintf(
-        "Nombre de series (%d) superieur a la limite autorisee (%d).", n_series, limits$max_series
+        "Nombre de séries (%d) supérieur à la limite autorisée (%d).", n_series, limits$max_series
       ))
     )))
   }
@@ -210,14 +210,14 @@ api_v1_validate_request <- function(body, limits) {
     d <- df[[date_var]][idx]
     dups <- unique(d[duplicated(d)])
     if (length(dups) > 0) {
-      label <- if (is.na(g)) "" else sprintf(" pour la serie '%s'", g)
+      label <- if (is.na(g)) "" else sprintf(" pour la série '%s'", g)
       dup_msgs <- c(dup_msgs, sprintf("%s : %s", label, paste(utils::head(as.character(dups), 5), collapse = ", ")))
     }
   }
   if (length(dup_msgs) > 0) {
     return(list(ok = FALSE, status = 400L, errors = list(
       api_v1_error("data", sprintf(
-        "Doublons de dates detectes%s.", paste(dup_msgs, collapse = " ; ")
+        "Doublons de dates détectés%s.", paste(dup_msgs, collapse = " ; ")
       ))
     )))
   }
@@ -226,17 +226,19 @@ api_v1_validate_request <- function(body, limits) {
   too_short <- character(0)
   for (g in unique(group_values)) {
     idx <- if (is.na(g)) which(is.na(group_values)) else which(group_values == g)
-    if (length(idx) < min_points) {
-      label <- if (is.na(g)) "la serie" else sprintf("la serie '%s'", g)
-      too_short <- c(too_short, sprintf("%s (%d points)", label, length(idx)))
+    n_pts <- length(idx)
+    if (n_pts < min_points) {
+      label <- if (is.na(g)) "" else sprintf(" pour la série '%s'", g)
+      max_horizon_for_n <- max(n_pts - 1L, 0L)
+      too_short <- c(too_short, sprintf(
+        "Historique trop court%s : %d points pour un horizon de %d. Il faut au moins %d points, ou réduire l'horizon à %d au plus.",
+        label, n_pts, horizon, min_points, max_horizon_for_n
+      ))
     }
   }
   if (length(too_short) > 0) {
     return(list(ok = FALSE, status = 400L, errors = list(
-      api_v1_error("horizon", sprintf(
-        "Trop peu de points pour l'horizon demande (%d) : %s. Il faut au moins %d points (max(10, horizon + 1)).",
-        horizon, paste(too_short, collapse = ", "), min_points
-      ))
+      api_v1_error("horizon", paste(too_short, collapse = " ; "))
     )))
   }
 
