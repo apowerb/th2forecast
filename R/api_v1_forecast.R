@@ -3,6 +3,11 @@ NULL
 
 CANDIDATE_MODELS <- c("arima", "prophet", "ets")
 
+#' modeltime_accuracy() renvoie mape/smape en points de pourcentage
+#' (yardstick::mape()/smape()) ; le contrat attend une fraction (0.08 = 8 %).
+#' @keywords internal
+.api_v1_pct_to_fraction <- function(x) x / 100
+
 #' @keywords internal
 .api_v1_expand_models <- function(models) {
   if ("auto" %in% models) {
@@ -49,7 +54,7 @@ api_v1_forecast_one_series <- function(df, request) {
   fits <- Filter(Negate(is.null), fits)
 
   if (length(fits) == 0) {
-    return(list(error = api_v1_error("models", "Aucun modele n'a pu etre entraine sur cette serie.")))
+    return(list(error = api_v1_error("models", "Aucun modèle n'a pu être entraîné sur cette série.")))
   }
 
   calib_tbl <- do.call(modeltime::modeltime_table, unname(fits))
@@ -109,7 +114,7 @@ api_v1_forecast_one_series <- function(df, request) {
     )
     if (is.null(fc)) {
       warnings_out <- c(warnings_out, sprintf(
-        "Intervalle de confiance au niveau %.2f indisponible pour le modele '%s'.", level, best_model
+        "Intervalle de confiance au niveau %.2f indisponible pour le modèle '%s'.", level, best_model
       ))
       next
     }
@@ -131,7 +136,7 @@ api_v1_forecast_one_series <- function(df, request) {
 
   if (is.null(forecast_rows)) {
     return(list(error = api_v1_error("models", sprintf(
-      "Impossible de produire une prevision pour le modele '%s'.", best_model
+      "Impossible de produire une prévision pour le modèle '%s'.", best_model
     ))))
   }
 
@@ -155,7 +160,7 @@ api_v1_forecast_one_series <- function(df, request) {
 
   metrics <- if (!is.null(winner_row)) {
     list(
-      mape = winner_row$mape[1], smape = winner_row$smape[1],
+      mape = .api_v1_pct_to_fraction(winner_row$mape[1]), smape = .api_v1_pct_to_fraction(winner_row$smape[1]),
       mase = winner_row$mase[1], rmse = winner_row$rmse[1],
       holdout_points = holdout_points
     )
@@ -166,7 +171,7 @@ api_v1_forecast_one_series <- function(df, request) {
   baseline <- list(
     model = baseline_name,
     metrics = if (!is.null(baseline_row)) list(
-      mape = baseline_row$mape[1], smape = baseline_row$smape[1],
+      mape = .api_v1_pct_to_fraction(baseline_row$mape[1]), smape = .api_v1_pct_to_fraction(baseline_row$smape[1]),
       mase = baseline_row$mase[1], rmse = baseline_row$rmse[1]
     ) else list(mape = NA, smape = NA, mase = NA, rmse = NA)
   )
@@ -208,7 +213,7 @@ api_v1_run_forecast <- function(body, limits) {
   frequency <- req$frequency
   if (is.null(frequency)) {
     frequency <- api_v1_detect_frequency(df[[req$date_var]])
-    warnings_out <- c(warnings_out, sprintf("Frequence detectee automatiquement : %s.", frequency))
+    warnings_out <- c(warnings_out, sprintf("Fréquence détectée automatiquement : %s.", frequency))
   }
   req$frequency <- frequency
 
@@ -225,7 +230,7 @@ api_v1_run_forecast <- function(body, limits) {
     series_warnings <- character(0)
     if (reg$n_padded > 0) {
       series_warnings <- c(series_warnings, sprintf(
-        "%d point(s) manquant(s) au pas '%s' comble(s) par interpolation lineaire.", reg$n_padded, frequency
+        "%d point(s) manquant(s) au pas '%s' comblé(s) par interpolation linéaire.", reg$n_padded, frequency
       ))
     }
 

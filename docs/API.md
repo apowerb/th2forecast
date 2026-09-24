@@ -118,10 +118,15 @@ validation (400 sinon) pour garantir un découpage exploitable.
 ### Métriques et baseline
 
 `modeltime::modeltime_accuracy()` (jeu de métriques par défaut) sur le jeu
-de test : `mape`, `smape`, `mase`, `rmse`. `holdout_points` = nombre de
-points du jeu de test. Baseline : `snaive` si la fréquence a une saisonnalité
-(`day` → 7, `week` → 52, `month` → 12, `quarter` → 4), `naive` sinon
-(`year`, pas de cycle saisonnier annuel exploitable).
+de test : `mape`, `smape`, `mase`, `rmse`. **Unités** : `mape` et `smape`
+sont des **fractions** (`0.08` = 8 %), pas des pourcentages —
+`yardstick::mape()`/`yardstick::smape()` renvoient des points de
+pourcentage (`8.0` pour 8 %), divisés par 100 avant de sortir dans la
+réponse (`mase`, `rmse` restent des mesures d'échelle, non concernées).
+`holdout_points` = nombre de points du jeu de test. Baseline : `snaive` si
+la fréquence a une saisonnalité (`day` → 7, `week` → 52, `month` → 12,
+`quarter` → 4), `naive` sinon (`year`, pas de cycle saisonnier annuel
+exploitable).
 
 ### Règle `reliability`
 
@@ -137,10 +142,15 @@ Fonction `api_v1_reliability(model_mase, baseline_mase, holdout_points)` :
 ### Erreurs
 
 Même format que le contrat : `400/401/404/413`
-`{"status":"error","errors":[{"field":..., "message":"..."}]}`, messages en
-français, actionnables (colonnes disponibles listées, modèles disponibles
-listés, etc.). Aucune entrée invalide ne produit de `500` : toute erreur
-prévisible est interceptée en amont de l'ajustement des modèles
+`{"status":"error","errors":[{"field":..., "message":"..."}]}` — `field` vaut
+`null` (JSON) quand l'erreur ne porte pas sur un champ précis (pas `{}` :
+tous les endpoints sérialisent en `application/json;charset=utf-8` via
+`reqres::format_json(auto_unbox = TRUE, null = "null")`, qui rend les `NULL`
+R comme `null` JSON plutôt que le défaut de plumber2 — `{}` — voir
+`plumber.R`). Messages en français, accentués (UTF-8), actionnables
+(colonnes disponibles listées, modèles disponibles listés, etc.). Aucune
+entrée invalide ne produit de `500` : toute erreur prévisible est
+interceptée en amont de l'ajustement des modèles
 (`api_v1_validate_request()`), et un échec d'ajustement isolé sur une série
 (dans un cas multi-groupes) est reporté comme avertissement au niveau de
 cette série plutôt que de faire échouer toute la requête.
