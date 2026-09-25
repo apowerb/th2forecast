@@ -31,7 +31,7 @@ def test_dates_non_parsables():
 def test_modele_inconnu():
     e = invalid({"data": monthly(12, float), "date_var": "date", "target_var": "sales", "horizon": 2, "models": ["magic"]})
     assert e.errors[0]["field"] == "models"
-    assert e.errors[0]["message"] == ("Modèle(s) inconnu(s) : magic ; modèles disponibles : prophet, arima, ets, snaive, naive, auto.")
+    assert e.errors[0]["message"] == ("Modèle(s) inconnu(s) : magic ; modèles disponibles : prophet, arima, ets, snaive, naive, croston, tsb, imapa, auto.")
 
 
 def test_doublons_de_dates_par_serie():
