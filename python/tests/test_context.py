@@ -96,6 +96,18 @@ def test_evenement_sans_precedent_signale_et_ignore(engine):
     assert s["scenarios"][0]["difference"]["total"] == 0
 
 
+def test_evenement_present_dans_chaque_periode_ecarte(engine):
+    # Promo « le 1er de chaque mois » sur des mois : la part couverte vaut ~1/30 partout,
+    # une quasi-constante confondue avec le niveau de la série, donc inapprenable.
+    rows = monthly(24, lambda i: 50 + i)
+    firsts = [r["date"] for r in rows] + ["2024-01-01", "2024-02-01", "2024-03-01"]
+    _, out = run_forecast(body(rows, horizon=3, models=["arima"], events=[{"name": "promo", "dates": firsts}]),
+                          LIMITS, engine)
+    s = out["series"][0]
+    assert s["events"] == [{"name": "promo", "history_share": 1.0, "used": False}]
+    assert any("'promo' touche presque également chaque période" in w for w in s["warnings"])
+
+
 def test_sans_contexte_la_reponse_ne_change_pas(engine):
     _, out = run_forecast(body(monthly(24, lambda i: 50 + i), horizon=3, models=["naive"]), LIMITS, engine)
     assert "events" not in out["series"][0] and "scenarios" not in out["series"][0]

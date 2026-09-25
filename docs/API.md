@@ -187,7 +187,9 @@ Requête :
   comme covariable connue par Chronos-2, ARIMA (ARIMAX) et Prophet (régresseur). Avec des événements,
   `auto` = ensemble Chronos-2 + ARIMA (ETS et Theta ne les exploitent pas).
 - Un événement **sans précédent dans l'historique** d'une série est ignoré pour elle (avertissement) :
-  son effet ne peut pas être appris ; le simuler avec un ajustement.
+  son effet ne peut pas être appris ; le simuler avec un ajustement. Il en va de même d'un événement qui
+  touche presque également chaque période (écart entre ses parts extrêmes ≤ 20 % de la plus forte,
+  ex. « le 1er de chaque mois » sur des données mensuelles) : son effet se confond avec le niveau.
 - **Scénario** : `events` (facultatif) remplace les événements **futurs** (liste vide = aucun) ; les
   noms inconnus de `events` sont ignorés avec un avertissement. `adjustments` impose ensuite un
   effet explicite, `percent` (> -100) ou `add`, au prorata des jours couverts de chaque période.

@@ -15,6 +15,11 @@ log = logging.getLogger("th2fc")
 NA_METRICS = {"mape": None, "smape": None, "mase": None, "rmse": None}
 
 
+# Un événement n'est appris que s'il distingue des périodes : l'écart entre sa part la plus forte et
+# la plus faible dépasse 20 % de la plus forte. Sinon (promo « le 1er de chaque mois » sur des mois),
+# la covariable est une quasi-constante colinéaire à la constante du modèle.
+LEARNABLE_SPREAD = 0.2
+
 def reliability(model_mase, baseline_mase, holdout_points) -> str:
     if model_mase is None or baseline_mase is None or holdout_points is None or holdout_points < 2:
         return "unknown"
@@ -114,13 +119,18 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         names, x = ctx.matrix(req.events, g, dates + fut, frequency)
         n = len(dates)
         keep = []
+        where = "" if g is None else " de la série '%s'" % g
         for j, name in enumerate(names):
-            if np.ptp(x[:n, j]) > 0:
+            hist = x[:n, j]
+            if np.ptp(hist) > LEARNABLE_SPREAD * np.max(hist):
                 keep.append(j)
-            else:
+            elif np.max(hist) == 0:
                 s_warn.append("L'événement '%s' n'a aucun précédent dans l'historique%s : son effet ne peut pas être appris ; "
-                              "pour le simuler, utilisez un ajustement explicite dans un scénario."
-                              % (name, "" if g is None else " de la série '%s'" % g))
+                              "pour le simuler, utilisez un ajustement explicite dans un scénario." % (name, where))
+            else:
+                s_warn.append("L'événement '%s' touche presque également chaque période de l'historique%s : son effet se "
+                              "confond avec le niveau de la série et n'est pas appris ; déclarez-le à une fréquence plus fine "
+                              "ou utilisez un ajustement explicite." % (name, where))
         series.append({"group": g, "dates": dates, "y": values, "warnings": s_warn, "future": fut,
                        "x_names": tuple(names[j] for j in keep), "x": x[:, keep],
                        "event_info": [{"name": name, "history_share": round(float(np.mean(x[:n, j] > 0)), 4),
