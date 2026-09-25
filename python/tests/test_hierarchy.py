@@ -242,3 +242,45 @@ def test_bottom_up_est_une_simple_somme_et_coherent():
 def test_is_singular_detecte_une_matrice_non_inversible():
     assert h.is_singular(np.array([[1.0, 1.0], [1.0, 1.0]]))
     assert not h.is_singular(np.eye(3))
+
+
+def test_build_children_directs():
+    df = _df([
+        {"group": "A", "region": "Nord", "zone": "N1"},
+        {"group": "B", "region": "Nord", "zone": "N2"},
+        {"group": "C", "region": "Sud", "zone": "S1"},
+    ])
+    hier = h.build(df, ["A", "B", "C"], ["region", "zone"])
+    label = {i: n.label for i, n in enumerate(hier.nodes)}
+    total = 0
+    nord = next(i for i, n in enumerate(hier.nodes) if n.label == "Nord")
+    n1 = next(i for i, n in enumerate(hier.nodes) if n.label == "N1")
+    n2 = next(i for i, n in enumerate(hier.nodes) if n.label == "N2")
+    a = next(i for i, n in enumerate(hier.nodes) if n.level == "bottom" and n.label == "A")
+    assert set(label[j] for j in hier.children[total]) == {"Nord", "Sud"}
+    assert set(label[j] for j in hier.children[nord]) == {"N1", "N2"}
+    assert hier.children[n1] == [a]
+    assert hier.children[a] == []
+    assert set(hier.children[n2]) == {next(i for i, n in enumerate(hier.nodes) if n.level == "bottom" and n.label == "B")}
+
+
+def test_propagate_mean_moyenne_des_enfants_directs_pas_de_toutes_les_feuilles():
+    df = _df([
+        {"group": "A", "region": "Nord", "zone": "N1"},
+        {"group": "B", "region": "Nord", "zone": "N2"},
+        {"group": "C", "region": "Sud", "zone": "S1"},
+    ])
+    hier = h.build(df, ["A", "B", "C"], ["region", "zone"])
+    # part d'un événement par série bas : A=1.0, B=0.0, C=1.0
+    leaf = [np.array([1.0]), np.array([0.0]), np.array([1.0])]
+    out = h.propagate_mean(hier, leaf)
+    n1 = next(i for i, n in enumerate(hier.nodes) if n.label == "N1")
+    n2 = next(i for i, n in enumerate(hier.nodes) if n.label == "N2")
+    nord = next(i for i, n in enumerate(hier.nodes) if n.label == "Nord")
+    total = 0
+    np.testing.assert_allclose(out[n1], [1.0])   # N1 = A seul
+    np.testing.assert_allclose(out[n2], [0.0])   # N2 = B seul
+    # Nord = moyenne de ses enfants DIRECTS (N1, N2), pas de A/B/C mélangés au niveau "zone"
+    np.testing.assert_allclose(out[nord], [0.5])
+    # Total = moyenne de ses enfants directs (Nord=0.5, Sud=1.0), pas la moyenne des 3 feuilles (0.667)
+    np.testing.assert_allclose(out[total], [0.75])

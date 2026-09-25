@@ -30,6 +30,7 @@ class Hierarchy:
     bottom_order: list        # valeurs de group_var, dans l'ordre des colonnes de S
     S: np.ndarray              # (n_nodes, n_bottom), 0/1 : S[i, j] = 1 si le bas j contribue au nœud i
     bottom_start: int          # index du premier nœud "bottom" dans `nodes` (= len(nodes) - n_bottom)
+    children: list             # children[i] = indices des enfants DIRECTS du nœud i (liste vide pour un bas)
 
 
 def _raw(v) -> str | None:
@@ -113,10 +114,13 @@ def build(df: pd.DataFrame, bottom_order: list, hierarchy_cols: list[str]) -> Hi
                                       % " ; ".join(dict.fromkeys(collisions)))])
 
     # 3) nœuds : total, puis chaque colonne (du haut au bas, valeurs dans l'ordre de première
-    #    apparition parmi les groupes), puis le bas.
+    #    apparition parmi les groupes), puis le bas. `index_of` retrouve un nœud par son chemin
+    #    interne pour relier chaque nœud à son parent DIRECT (utile pour la moyenne des parts
+    #    d'événement des agrégats, qui se propage enfant -> parent, niveau par niveau).
     m = len(bottom_order)
     nodes = [Node(TOTAL_LABEL, "total", ())]
     rows = [np.ones(m, dtype=float)]
+    index_of = {(): 0}
     for j, col in enumerate(hierarchy_cols):
         seen = []
         for g in bottom_order:
@@ -124,6 +128,7 @@ def build(df: pd.DataFrame, bottom_order: list, hierarchy_cols: list[str]) -> Hi
             if prefix not in seen:
                 seen.append(prefix)
         for prefix in seen:
+            index_of[prefix] = len(nodes)
             nodes.append(Node(prefix[-1], col, prefix))
             rows.append(np.array([1.0 if parent[g][:j + 1] == prefix else 0.0 for g in bottom_order]))
     bottom_start = len(nodes)
@@ -133,12 +138,35 @@ def build(df: pd.DataFrame, bottom_order: list, hierarchy_cols: list[str]) -> Hi
         row[k] = 1.0
         rows.append(row)
 
-    return Hierarchy(nodes=nodes, bottom_order=bottom_order, S=np.vstack(rows), bottom_start=bottom_start)
+    children: list = [[] for _ in nodes]
+    for i, node in enumerate(nodes[1:bottom_start], start=1):
+        parent_path = node.path[:-1]
+        children[index_of[parent_path]].append(i)
+    for k, g in enumerate(bottom_order):
+        children[index_of[parent[g]]].append(bottom_start + k)
+
+    return Hierarchy(nodes=nodes, bottom_order=bottom_order, S=np.vstack(rows), bottom_start=bottom_start,
+                     children=children)
 
 
 def aggregate(S: np.ndarray, y_bottom: np.ndarray) -> np.ndarray:
     """Sommes des séries filles : S (n, m) @ y_bottom (m, T) -> (n, T)."""
     return S @ y_bottom
+
+
+def propagate_mean(hier: Hierarchy, leaf_values: list) -> list:
+    """Moyenne non pondérée des enfants DIRECTS, propagée niveau par niveau jusqu'à la racine.
+
+    Sert aux parts d'événement des agrégats (« la moyenne des parts de ses enfants ») : contrairement
+    à `aggregate` (une somme), un agrégat à deux niveaux reçoit la moyenne de ses enfants directs
+    (déjà des moyennes), pas la moyenne de toutes les feuilles du sous-arbre.
+    """
+    out = [None] * len(hier.nodes)
+    for k, v in enumerate(leaf_values):
+        out[hier.bottom_start + k] = v
+    for i in range(hier.bottom_start - 1, -1, -1):
+        out[i] = np.mean([out[j] for j in hier.children[i]], axis=0)
+    return out
 
 
 # -- Estimateur de covariance à rétrécissement (Schäfer & Strimmer, 2005) -------------------------
