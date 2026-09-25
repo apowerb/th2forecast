@@ -97,3 +97,39 @@ def test_max_series_compte_les_agregats():
         c.validate(body(rows, horizon=3, hierarchy=["region"]), limits)
     assert e.value.status == 413
     assert "agrégats" in e.value.errors[0]["message"]
+def test_dates_non_alignees_est_refuse_400(engine):
+    from datetime import date
+
+    rows = ([{"date": date(2024, m, 1).isoformat(), "sales": 10 + m, "store": "A", "region": "Nord"} for m in range(1, 13)]
+           + [{"date": date(2023, m, 1).isoformat(), "sales": 20 + m, "store": "B", "region": "Nord"} for m in range(1, 13)])
+    status, out = run_forecast(body(rows, horizon=2, models=["naive"], hierarchy=["region"]), LIMITS, engine)
+    assert status == 400
+    assert out["errors"][0]["field"] == "hierarchy"
+    assert "non alignées" in out["errors"][0]["message"]
+
+
+def _two_region_hierarchy():
+    from th2fc import hierarchy as hie
+    df = __import__("pandas").DataFrame({"group": ["A", "B"], "region": ["Nord", "Sud"]})
+    return hie.build(df, ["A", "B"], ["region"])  # nœuds : Total, Nord, Sud, A, B
+
+
+def test_repli_bottom_up_si_w_singuliere():
+    from th2fc.forecast import _reconcile_matrix
+
+    hier = _two_region_hierarchy()
+    Y = np.array([[10.0, 11.0], [4.0, 5.0], [6.0, 6.0], [4.0, 5.0], [6.0, 6.0]])  # Total, Nord, Sud, A, B
+    W_singular = np.ones((5, 5))  # rang 1 : singulière
+    Y_rec, method, warn = _reconcile_matrix(hier, Y, W_singular, "mint")
+    assert method == "bottom_up"
+    assert warn is not None and "singulière" in warn
+    np.testing.assert_allclose(Y_rec[0], Y_rec[3] + Y_rec[4])
+
+
+def test_repli_bottom_up_si_w_absente():
+    from th2fc.forecast import _reconcile_matrix
+
+    hier = _two_region_hierarchy()
+    Y = np.array([[10.0], [4.0], [6.0], [4.0], [6.0]])
+    Y_rec, method, warn = _reconcile_matrix(hier, Y, None, "mint")
+    assert method == "bottom_up" and "non estimable" in warn
