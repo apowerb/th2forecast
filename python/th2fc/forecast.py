@@ -9,6 +9,7 @@ import numpy as np
 from . import calibration as cal
 from . import context as ctx
 from . import contract as c
+from . import demand as dmd
 from .engine import Engine, Task, components, metrics, windows
 
 log = logging.getLogger("th2fc")
@@ -63,12 +64,13 @@ def _nested(point, bounds: dict, levels: list[float]) -> dict:
     return out
 
 
-def _failed_series(group, warnings: list[str]) -> dict:
+def _failed_series(group, warnings: list[str], demand: dict) -> dict:
     return {
         "group": group, "model": None, "history": [], "forecast": [],
         "metrics": {**NA_METRICS, "holdout_points": 0},
         "baseline": {"model": None, "metrics": dict(NA_METRICS)},
-        "beats_baseline": False, "reliability": "unknown", "calibration": None, "warnings": warnings,
+        "beats_baseline": False, "reliability": "unknown", "calibration": None, "demand": demand,
+        "warnings": warnings,
     }
 
 
@@ -105,7 +107,11 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
     baseline = "snaive" if season > 1 else "naive"
     cands = candidates(req.models)
     has_events = bool(req.events)
-    needed = set().union(*(components(m, has_events) for m in cands)) | {baseline}
+    # Les deux ensembles "auto" (série lisse / intermittente) sont réunis ici : le type de demande
+    # de chaque série n'est connu qu'après régularisation, plus bas ; chaque tâche ne garde ensuite
+    # que ses propres composants via `t.models` et `t.sparse`.
+    needed = (set().union(*(components(m, has_events, sparse=False) for m in cands))
+             | set().union(*(components(m, has_events, sparse=True) for m in cands)) | {baseline})
     levels = req.confidence_levels
 
     series = []
@@ -131,8 +137,10 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
                 s_warn.append("L'événement '%s' touche presque également chaque période de l'historique%s : son effet se "
                               "confond avec le niveau de la série et n'est pas appris ; déclarez-le à une fréquence plus fine "
                               "ou utilisez un ajustement explicite." % (name, where))
+        demand_info = dmd.classify(values)
         series.append({"group": g, "dates": dates, "y": values, "warnings": s_warn, "future": fut,
                        "x_names": tuple(names[j] for j in keep), "x": x[:, keep],
+                       "demand": demand_info, "sparse": dmd.is_sparse(demand_info["type"]),
                        "event_info": [{"name": name, "history_share": round(float(np.mean(x[:n, j] > 0)), 4),
                                        "used": j in keep} for j, name in enumerate(names)]})
 
@@ -143,7 +151,7 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         s["h_cv"] = h_cv
         for w, o in enumerate(origins):
             cv.append(Task(key=(i, w), y=s["y"][:o], dates=s["dates"][:o], h=h_cv,
-                           season=_season(o, season), models=needed, events=has_events,
+                           season=_season(o, season), models=needed, events=has_events, sparse=s["sparse"],
                            x_names=s["x_names"], x_hist=s["x"][:o], x_fut=s["x"][o:o + h_cv]))
     _run_isolated(engine, cv, levels, frequency)
 
@@ -184,8 +192,8 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
 
         def task(key, x_fut):
             return Task(key=key, y=s["y"], dates=s["dates"], h=req.horizon, season=_season(n, season),
-                        models=components(s["winner"], has_events), events=has_events,
-                        x_names=s["x_names"], x_hist=s["x"][:n], x_fut=x_fut)
+                        models=components(s["winner"], has_events, sparse=s["sparse"]), events=has_events,
+                        sparse=s["sparse"], x_names=s["x_names"], x_hist=s["x"][:n], x_fut=x_fut)
 
         final.append(task((i, None), s["x"][n:]))
         for j, scn in enumerate(req.scenarios):
@@ -204,13 +212,23 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         group = s["group"]
         t = by_series.get(i)
         if t is None or s["winner"] not in t.out:
-            out.append(_failed_series(group, s["warnings"] + ["Aucun modèle n'a pu être entraîné sur cette série."]))
+            out.append(_failed_series(group, s["warnings"] + ["Aucun modèle n'a pu être entraîné sur cette série."],
+                                      s["demand"]))
             continue
 
-        is_int = bool(np.all(s["y"] == np.round(s["y"])))
+        # Ventes rares : jamais arrondi à l'entier (2 décimales), même sur un historique entier.
+        is_int = not s["sparse"] and bool(np.all(s["y"] == np.round(s["y"])))
 
         def fmt(x):
+            if s["sparse"]:
+                return round(float(x), 2)
             return int(round(float(x))) if is_int else round(float(x), 6)
+
+        def floor0(bounds):
+            # Demande intermittente/lumpy : jamais de borne basse négative, même après calibration.
+            if not s["sparse"]:
+                return bounds
+            return {lv: (np.maximum(lo, 0.0), hi) for lv, (lo, hi) in bounds.items()}
 
         def rows(point, bounds):
             out_rows = []
@@ -223,7 +241,7 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
             return out_rows
 
         point, bounds = t.out[s["winner"]]
-        bounds = _nested(point, cal.apply(point, bounds, s["calibration"]), levels)
+        bounds = floor0(_nested(point, cal.apply(point, bounds, s["calibration"]), levels))
         forecast = rows(point, bounds)
 
         scenarios = []
@@ -235,11 +253,17 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
             else:
                 p_s, b_s = point, bounds
             p_s, b_s = ctx.adjust(p_s, b_s, scn.adjustments, s["future"], frequency)
-            b_s = _nested(p_s, b_s, levels)
+            b_s = floor0(_nested(p_s, b_s, levels))
             total, base_total = float(np.sum(p_s)), float(np.sum(point))
             scenarios.append({"name": scn.name, "forecast": rows(p_s, b_s),
                               "difference": {"total": fmt(total - base_total),
                                              "percent": round((total / base_total - 1) * 100, 2) if base_total else None}})
+
+        if s["sparse"]:
+            s["warnings"].append("Ventes rares (%s) : la prévision donne la demande moyenne attendue par période."
+                                 % s["demand"]["type"])
+            if s["winner"] != "ensemble":
+                s["warnings"].append("Série à ventes rares : le mode auto ou tsb/imapa sont plus adaptés.")
 
         m, b = s["metrics"], s["baseline_metrics"] or dict(NA_METRICS)
         model_mase, base_mase = m["mase"], b["mase"]
@@ -252,6 +276,7 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
             "beats_baseline": model_mase is not None and base_mase is not None and model_mase < base_mase,
             "reliability": reliability(model_mase, base_mase, s["holdout_points"]),
             "calibration": _calibration_body(s["calibration"], s["holdout_points"]),
+            "demand": s["demand"],
             "warnings": s["warnings"],
         }
         if req.events:
