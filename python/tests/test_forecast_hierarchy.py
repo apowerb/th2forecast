@@ -136,3 +136,20 @@ def test_repli_bottom_up_si_w_absente():
     Y = np.array([[10.0], [4.0], [6.0], [4.0], [6.0]])
     Y_rec, method, warn = _reconcile_matrix(hier, Y, None, "mint")
     assert method == "bottom_up" and "non estimable" in warn
+
+
+def test_hierarchie_ventes_rares_entieres_reste_coherente(engine):
+    """Magasins à ventes rares ENTIÈRES : demand sur chaque nœud, bornes >= 0 sur les nœuds rares,
+    et cohérence exacte malgré le format (pas d'arrondi indépendant à l'entier ni à 2 décimales)."""
+    rng = np.random.default_rng(7)
+    rows = []
+    for store, region in (("A", "Nord"), ("B", "Nord"), ("C", "Sud")):
+        y = [float(rng.poisson(6)) if rng.random() < 0.35 else 0.0 for _ in range(48)]
+        rows += monthly(48, lambda i, y=y: y[i - 1], store=store, region=region)
+    status, out = run_forecast(body(rows, horizon=4, models=["auto"], hierarchy=["region"]), LIMITS, engine)
+    assert status == 200
+    assert all("demand" in s for s in out["series"])
+    for s in out["series"]:
+        if s["demand"]["type"] in ("intermittent", "lumpy"):
+            assert all(r["lower_80"] >= 0 and r["lower_95"] >= 0 for r in s["forecast"])
+    _coherent(out, atol=5e-6)  # chaque nœud est arrondi à 6 décimales : cumul de 2 arrondis <= 1e-6

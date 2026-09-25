@@ -478,10 +478,12 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
             continue
 
         # Ventes rares : jamais arrondi à l'entier (2 décimales), même sur un historique entier.
-        is_int = not s["sparse"] and bool(np.all(s["y"] == np.round(s["y"])))
+        # Hiérarchie : un arrondi propre à chaque nœud casserait « parent = somme des enfants » :
+        # tous les nœuds gardent la même précision (6 décimales).
+        is_int = not hier and not s["sparse"] and bool(np.all(s["y"] == np.round(s["y"])))
 
         def fmt(x):
-            if s["sparse"]:
+            if s["sparse"] and not hier:
                 return round(float(x), 2)
             return int(round(float(x))) if is_int else round(float(x), 6)
 
