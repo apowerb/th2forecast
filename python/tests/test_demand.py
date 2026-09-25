@@ -199,3 +199,32 @@ def test_non_regression_serie_lisse(engine):
     assert s["model"] == "naive"
     last = s["history"][-1]["value"]
     assert all(f["value"] == last for f in s["forecast"])  # invariant du modèle naïf, inchangé
+
+
+def test_backtest_ne_calcule_que_les_composants_du_type_de_demande():
+    """Série lisse : ni tsb ni imapa ; série intermittente : ni ets ni theta (coût de calcul)."""
+    from th2fc.engine import Engine
+
+    seen = []
+
+    class Spy(Engine):
+        def run(self, tasks, levels, frequency, step):
+            seen.extend((t.sparse, frozenset(t.models)) for t in tasks)
+            for t in tasks:
+                t.out.clear()
+
+    smooth = [dict(r, store="A") for r in monthly(30, lambda t: 100.0 + t)]
+    sparse = [dict(r, store="B") for r in sparse_rows(n=30)]
+    run_forecast(body(smooth + sparse, group_var="store", horizon=3), LIMITS, Spy())
+    assert {sp for sp, _ in seen} == {False, True}
+    for sp, models in seen:
+        if sp:
+            assert not models & {"ets", "theta"}
+        else:
+            assert not models & {"tsb", "imapa", "croston"}
+
+
+def test_pas_davertissement_modele_quand_tsb_demande(engine):
+    status, res = run_forecast(body(sparse_rows(n=30), horizon=3, models=["tsb"]), LIMITS, engine)
+    assert status == 200
+    assert not any("plus adaptés" in w for w in res["series"][0]["warnings"])

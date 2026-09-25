@@ -107,11 +107,9 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
     baseline = "snaive" if season > 1 else "naive"
     cands = candidates(req.models)
     has_events = bool(req.events)
-    # Les deux ensembles "auto" (série lisse / intermittente) sont réunis ici : le type de demande
-    # de chaque série n'est connu qu'après régularisation, plus bas ; chaque tâche ne garde ensuite
-    # que ses propres composants via `t.models` et `t.sparse`.
-    needed = (set().union(*(components(m, has_events, sparse=False) for m in cands))
-             | set().union(*(components(m, has_events, sparse=True) for m in cands)) | {baseline})
+    # Composants par type de demande : lensemble auto dune série intermittente/lumpy diffère.
+    needed = {sp: set().union(*(components(m, has_events, sparse=sp) for m in cands)) | {baseline}
+              for sp in (False, True)}
     levels = req.confidence_levels
 
     series = []
@@ -151,7 +149,7 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         s["h_cv"] = h_cv
         for w, o in enumerate(origins):
             cv.append(Task(key=(i, w), y=s["y"][:o], dates=s["dates"][:o], h=h_cv,
-                           season=_season(o, season), models=needed, events=has_events, sparse=s["sparse"],
+                           season=_season(o, season), models=needed[s["sparse"]], events=has_events, sparse=s["sparse"],
                            x_names=s["x_names"], x_hist=s["x"][:o], x_fut=s["x"][o:o + h_cv]))
     _run_isolated(engine, cv, levels, frequency)
 
@@ -262,7 +260,7 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         if s["sparse"]:
             s["warnings"].append("Ventes rares (%s) : la prévision donne la demande moyenne attendue par période."
                                  % s["demand"]["type"])
-            if s["winner"] != "ensemble":
+            if s["winner"] not in {"ensemble", "croston", "tsb", "imapa"}:
                 s["warnings"].append("Série à ventes rares : le mode auto ou tsb/imapa sont plus adaptés.")
 
         m, b = s["metrics"], s["baseline_metrics"] or dict(NA_METRICS)
