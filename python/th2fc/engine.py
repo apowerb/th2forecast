@@ -17,6 +17,7 @@ import pandas as pd
 log = logging.getLogger("th2fc")
 
 ENSEMBLE = ("chronos2", "ets", "arima", "theta")
+ENSEMBLE_EVENTS = ("chronos2", "arima")  # seuls modèles de l'ensemble qui exploitent les événements
 STATS = {"ets", "arima", "theta", "naive", "snaive"}
 MAX_WINDOWS = 3
 
@@ -31,6 +32,23 @@ class Task:
     season: int
     models: set[str]
     out: dict = field(default_factory=dict)  # modèle -> (point, {niveau: (bas, haut)})
+    events: bool = False  # la requête déclare des événements : ensemble réduit aux modèles qui les exploitent
+    x_names: tuple = ()  # événements utilisés comme covariables
+    x_hist: np.ndarray | None = None  # (len(y), k)
+    x_fut: np.ndarray | None = None  # (h, k)
+
+    def usable(self) -> "Task":
+        """Ne garde que les covariables qui varient sur l'entraînement (sinon effet inapprenable)."""
+        if not self.x_names:
+            return self
+        keep = [j for j in range(len(self.x_names)) if np.ptp(self.x_hist[:, j]) > 0]
+        self.x_names = tuple(self.x_names[j] for j in keep)
+        self.x_hist, self.x_fut = self.x_hist[:, keep], self.x_fut[:, keep]
+        return self
+
+
+def _cov_frame(x: np.ndarray, names: tuple) -> dict:
+    return {"x%d" % j: x[:, j] for j in range(len(names))}
 
 
 def quantile_pair(level: float) -> tuple[float, float]:
@@ -62,14 +80,18 @@ class Engine:
 
     def _run_chronos(self, tasks: list[Task], levels: list[float]) -> None:
         qs = sorted({0.5} | {q for lv in levels for q in quantile_pair(lv)})
-        for h in sorted({t.h for t in tasks}):
-            batch = [t for t in tasks if t.h == h]
-            ctx = pd.concat([
-                pd.DataFrame({"id": str(i), "timestamp": pd.date_range("2000-01-01", periods=len(t.y), freq="D"), "target": t.y})
-                for i, t in enumerate(batch)
-            ])
+        for h, k in sorted({(t.h, len(t.x_names)) for t in tasks}):
+            batch = [t for t in tasks if (t.h, len(t.x_names)) == (h, k)]
+            ctx, fut = [], []
+            for i, t in enumerate(batch):
+                ts = pd.date_range("2000-01-01", periods=len(t.y) + h, freq="D")
+                ctx.append(pd.DataFrame({"id": str(i), "timestamp": ts[:len(t.y)], "target": t.y,
+                                         **(_cov_frame(t.x_hist, t.x_names) if k else {})}))
+                if k:
+                    fut.append(pd.DataFrame({"id": str(i), "timestamp": ts[len(t.y):], **_cov_frame(t.x_fut, t.x_names)}))
             with self._lock:
-                pred = self.chronos().predict_df(ctx, prediction_length=h, quantile_levels=qs,
+                pred = self.chronos().predict_df(pd.concat(ctx), future_df=pd.concat(fut) if k else None,
+                                                 prediction_length=h, quantile_levels=qs,
                                                  id_column="id", timestamp_column="timestamp", target="target")
             cols = {round(float(c), 6): c for c in pred.columns if _is_float(c)}
             for i, t in enumerate(batch):
@@ -79,12 +101,36 @@ class Engine:
 
     # -- statsforecast ---------------------------------------------------------
     def _run_stats(self, tasks: list[Task], levels: list[float]) -> None:
+        # ARIMA avec covariables à part : les autres modèles n'acceptent pas d'exogènes.
+        plain = [t for t in tasks if not t.x_names]
+        for t in tasks:
+            if t.x_names and "arima" in t.models:
+                self._run_arimax(t, levels)
+        for t in tasks:
+            if t.x_names and t.models & (STATS - {"arima"}):
+                plain.append(t)
+        self._run_stats_plain(plain, levels, skip_arima={id(t) for t in tasks if t.x_names})
+
+    def _run_arimax(self, t: Task, levels: list[float]) -> None:
+        from statsforecast import StatsForecast
+        from statsforecast.models import AutoARIMA, Naive
+
+        n = len(t.y)
+        df = pd.DataFrame({"unique_id": "0", "ds": np.arange(n), "y": t.y, **_cov_frame(t.x_hist, t.x_names)})
+        x_df = pd.DataFrame({"unique_id": "0", "ds": np.arange(n, n + t.h), **_cov_frame(t.x_fut, t.x_names)})
+        sf = StatsForecast(models=[AutoARIMA(season_length=t.season, alias="arima")], freq=1,
+                           fallback_model=Naive(alias="fallback"))
+        f = sf.forecast(df=df, h=t.h, X_df=x_df, level=[pct(x) for x in levels])
+        t.out["arima"] = (f["arima"].to_numpy(),
+                          {x: (f[f"arima-lo-{pct(x)}"].to_numpy(), f[f"arima-hi-{pct(x)}"].to_numpy()) for x in levels})
+
+    def _run_stats_plain(self, tasks: list[Task], levels: list[float], skip_arima: set) -> None:
         from statsforecast import StatsForecast
         from statsforecast.models import AutoARIMA, AutoETS, AutoTheta, Naive, SeasonalNaive
 
         for h, season in sorted({(t.h, t.season) for t in tasks}):
             batch = [t for t in tasks if (t.h, t.season) == (h, season)]
-            wanted = set().union(*(t.models & STATS for t in batch))
+            wanted = set().union(*((t.models & STATS) - ({"arima"} if id(t) in skip_arima else set()) for t in batch))
             if not wanted:
                 continue
             builders = {
@@ -102,7 +148,7 @@ class Engine:
             fc = sf.forecast(df=df, h=h, level=lv)
             for i, t in enumerate(batch):
                 f = fc[fc["unique_id"] == str(i)]
-                for m in sorted(wanted & t.models):
+                for m in sorted(wanted & t.models - ({"arima"} if id(t) in skip_arima else set())):
                     bounds = {x: (f[f"{m}-lo-{pct(x)}"].to_numpy(), f[f"{m}-hi-{pct(x)}"].to_numpy()) for x in levels}
                     t.out[m] = (f[m].to_numpy(), bounds)
 
@@ -115,8 +161,12 @@ class Engine:
             if "prophet" not in t.models:
                 continue
             m = Prophet(uncertainty_samples=500)
-            m.fit(pd.DataFrame({"ds": pd.to_datetime(t.dates), "y": t.y}))
-            future = pd.DataFrame({"ds": pd.to_datetime([step(t.dates[-1], frequency, k) for k in range(1, t.h + 1)])})
+            for name in _cov_frame(t.x_hist, t.x_names) if t.x_names else {}:
+                m.add_regressor(name)
+            m.fit(pd.DataFrame({"ds": pd.to_datetime(t.dates), "y": t.y,
+                                **(_cov_frame(t.x_hist, t.x_names) if t.x_names else {})}))
+            future = pd.DataFrame({"ds": pd.to_datetime([step(t.dates[-1], frequency, k) for k in range(1, t.h + 1)]),
+                                   **(_cov_frame(t.x_fut, t.x_names) if t.x_names else {})})
             point = m.predict(future)["yhat"].to_numpy()
             samples = m.predictive_samples(future)["yhat"]
             bounds = {lv: tuple(np.quantile(samples, quantile_pair(lv), axis=1)) for lv in levels}
@@ -124,6 +174,7 @@ class Engine:
 
     # -- orchestration ----------------------------------------------------------
     def run(self, tasks: list[Task], levels: list[float], frequency: str, step) -> None:
+        tasks = [t.usable() for t in tasks]
         chronos_tasks = [t for t in tasks if "chronos2" in t.models]
         if chronos_tasks:
             self._run_chronos(chronos_tasks, levels)
@@ -131,7 +182,7 @@ class Engine:
         self._run_prophet(tasks, levels, frequency, step)
         for t in tasks:
             if "ensemble" in t.models:
-                parts = [t.out[m] for m in ENSEMBLE if m in t.out]
+                parts = [t.out[m] for m in (ENSEMBLE_EVENTS if t.events else ENSEMBLE) if m in t.out]
                 point = np.mean([p[0] for p in parts], axis=0)
                 bounds = {lv: (np.mean([p[1][lv][0] for p in parts], axis=0), np.mean([p[1][lv][1] for p in parts], axis=0))
                           for lv in levels}
@@ -146,8 +197,10 @@ def _is_float(c) -> bool:
         return False
 
 
-def components(model: str) -> set[str]:
-    return set(ENSEMBLE) | {"ensemble"} if model == "ensemble" else {model}
+def components(model: str, events: bool = False) -> set[str]:
+    if model != "ensemble":
+        return {model}
+    return set(ENSEMBLE_EVENTS if events else ENSEMBLE) | {"ensemble"}
 
 
 def windows(n: int, horizon: int) -> tuple[int, list[int]]:
