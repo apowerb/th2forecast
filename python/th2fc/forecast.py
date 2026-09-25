@@ -166,7 +166,7 @@ def _build_hierarchy_series(hier: hie.Hierarchy, bottom_series: list, events, fr
     return out
 
 
-def _final_W(series: list, cv: list) -> np.ndarray | None:
+def _final_residuals(series: list, cv: list) -> np.ndarray | None:
     """Résidus empilés (T, n_nœuds) de TOUTES les fenêtres de backtest, modèle retenu de chaque nœud
     (une colonne par nœud) ; None si une série a échoué ou si son modèle manque une fenêtre."""
     by_key = {t.key: t for t in cv}
@@ -183,6 +183,16 @@ def _final_W(series: list, cv: list) -> np.ndarray | None:
                 row.append(s["y"][s["origins"][w] + step] - t.out[s["winner"]][0][step])
             rows.append(row)
     return np.array(rows) if rows else None
+
+
+def _final_W(series: list, cv: list) -> np.ndarray | None:
+    """Matrice de covariance des erreurs de backtest (n_nœuds, n_nœuds), estimateur à rétrécissement
+    de Schäfer-Strimmer, pour `hierarchy.reconcile` ; None si non estimable."""
+    E = _final_residuals(series, cv)
+    if E is None:
+        return None
+    W, _ = hie.shrink_covariance(E)
+    return W
 
 
 def _final_points(series: list, by_series: dict) -> np.ndarray | None:

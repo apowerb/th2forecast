@@ -33,12 +33,15 @@ def _coherent(out, atol=1e-6):
         assert total["forecast"][k]["value"] == pytest.approx(nord["forecast"][k]["value"] + sud["forecast"][k]["value"], abs=atol)
 
 
-@pytest.mark.parametrize("method", ["mint", "bottom_up"])
-def test_coherence_point_et_bornes_agregats_somme_des_enfants(engine, method):
-    status, out = run_forecast(body(hier_rows(), horizon=4, models=["ets"],
+@pytest.mark.parametrize("method,expected", [("mint", "mint_shrink"), ("bottom_up", "bottom_up")])
+def test_coherence_point_et_bornes_agregats_somme_des_enfants(engine, method, expected):
+    # historique assez long pour que la matrice W (résidus de TOUTES les fenêtres de backtest)
+    # soit effectivement estimable : sinon _reconcile_matrix replie sur bottom_up et le test ne
+    # prouverait plus rien sur le vrai calcul MinT (n_noeuds x n_noeuds, pas juste cohérent par accident).
+    status, out = run_forecast(body(hier_rows(48), horizon=4, models=["ets"],
                                     hierarchy=["region"], reconciliation=method), LIMITS, engine)
     assert status == 200
-    assert out["reconciliation"]["method"] in ("mint_shrink", "bottom_up")
+    assert out["reconciliation"]["method"] == expected
     assert out["reconciliation"]["coherent"] is True
     _coherent(out)
 
