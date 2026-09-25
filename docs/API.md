@@ -77,7 +77,9 @@ perdue dans ce cas de repli.
 - `frequency` : `null` (détection automatique) ou une valeur explicite parmi
   `day`, `week`, `month`, `quarter`, `year`. Une fréquence explicite est
   toujours prioritaire sur la détection.
-- `models` : sous-ensemble de `["prophet","arima","ets","snaive","naive","auto"]`.
+- `models` : sous-ensemble de `["prophet","arima","ets","snaive","naive","auto"]`. Le moteur
+  Python (`python/`) accepte en plus `"croston"` (CrostonSBA), `"tsb"` (TSB, `alpha_d = alpha_p =
+  0,1`) et `"imapa"` (IMAPA), dédiés à la demande intermittente ; voir « Champ `demand` » plus bas.
 
 **Précision d'implémentation (choix documenté, contrat ambigu sur ce point) :**
 le schéma de réponse ne renvoie **qu'un seul** `model` par série. Le service
@@ -166,6 +168,35 @@ renvoie pas, un client doit donc tolérer son absence (ou `null` pour une série
 - `raw_coverage` : part des valeurs réelles du backtest dans les bandes brutes du modèle.
 - `calibrated_coverage` : même mesure pour les bandes calibrées, estimée hors échantillon
   (chaque fenêtre recalibrée sans ses propres points) ; `null` s'il n'y a qu'une fenêtre.
+
+### Champ `demand` (moteur Python uniquement)
+
+Le moteur Python classe chaque série sur son historique régularisé selon la méthode
+Syntetos-Boylan (2005), et renvoie toujours ce champ, y compris pour une série en échec :
+
+```json
+"demand": {"type": "intermittent", "adi": 2.4, "cv2": 0.31, "zero_share": 0.58}
+```
+
+- `adi` (average inter-demand interval) = nb de périodes / nb de périodes non nulles ; `null` si
+  aucune valeur non nulle. `cv2` = (écart-type / moyenne)² des valeurs non nulles ; `null` si moins
+  de deux valeurs non nulles. `zero_share` = part de périodes à zéro. Les trois sont arrondis à 4
+  décimales.
+- `type`, seuils ADI = 1,32 et CV² = 0,49 : `smooth` (ADI < 1,32, CV² < 0,49), `erratic` (ADI <
+  1,32, CV² ≥ 0,49), `intermittent` (ADI ≥ 1,32, CV² < 0,49), `lumpy` (ADI ≥ 1,32, CV² ≥ 0,49).
+  Une valeur négative dans l'historique, ou moins de deux valeurs non nulles, classe toujours la
+  série `smooth` (CV² non fiable dans ces cas) même si `adi`/`cv2` restent calculables.
+- Sur une série `intermittent`/`lumpy`, `models: ["auto"]` remplace l'ensemble par défaut
+  (`chronos2, ets, arima, theta`) par `chronos2, tsb, imapa` (avec événements déclarés :
+  `chronos2` seul, comme pour l'ensemble par défaut). Le champ `model` de la série reste
+  `"ensemble"` dans les deux cas ; `demand.type` indique lequel a servi.
+- `croston`/`tsb`/`imapa` n'ont pas de bande native : la bande brute est
+  `point ± z(niveau) × écart-type des valeurs d'entraînement`, bornée à 0 en bas. Sur une série
+  `intermittent`/`lumpy`, la borne basse de la bande finale (même calibrée) est toujours bornée à
+  0. Les valeurs prévues ne sont jamais arrondies à l'entier (2 décimales), même si l'historique
+  est entier. Un avertissement `warnings[]` accompagne systématiquement ces séries ; un modèle
+  explicite (`prophet`, `arima`, ...) demandé sur une série intermittente est exécuté quand même,
+  avec un avertissement suggérant `auto`, `tsb` ou `imapa`.
 
 ### Champs optionnels `events` et `scenarios` (moteur Python uniquement)
 
