@@ -10,7 +10,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-ALLOWED_MODELS = ["prophet", "arima", "ets", "snaive", "naive", "auto"]
+ALLOWED_MODELS = ["prophet", "arima", "ets", "snaive", "naive", "croston", "tsb", "imapa", "auto"]
 ALLOWED_FREQUENCIES = ["day", "week", "month", "quarter", "year"]
 SEASONAL_PERIOD = {"day": 7, "week": 52, "month": 12, "quarter": 4, "year": 1}
 _DATE_RE = re.compile(r"^\s*(\d{4})[-/](\d{1,2})[-/](\d{1,2})")

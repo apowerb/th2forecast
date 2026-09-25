@@ -18,7 +18,10 @@ log = logging.getLogger("th2fc")
 
 ENSEMBLE = ("chronos2", "ets", "arima", "theta")
 ENSEMBLE_EVENTS = ("chronos2", "arima")  # seuls modèles de l'ensemble qui exploitent les événements
+ENSEMBLE_SPARSE = ("chronos2", "tsb", "imapa")  # ensemble "auto" sur série intermittente/lumpy
+ENSEMBLE_SPARSE_EVENTS = ("chronos2",)  # tsb/imapa n'acceptent pas de covariables
 STATS = {"ets", "arima", "theta", "naive", "snaive"}
+SPARSE_MODELS = {"croston", "tsb", "imapa"}
 MAX_WINDOWS = 3
 
 
@@ -33,6 +36,7 @@ class Task:
     models: set[str]
     out: dict = field(default_factory=dict)  # modèle -> (point, {niveau: (bas, haut)})
     events: bool = False  # la requête déclare des événements : ensemble réduit aux modèles qui les exploitent
+    sparse: bool = False  # série intermittente/lumpy (Syntetos-Boylan) : ensemble "auto" dédié
     x_names: tuple = ()  # événements utilisés comme covariables
     x_hist: np.ndarray | None = None  # (len(y), k)
     x_fut: np.ndarray | None = None  # (h, k)
@@ -152,6 +156,41 @@ class Engine:
                     bounds = {x: (f[f"{m}-lo-{pct(x)}"].to_numpy(), f[f"{m}-hi-{pct(x)}"].to_numpy()) for x in levels}
                     t.out[m] = (f[m].to_numpy(), bounds)
 
+    # -- modèles de demande intermittente (croston/tsb/imapa) -------------------------
+    def _run_sparse(self, tasks: list[Task], levels: list[float]) -> None:
+        """Pas de bande native (pas de `level` demandé à statsforecast) : bande = point ± z(niveau)
+        × écart-type des valeurs d'entraînement, bornée à 0 en bas (demande jamais négative)."""
+        from scipy.stats import norm
+        from statsforecast import StatsForecast
+        from statsforecast.models import IMAPA, TSB, CrostonSBA, Naive
+
+        wanted_tasks = [t for t in tasks if t.models & SPARSE_MODELS]
+        if not wanted_tasks:
+            return
+        builders = {
+            "croston": lambda: CrostonSBA(alias="croston"),
+            "tsb": lambda: TSB(0.1, 0.1, alias="tsb"),
+            "imapa": lambda: IMAPA(alias="imapa"),
+        }
+        for h in sorted({t.h for t in wanted_tasks}):
+            batch = [t for t in wanted_tasks if t.h == h]
+            wanted = set().union(*(t.models & SPARSE_MODELS for t in batch))
+            models = [builders[m]() for m in sorted(wanted)]
+            df = pd.concat([pd.DataFrame({"unique_id": str(i), "ds": np.arange(len(t.y)), "y": t.y})
+                            for i, t in enumerate(batch)])
+            sf = StatsForecast(models=models, freq=1, n_jobs=self.n_jobs, fallback_model=Naive(alias="fallback"))
+            fc = sf.forecast(df=df, h=h)
+            for i, t in enumerate(batch):
+                f = fc[fc["unique_id"] == str(i)]
+                std = float(np.std(t.y))
+                for m in sorted(wanted & t.models):
+                    point = f[m].to_numpy()
+                    bounds = {}
+                    for lv in levels:
+                        z = float(norm.ppf((1 + lv) / 2))
+                        bounds[lv] = (np.maximum(point - z * std, 0.0), point + z * std)
+                    t.out[m] = (point, bounds)
+
     # -- prophet ------------------------------------------------------------------
     def _run_prophet(self, tasks: list[Task], levels: list[float], frequency: str, step) -> None:
         from prophet import Prophet
@@ -179,10 +218,15 @@ class Engine:
         if chronos_tasks:
             self._run_chronos(chronos_tasks, levels)
         self._run_stats(tasks, levels)
+        self._run_sparse(tasks, levels)
         self._run_prophet(tasks, levels, frequency, step)
         for t in tasks:
             if "ensemble" in t.models:
-                parts = [t.out[m] for m in (ENSEMBLE_EVENTS if t.events else ENSEMBLE) if m in t.out]
+                if t.sparse:
+                    base = ENSEMBLE_SPARSE_EVENTS if t.events else ENSEMBLE_SPARSE
+                else:
+                    base = ENSEMBLE_EVENTS if t.events else ENSEMBLE
+                parts = [t.out[m] for m in base if m in t.out]
                 point = np.mean([p[0] for p in parts], axis=0)
                 bounds = {lv: (np.mean([p[1][lv][0] for p in parts], axis=0), np.mean([p[1][lv][1] for p in parts], axis=0))
                           for lv in levels}
@@ -197,9 +241,11 @@ def _is_float(c) -> bool:
         return False
 
 
-def components(model: str, events: bool = False) -> set[str]:
+def components(model: str, events: bool = False, sparse: bool = False) -> set[str]:
     if model != "ensemble":
         return {model}
+    if sparse:
+        return set(ENSEMBLE_SPARSE_EVENTS if events else ENSEMBLE_SPARSE) | {"ensemble"}
     return set(ENSEMBLE_EVENTS if events else ENSEMBLE) | {"ensemble"}
 
 
