@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 
+from . import calibration as cal
 from . import contract as c
 from .engine import Engine, Task, components, metrics, windows
 
@@ -61,7 +62,24 @@ def _failed_series(group, warnings: list[str]) -> dict:
         "group": group, "model": None, "history": [], "forecast": [],
         "metrics": {**NA_METRICS, "holdout_points": 0},
         "baseline": {"model": None, "metrics": dict(NA_METRICS)},
-        "beats_baseline": False, "reliability": "unknown", "warnings": warnings,
+        "beats_baseline": False, "reliability": "unknown", "calibration": None, "warnings": warnings,
+    }
+
+
+def _tag(level: float) -> str:
+    return "%02d" % round(level * 100)
+
+
+def _calibration_body(calibration: dict, points: int) -> dict:
+    def r(x):
+        return None if x is None else round(x, 4)
+
+    return {
+        "method": "split-conformal",
+        "points": points,
+        "levels": {_tag(lv): {"calibrated": v["factor"] is not None, "pooled": v["pooled"], "factor": r(v["factor"]),
+                              "raw_coverage": r(v["raw_coverage"]), "calibrated_coverage": r(v["calibrated_coverage"])}
+                   for lv, v in calibration.items()},
     }
 
 
@@ -117,6 +135,17 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         s["metrics"] = scores.get(s["winner"])
         s["baseline_metrics"] = pooled(baseline)
         s["holdout_points"] = sum(len(y) for y, _ in tests)
+        s["scores"] = ({lv: cal.window_scores([(y, *t.out[s["winner"]]) for y, t in tests], lv) for lv in levels}
+                       if s["winner"] else None)
+
+    # Calibration : scores de la série, complétés par ceux des autres séries s'ils manquent.
+    for i, s in enumerate(series):
+        if s["scores"] is None:
+            s["calibration"] = None
+            continue
+        pool = {lv: np.concatenate([x for j, o in enumerate(series) if j != i and o["scores"] for x in o["scores"][lv]]
+                                   or [np.array([])]) for lv in levels}
+        s["calibration"] = cal.calibrate(s["scores"], levels, pool)
 
     # 2) Prévision finale : modèle retenu ré-entraîné sur toute la série.
     final = [Task(key=(i, None), y=s["y"], dates=s["dates"], h=req.horizon,
@@ -139,12 +168,12 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
             return int(round(float(x))) if is_int else round(float(x), 6)
 
         point, bounds = t.out[s["winner"]]
-        bounds = _nested(point, bounds, levels)
+        bounds = _nested(point, cal.apply(point, bounds, s["calibration"]), levels)
         forecast = []
         for k in range(req.horizon):
             row = {"date": c.step(s["dates"][-1], frequency, k + 1).isoformat(), "value": fmt(point[k])}
             for lv in levels:
-                tag = "%02d" % round(lv * 100)
+                tag = _tag(lv)
                 row["lower_" + tag], row["upper_" + tag] = fmt(bounds[lv][0][k]), fmt(bounds[lv][1][k])
             forecast.append(row)
 
@@ -158,6 +187,7 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
             "baseline": {"model": baseline, "metrics": b},
             "beats_baseline": model_mase is not None and base_mase is not None and model_mase < base_mase,
             "reliability": reliability(model_mase, base_mase, s["holdout_points"]),
+            "calibration": _calibration_body(s["calibration"], s["holdout_points"]),
             "warnings": s["warnings"],
         }
         if req.has_group:
