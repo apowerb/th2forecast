@@ -99,11 +99,26 @@ api_v1_forecast_one_series <- function(df, request) {
 
   winner_id <- calib_tbl$.model_id[calib_tbl$.model_desc == best_model][1]
 
+  # Le modele retenu est re-entraine sur toute la serie avant de prevoir : arima
+  # et ets prevoient a partir de la fin de leurs donnees d'entrainement, sans
+  # regarder les dates demandees. Sans refit, leur prevision serait celle du
+  # holdout, datee comme le futur. Les intervalles restent calibres sur les
+  # residus du holdout (conformal_split).
+  refit_tbl <- tryCatch(
+    modeltime::modeltime_refit(calib_tbl[calib_tbl$.model_id == winner_id, ], data = df),
+    error = function(e) NULL
+  )
+  if (is.null(refit_tbl)) {
+    return(list(error = api_v1_error("models", sprintf(
+      "Impossible de ré-entraîner le modèle '%s' sur toute la série.", best_model
+    ))))
+  }
+
   forecast_rows <- NULL
   for (level in request$confidence_levels) {
     fc <- tryCatch(
       modeltime::modeltime_forecast(
-        calib_tbl,
+        refit_tbl,
         h = horizon,
         actual_data = df,
         conf_interval = level,
