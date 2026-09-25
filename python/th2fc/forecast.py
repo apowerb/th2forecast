@@ -7,6 +7,7 @@ import time
 import numpy as np
 
 from . import calibration as cal
+from . import context as ctx
 from . import contract as c
 from .engine import Engine, Task, components, metrics, windows
 
@@ -90,7 +91,7 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
     except c.Invalid as e:
         return e.status, c.error_body(e.errors)
 
-    warnings = []
+    warnings = list(req.context_warnings)
     frequency = req.frequency
     if frequency is None:
         frequency = c.detect_frequency(req.df["date"])
@@ -98,7 +99,8 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
     season = c.SEASONAL_PERIOD[frequency]
     baseline = "snaive" if season > 1 else "naive"
     cands = candidates(req.models)
-    needed = set().union(*(components(m) for m in cands)) | {baseline}
+    has_events = bool(req.events)
+    needed = set().union(*(components(m, has_events) for m in cands)) | {baseline}
     levels = req.confidence_levels
 
     series = []
@@ -108,7 +110,21 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         s_warn = []
         if n_padded > 0:
             s_warn.append("%d point(s) manquant(s) au pas '%s' comblé(s) par interpolation linéaire." % (n_padded, frequency))
-        series.append({"group": g, "dates": dates, "y": values, "warnings": s_warn})
+        fut = [c.step(dates[-1], frequency, k) for k in range(1, req.horizon + 1)]
+        names, x = ctx.matrix(req.events, g, dates + fut, frequency)
+        n = len(dates)
+        keep = []
+        for j, name in enumerate(names):
+            if np.ptp(x[:n, j]) > 0:
+                keep.append(j)
+            else:
+                s_warn.append("L'événement '%s' n'a aucun précédent dans l'historique%s : son effet ne peut pas être appris ; "
+                              "pour le simuler, utilisez un ajustement explicite dans un scénario."
+                              % (name, "" if g is None else " de la série '%s'" % g))
+        series.append({"group": g, "dates": dates, "y": values, "warnings": s_warn, "future": fut,
+                       "x_names": tuple(names[j] for j in keep), "x": x[:, keep],
+                       "event_info": [{"name": name, "history_share": round(float(np.mean(x[:n, j] > 0)), 4),
+                                       "used": j in keep} for j, name in enumerate(names)]})
 
     # 1) Backtest en origines glissantes, toutes séries et fenêtres dans un même lot.
     cv = []
@@ -117,7 +133,8 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         s["h_cv"] = h_cv
         for w, o in enumerate(origins):
             cv.append(Task(key=(i, w), y=s["y"][:o], dates=s["dates"][:o], h=h_cv,
-                           season=_season(o, season), models=needed))
+                           season=_season(o, season), models=needed, events=has_events,
+                           x_names=s["x_names"], x_hist=s["x"][:o], x_fut=s["x"][o:o + h_cv]))
     _run_isolated(engine, cv, levels, frequency)
 
     for i, s in enumerate(series):
@@ -148,11 +165,29 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         s["calibration"] = cal.calibrate(s["scores"], levels, pool)
 
     # 2) Prévision finale : modèle retenu ré-entraîné sur toute la série.
-    final = [Task(key=(i, None), y=s["y"], dates=s["dates"], h=req.horizon,
-                  season=_season(len(s["y"]), season), models=components(s["winner"]))
-             for i, s in enumerate(series) if s["winner"]]
+    # Scénarios : mêmes modèles, événements futurs remplacés (les ajustements viennent après).
+    final = []
+    for i, s in enumerate(series):
+        if not s["winner"]:
+            continue
+        n = len(s["y"])
+
+        def task(key, x_fut):
+            return Task(key=key, y=s["y"], dates=s["dates"], h=req.horizon, season=_season(n, season),
+                        models=components(s["winner"], has_events), events=has_events,
+                        x_names=s["x_names"], x_hist=s["x"][:n], x_fut=x_fut)
+
+        final.append(task((i, None), s["x"][n:]))
+        for j, scn in enumerate(req.scenarios):
+            if scn.events is not None and s["x_names"]:
+                names, x = ctx.matrix(scn.events, s["group"], s["future"], frequency)
+                cols = [x[:, names.index(nm)] if nm in names else np.zeros(req.horizon) for nm in s["x_names"]]
+                final.append(task((i, j), np.column_stack(cols)))
+        if s["x_names"] and s["winner"] in {"ets", "theta", "naive", "snaive"}:
+            s["warnings"].append("Le modèle retenu (%s) n'exploite pas les événements déclarés." % s["winner"])
     _run_isolated(engine, final, levels, frequency)
-    by_series = {t.key[0]: t for t in final}
+    by_series = {t.key[0]: t for t in final if t.key[1] is None}
+    by_scenario = {t.key: t for t in final if t.key[1] is not None}
 
     out = []
     for i, s in enumerate(series):
@@ -167,15 +202,34 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         def fmt(x):
             return int(round(float(x))) if is_int else round(float(x), 6)
 
+        def rows(point, bounds):
+            out_rows = []
+            for k in range(req.horizon):
+                row = {"date": s["future"][k].isoformat(), "value": fmt(point[k])}
+                for lv in levels:
+                    tag = _tag(lv)
+                    row["lower_" + tag], row["upper_" + tag] = fmt(bounds[lv][0][k]), fmt(bounds[lv][1][k])
+                out_rows.append(row)
+            return out_rows
+
         point, bounds = t.out[s["winner"]]
         bounds = _nested(point, cal.apply(point, bounds, s["calibration"]), levels)
-        forecast = []
-        for k in range(req.horizon):
-            row = {"date": c.step(s["dates"][-1], frequency, k + 1).isoformat(), "value": fmt(point[k])}
-            for lv in levels:
-                tag = _tag(lv)
-                row["lower_" + tag], row["upper_" + tag] = fmt(bounds[lv][0][k]), fmt(bounds[lv][1][k])
-            forecast.append(row)
+        forecast = rows(point, bounds)
+
+        scenarios = []
+        for j, scn in enumerate(req.scenarios):
+            st = by_scenario.get((i, j))
+            if st is not None and s["winner"] in st.out:
+                p_s, b_s = st.out[s["winner"]]
+                b_s = cal.apply(p_s, b_s, s["calibration"])
+            else:
+                p_s, b_s = point, bounds
+            p_s, b_s = ctx.adjust(p_s, b_s, scn.adjustments, s["future"], frequency)
+            b_s = _nested(p_s, b_s, levels)
+            total, base_total = float(np.sum(p_s)), float(np.sum(point))
+            scenarios.append({"name": scn.name, "forecast": rows(p_s, b_s),
+                              "difference": {"total": fmt(total - base_total),
+                                             "percent": round((total / base_total - 1) * 100, 2) if base_total else None}})
 
         m, b = s["metrics"], s["baseline_metrics"] or dict(NA_METRICS)
         model_mase, base_mase = m["mase"], b["mase"]
@@ -190,6 +244,10 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
             "calibration": _calibration_body(s["calibration"], s["holdout_points"]),
             "warnings": s["warnings"],
         }
+        if req.events:
+            entry["events"] = s["event_info"]
+        if req.scenarios:
+            entry["scenarios"] = scenarios
         if req.has_group:
             entry = {"group": group, **entry}
         out.append(entry)

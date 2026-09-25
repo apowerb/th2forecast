@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import numpy as np
@@ -40,6 +40,9 @@ class Request:
     models: list[str]
     confidence_levels: list[float]
     has_group: bool
+    events: list = field(default_factory=list)  # context.Event
+    scenarios: list = field(default_factory=list)  # context.Scenario
+    context_warnings: list[str] = field(default_factory=list)
 
 
 class Invalid(Exception):
@@ -193,8 +196,18 @@ def validate(body, limits: dict) -> Request:
     if short:
         raise Invalid(400, [error("horizon", " ; ".join(short))])
 
+    from . import context  # import tardif : context dépend de ce module
+
+    ctx_errors, ctx_warnings = [], []
+    events = context.parse_events(body.get("events"), ctx_errors)
+    scenarios = context.parse_scenarios(body.get("scenarios"), {e.name for e in events}, ctx_errors, ctx_warnings)
+    if ctx_errors:
+        raise Invalid(400, [error("scenarios" if m.startswith("scenarios") or m.startswith("'scenarios'") else "events", m)
+                            for m in ctx_errors])
+
     return Request(df=df, horizon=horizon, frequency=frequency, models=models,
-                   confidence_levels=sorted(set(float(x) for x in levels)), has_group=bool(group_var))
+                   confidence_levels=sorted(set(float(x) for x in levels)), has_group=bool(group_var),
+                   events=events, scenarios=scenarios, context_warnings=ctx_warnings)
 
 
 def _mask(df: pd.DataFrame, g) -> pd.Series:
