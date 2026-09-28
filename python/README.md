@@ -15,17 +15,24 @@ passe tel quel contre les deux services.
   ne peut pas se produire ici).
 - Toutes les séries d'une requête `group_var` sont calculées en lot (un appel statsforecast et
   un appel Chronos-2 par horizon).
+- **Bandes calibrées** (conformal sur les fenêtres de backtest) : les bandes du modèle retenu
+  sont élargies ou resserrées pour contenir la part promise des valeurs réelles passées ; le
+  champ additionnel `calibration` (voir `docs/API.md`) donne le facteur et la couverture mesurée.
 - Écart connu : une date absente (`null`) est signalée comme non parsable.
 
 ## Mesures (banc M3 mensuel, 100 séries, h = 12, une requête)
 
-| Moteur | MASE moyen | Couverture 80 % | Durée |
-| --- | --- | --- | --- |
-| API R corrigée (PR #5) | 0,912 | 0,63 | — |
-| Python `arima` | 0,907 | 0,74 | 44 s |
-| Python `auto` (ensemble) | **0,881** | **0,77** | 54 s |
+| Moteur | MASE moyen | Couverture 80 % | Couverture 95 % | Durée |
+| --- | --- | --- | --- | --- |
+| API R corrigée (PR #5) | 0,912 | 0,63 | — | — |
+| Python `arima`, bandes brutes | 0,907 | 0,74 | 0,88 | 44 s |
+| Python `arima`, bandes calibrées | 0,907 | **0,79** | **0,94** | 46 s |
+| Python `auto`, bandes brutes | **0,881** | 0,77 | 0,93 | 54 s |
+| Python `auto`, bandes calibrées | **0,881** | 0,78 | 0,93 | 63 s |
 
 Mesuré le 25/09/2026 sur une VM 4 vCPU sans GPU ; mémoire du conteneur ≈ 420 Mo après le banc.
+Les bandes de l'ensemble étant déjà presque justes au backtest (0,78 / 0,96), la calibration les
+modifie peu ; elle corrige surtout les modèles aux bandes trop étroites (ARIMA ×1,28 à 80 %).
 
 ## Lancer
 

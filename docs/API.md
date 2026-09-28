@@ -140,6 +140,33 @@ Fonction `api_v1_reliability(model_mase, baseline_mase, holdout_points)` :
 - `"fair"` : le modèle bat la baseline mais ne remplit pas les deux
   conditions de `"good"`.
 
+### Champ optionnel `calibration` (moteur Python uniquement)
+
+Le moteur Python (`python/`) ajoute à chaque série un champ `calibration` ; l'API R ne le
+renvoie pas, un client doit donc tolérer son absence (ou `null` pour une série en échec).
+
+```json
+"calibration": {
+  "method": "split-conformal",
+  "points": 14,
+  "levels": {
+    "80": {"calibrated": true, "pooled": false, "factor": 1.1237,
+           "raw_coverage": 0.7143, "calibrated_coverage": 0.8571}
+  }
+}
+```
+
+- Score de chaque point du backtest : facteur d'élargissement de la bande du modèle qu'il aurait
+  fallu pour contenir la valeur réelle. `factor` = quantile conforme d'ordre
+  `ceil((n + 1) × niveau)` de ces scores ; les bandes renvoyées sont celles du modèle multipliées
+  par ce facteur autour de la prévision (élargies si `factor > 1`, resserrées sinon).
+- `pooled: true` : la série seule n'avait pas assez de points pour ce niveau (il en faut 4 pour
+  80 %, 19 pour 95 %) ; ses scores ont été complétés par ceux des autres séries de la requête.
+- `calibrated: false` : points insuffisants même ainsi ; bandes du modèle inchangées.
+- `raw_coverage` : part des valeurs réelles du backtest dans les bandes brutes du modèle.
+- `calibrated_coverage` : même mesure pour les bandes calibrées, estimée hors échantillon
+  (chaque fenêtre recalibrée sans ses propres points) ; `null` s'il n'y a qu'une fenêtre.
+
 ### Erreurs
 
 Même format que le contrat : `400/401/404/413`
