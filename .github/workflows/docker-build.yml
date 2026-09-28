@@ -3,6 +3,9 @@ name: Build Docker Image
 on:
   push:
     branches: [ main ]
+    # Release : un tag vX.Y.Z publie les deux images en X.Y.Z et latest.
+    # Les pushes sur main continuent de publier l'image par SHA (déploiement actuel).
+    tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
   pull_request:
     branches: [ main ]
 
@@ -55,7 +58,16 @@ jobs:
 
       - name: Push Docker Image
         if: github.event_name == 'push'
-        run: docker push apowerb/th2forecast:${{ github.sha }}
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            for tag in "$version" latest; do
+              docker tag apowerb/th2forecast:${{ github.sha }} apowerb/th2forecast:"$tag"
+              docker push apowerb/th2forecast:"$tag"
+            done
+          else
+            docker push apowerb/th2forecast:${{ github.sha }}
+          fi
 
   build-python:
     runs-on: ubuntu-latest
@@ -105,4 +117,13 @@ jobs:
 
       - name: Push Docker Image
         if: github.event_name == 'push'
-        run: docker push apowerb/th2forecast-py:${{ github.sha }}
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            for tag in "$version" latest; do
+              docker tag apowerb/th2forecast-py:${{ github.sha }} apowerb/th2forecast-py:"$tag"
+              docker push apowerb/th2forecast-py:"$tag"
+            done
+          else
+            docker push apowerb/th2forecast-py:${{ github.sha }}
+          fi
