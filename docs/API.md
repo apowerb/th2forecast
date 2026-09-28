@@ -169,6 +169,53 @@ renvoie pas, un client doit donc tolérer son absence (ou `null` pour une série
 - `calibrated_coverage` : même mesure pour les bandes calibrées, estimée hors échantillon
   (chaque fenêtre recalibrée sans ses propres points) ; `null` s'il n'y a qu'une fenêtre.
 
+### Champ optionnel `feedback` et `calibration.adaptive` (ACI, moteur Python uniquement)
+
+Requête :
+
+```json
+"feedback": [
+  {"group": "A", "level": "bottom",
+   "points": [{"date": "2026-01-01", "value": 950, "lower_80": 800, "upper_80": 1100,
+               "lower_95": 700, "upper_95": 1200}]}
+]
+```
+
+- Bandes prévues **passées** (relayées par le cœur depuis ses instantanés), une entrée par nœud
+  (`group`/`level` comme dans la réponse ; `level` absent ou `null` sans hiérarchie). `points` :
+  dates au format de la réponse, avec les bornes `lower_XX`/`upper_XX` des niveaux à réévaluer.
+- Le moteur apparie ces dates à **son propre historique régularisé** (mêmes dates que
+  `series[].history`) ; les dates hors de cet historique sont ignorées silencieusement. 400
+  explicite (`field: "feedback"`) si la forme de la requête est invalide ; une entrée dont
+  `(group, level)` ne correspond à aucun nœud est ignorée avec un avertissement global (pas 400).
+- Pour chaque niveau `L` présent (au moins 4 points appariés, sinon aucune adaptation pour ce
+  niveau) : `err_t = 1` si le réel régularisé de cette date est sorti de `[lower_L, upper_L]`,
+  sinon `0`, dans l'ordre des dates. ACI (Gibbs & Candès, 2021) :
+  `α_1 = 1 − L`, `α_{t+1} = α_t + γ((1 − L) − err_t)`, `γ = 0,05`,
+  `level_used = clip(1 − α_final, L, 0,995)` — jamais de resserrement sous le niveau demandé (peu
+  de points, asymétrie du risque entre bande trop étroite et bande trop large).
+- La calibration conforme existante prend alors le quantile de ses scores (mêmes scores, même
+  mise en commun entre séries) à l'ordre `level_used` au lieu de `L`. Si ce quantile n'existe pas
+  (trop peu de scores pour ce niveau, y compris mis en commun), repli sur le facteur du niveau `L`
+  multiplié par `z(level_used) / z(L)` (approximation gaussienne d'un intervalle symétrique,
+  documentée dans le code).
+- **Hiérarchie** : appliqué nœud par nœud (bas et agrégats), **avant** réconciliation — comme le
+  reste de la calibration, c'est une propriété du nœud, pas de la vue réconciliée.
+- Réponse, dans l'objet `calibration` existant (même emplacement que les autres champs) :
+
+```json
+"calibration": {
+  "method": "split-conformal", "points": 14, "levels": {"80": {...}},
+  "adaptive": {"80": {"target": 0.8, "points": 9, "observed": 0.667, "level_used": 0.9}}
+}
+```
+
+  `target` = niveau demandé, `points` = nombre de points de feedback appariés pour ce niveau,
+  `observed` = couverture observée sur ces points (`1 - moyenne(err_t)`), `level_used` = niveau
+  effectivement calibré (arrondis 3 décimales). Absent (`calibration.adaptive` n'existe pas) si
+  aucun feedback n'est applicable à cette série ; **sans le champ `feedback` dans la requête, la
+  réponse est strictement inchangée**.
+
 ### Champ `demand` (moteur Python uniquement)
 
 Le moteur Python classe chaque série sur son historique régularisé selon la méthode

@@ -47,6 +47,7 @@ class Request:
     hierarchy_cols: list[str] = field(default_factory=list)  # colonnes de hiérarchie, du plus haut au plus bas
     reconciliation: str = "none"  # "mint" | "bottom_up" | "none"
     hierarchy: object = None  # hierarchy.Hierarchy | None (arbre + matrice S, structure seulement)
+    feedback: list[dict] = field(default_factory=list)  # bandes prévues passées, pour l'ACI (contrat §1)
 
 
 class Invalid(Exception):
@@ -219,10 +220,74 @@ def validate(body, limits: dict) -> Request:
         raise Invalid(400, [error("scenarios" if m.startswith("scenarios") or m.startswith("'scenarios'") else "events", m)
                             for m in ctx_errors])
 
+    fb_errors: list = []
+    feedback = parse_feedback(body.get("feedback"), fb_errors)
+    if fb_errors:
+        raise Invalid(400, fb_errors)
+
     return Request(df=df, horizon=horizon, frequency=frequency, models=models,
                    confidence_levels=sorted(set(float(x) for x in levels)), has_group=bool(group_var),
                    events=events, scenarios=scenarios, context_warnings=ctx_warnings,
-                   hierarchy_cols=hierarchy_cols, reconciliation=reconciliation, hierarchy=hierarchy)
+                   hierarchy_cols=hierarchy_cols, reconciliation=reconciliation, hierarchy=hierarchy,
+                   feedback=feedback)
+
+
+def parse_feedback(raw, errors: list) -> list[dict]:
+    """Feedback (contrat §1) : bandes prévues passées, appariées plus tard par le moteur aux dates
+    de son historique régularisé. Validation de forme seulement ; l'appariement et l'ACI sont du
+    ressort de forecast.py (dates/séries dépendent du résultat du backtest)."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        errors.append(error("feedback", "Le champ 'feedback' doit être une liste."))
+        return []
+    out = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, dict) or "group" not in item:
+            errors.append(error("feedback", "Élément %d de 'feedback' invalide : attend un objet avec au "
+                                "moins 'group' et 'points'." % i))
+            continue
+        level = item.get("level")
+        if level is not None and not isinstance(level, str):
+            errors.append(error("feedback", "Élément %d de 'feedback' : 'level' doit être une chaîne ou null." % i))
+            continue
+        raw_points = item.get("points")
+        if not isinstance(raw_points, list) or not raw_points:
+            errors.append(error("feedback", "Élément %d de 'feedback' : 'points' doit être une liste non vide." % i))
+            continue
+
+        points, bad = [], False
+        for j, p in enumerate(raw_points):
+            if not isinstance(p, dict):
+                errors.append(error("feedback", "Élément %d de 'feedback', point %d : objet attendu." % (i, j)))
+                bad = True
+                continue
+            d = _parse_date(_as_character(p.get("date")))
+            if d is None:
+                errors.append(error("feedback", "Élément %d de 'feedback', point %d : date invalide "
+                                    "(format attendu YYYY-MM-DD)." % (i, j)))
+                bad = True
+                continue
+            bounds, ok = {}, True
+            for k, v in p.items():
+                if k == "date":
+                    continue
+                if not (isinstance(v, (int, float)) and not isinstance(v, bool)):
+                    errors.append(error("feedback", "Élément %d de 'feedback', point %d : '%s' doit être numérique."
+                                        % (i, j, k)))
+                    ok = False
+            if not ok:
+                bad = True
+                continue
+            tags_lo = {k[len("lower_"):] for k in p if k.startswith("lower_")}
+            tags_hi = {k[len("upper_"):] for k in p if k.startswith("upper_")}
+            for tag in tags_lo & tags_hi:
+                bounds[tag] = (float(p["lower_" + tag]), float(p["upper_" + tag]))
+            points.append({"date": d, "bounds": bounds})
+        if bad:
+            continue
+        out.append({"group": item.get("group"), "level": level, "points": points})
+    return out
 
 
 def _mask(df: pd.DataFrame, g) -> pd.Series:
