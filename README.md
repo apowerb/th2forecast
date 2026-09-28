@@ -87,6 +87,19 @@ TH2FORECAST_BASE_URL=http://127.0.0.1:8000 TH2FORECAST_API_TOKEN=change-moi \
   bash tests/e2e/smoke.sh
 ```
 
+## Publication des images
+
+La CI (`.github/workflows/docker-build.yml`) construit et teste les deux images (API R `apowerb/th2forecast`,
+moteur Python `apowerb/th2forecast-py`) à chaque PR vers `main`, puis les publie :
+
+- push sur `main` : image étiquetée par le SHA du commit ;
+- tag `vX.Y.Z` : images étiquetées `X.Y.Z` et `latest`. C'est ce tag que les déploiements (chart Helm,
+  compose d'apowerb-hosting) épinglent.
+
+```bash
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+
 ## Licence
 
 Apache License 2.0 — voir [`LICENSE`](LICENSE).
