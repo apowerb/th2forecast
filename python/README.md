@@ -18,6 +18,11 @@ passe tel quel contre les deux services.
 - **Bandes calibrées** (conformal sur les fenêtres de backtest) : les bandes du modèle retenu
   sont élargies ou resserrées pour contenir la part promise des valeurs réelles passées ; le
   champ additionnel `calibration` (voir `docs/API.md`) donne le facteur et la couverture mesurée.
+- **Événements et scénarios** (`events`, `scenarios`, voir `docs/API.md`) : promotions, fermetures,
+  jours fériés… deviennent des covariables apprises sur l'historique ; un scénario remplace les
+  événements futurs ou impose un ajustement explicite, et la réponse donne l'écart à la base.
+  Banc synthétique (20 séries journalières, promos d'effet 15 à 60, h = 28) : MAE des jours de
+  promo 34,8 → 3,6, tous jours 6,4 → 3,3 ; effet estimé par le scénario « sans promo » : 35.
 - Écart connu : une date absente (`null`) est signalée comme non parsable.
 
 ## Mesures (banc M3 mensuel, 100 séries, h = 12, une requête)

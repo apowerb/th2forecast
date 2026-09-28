@@ -167,6 +167,46 @@ renvoie pas, un client doit donc tolérer son absence (ou `null` pour une série
 - `calibrated_coverage` : même mesure pour les bandes calibrées, estimée hors échantillon
   (chaque fenêtre recalibrée sans ses propres points) ; `null` s'il n'y a qu'une fenêtre.
 
+### Champs optionnels `events` et `scenarios` (moteur Python uniquement)
+
+Requête :
+
+```json
+"events": [
+  {"name": "promo", "ranges": [{"start": "2025-12-01", "end": "2025-12-15"}], "dates": ["2024-12-05"],
+   "groups": ["A"]}
+],
+"scenarios": [
+  {"name": "Sans promo de décembre", "events": []},
+  {"name": "Hausse de prix", "adjustments": [{"start": "2026-03-01", "end": "2026-06-30", "percent": -8}]}
+]
+```
+
+- **Événement** : dates ou plages sur l'historique **et** l'horizon ; `groups` (facultatif) limite
+  l'événement à certaines séries. Chaque période reçoit la part de ses jours couverte (0 à 1), utilisée
+  comme covariable connue par Chronos-2, ARIMA (ARIMAX) et Prophet (régresseur). Avec des événements,
+  `auto` = ensemble Chronos-2 + ARIMA (ETS et Theta ne les exploitent pas).
+- Un événement **sans précédent dans l'historique** d'une série est ignoré pour elle (avertissement) :
+  son effet ne peut pas être appris ; le simuler avec un ajustement. Il en va de même d'un événement qui
+  touche presque également chaque période (écart entre ses parts extrêmes ≤ 20 % de la plus forte,
+  ex. « le 1er de chaque mois » sur des données mensuelles) : son effet se confond avec le niveau.
+- **Scénario** : `events` (facultatif) remplace les événements **futurs** (liste vide = aucun) ; les
+  noms inconnus de `events` sont ignorés avec un avertissement. `adjustments` impose ensuite un
+  effet explicite, `percent` (> -100) ou `add`, au prorata des jours couverts de chaque période.
+  Les bandes du scénario reçoivent la même calibration que la prévision de base.
+- Limites : 20 événements, 400 plages par événement, 5 scénarios, 20 ajustements par scénario.
+
+Réponse, par série (seulement si la requête en contient) :
+
+```json
+"events": [{"name": "promo", "history_share": 0.11, "used": true}],
+"scenarios": [{"name": "Sans promo de décembre", "forecast": [...],
+               "difference": {"total": -1840, "percent": -6.2}}]
+```
+
+`history_share` : part des périodes de l'historique touchées par l'événement. `difference` :
+total du scénario moins total de la prévision de base sur l'horizon.
+
 ### Erreurs
 
 Même format que le contrat : `400/401/404/413`
