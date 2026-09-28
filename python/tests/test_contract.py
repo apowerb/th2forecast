@@ -105,3 +105,51 @@ def test_regularisation_comble_et_interpole():
     assert n == 2
     assert [d.isoformat() for d in full] == ["2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01", "2024-05-01"]
     assert list(v) == [10.0, 20.0, 30.0, 40.0, 50.0]
+
+
+def test_hierarchy_exige_group_var():
+    rows = [r for g in "AB" for r in monthly(12, float, store=g)]
+    e = invalid({"data": rows, "date_var": "date", "target_var": "sales", "horizon": 2, "hierarchy": ["region"]})
+    assert e.status == 400
+    assert e.errors[0]["field"] == "hierarchy"
+    assert "group_var" in e.errors[0]["message"]
+
+
+def test_hierarchy_colonne_absente():
+    rows = [r for g in "AB" for r in monthly(12, float, store=g)]
+    e = invalid({"data": rows, "date_var": "date", "target_var": "sales", "group_var": "store", "horizon": 2,
+                 "hierarchy": ["region"]})
+    assert e.status == 400
+    assert e.errors[0]["field"] == "hierarchy"
+    assert "absente" in e.errors[0]["message"]
+
+
+def test_hierarchy_parent_non_unique_via_validate():
+    rows = (monthly(12, float, store="A", region="Nord") + monthly(12, float, store="A", region="Sud"))
+    e = invalid({"data": rows, "date_var": "date", "target_var": "sales", "group_var": "store", "horizon": 2,
+                 "hierarchy": ["region"]})
+    assert e.status == 400
+    assert e.errors[0]["field"] == "hierarchy"
+    assert "non unique" in e.errors[0]["message"]
+
+
+def test_hierarchy_reconciliation_par_defaut_mint():
+    rows = (monthly(12, float, store="A", region="Nord") + monthly(12, float, store="B", region="Sud"))
+    req = c.validate({"data": rows, "date_var": "date", "target_var": "sales", "group_var": "store", "horizon": 2,
+                      "hierarchy": ["region"]}, LIMITS)
+    assert req.hierarchy_cols == ["region"]
+    assert req.reconciliation == "mint"
+    assert req.hierarchy is not None
+    assert [n.label for n in req.hierarchy.nodes] == ["Total", "Nord", "Sud", "A", "B"]
+
+
+def test_sans_hierarchy_reconciliation_none_et_hierarchy_none():
+    req = c.validate({"data": monthly(12, float), "date_var": "date", "target_var": "sales", "horizon": 2}, LIMITS)
+    assert req.hierarchy_cols == [] and req.reconciliation == "none" and req.hierarchy is None
+
+
+def test_reconciliation_bottom_up_explicite():
+    rows = (monthly(12, float, store="A", region="Nord") + monthly(12, float, store="B", region="Sud"))
+    req = c.validate({"data": rows, "date_var": "date", "target_var": "sales", "group_var": "store", "horizon": 2,
+                      "hierarchy": ["region"], "reconciliation": "bottom_up"}, LIMITS)
+    assert req.reconciliation == "bottom_up"

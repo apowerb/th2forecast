@@ -238,6 +238,99 @@ Réponse, par série (seulement si la requête en contient) :
 `history_share` : part des périodes de l'historique touchées par l'événement. `difference` :
 total du scénario moins total de la prévision de base sur l'horizon.
 
+### Champs optionnels `hierarchy` et `reconciliation` (moteur Python uniquement)
+
+Requête :
+
+```json
+"group_var": "store",
+"hierarchy": ["region"],
+"reconciliation": "mint"
+```
+
+- **`hierarchy`** : colonnes de `data`, du niveau le plus haut au plus bas, **au-dessus** de
+  `group_var` (qui reste le niveau le plus bas). Exige `group_var`. Un niveau « Total » racine est
+  toujours ajouté. Chaque groupe (valeur de `group_var`) doit avoir une seule valeur par colonne de
+  hiérarchie sur tout son historique, sinon 400 (`field: "hierarchy"`). Absent/`null`/`[]` : pas de
+  hiérarchie, réponse strictement identique à avant (pas de champ `level` par série, pas de champ
+  racine `reconciliation`).
+- **`reconciliation`** : `"mint"` (défaut dès que `hierarchy` est fourni), `"bottom_up"` ou
+  `"none"`. `"mint"` estime la covariance des erreurs de backtest par l'estimateur à rétrécissement
+  de Schäfer-Strimmer (comme `hierarchicalforecast`'s `MinTrace(method="mint_shrink")`, rétrécit la
+  **corrélation** vers l'identité, pas la covariance brute) puis réconcilie par
+  `ŷ_rec = S (Sᵀ W⁻¹ S)⁻¹ Sᵀ W⁻¹ ŷ` (numpy seul, aucune dépendance ajoutée). Repli automatique sur
+  `bottom_up` (avec avertissement au niveau racine) si la matrice est singulière ou si trop peu de
+  points de backtest sont disponibles pour l'estimer. `"bottom_up"` ignore la prévision propre des
+  agrégats et les recalcule comme la somme des séries du bas réconciliées. `"none"` laisse chaque
+  nœud (bas et agrégats) prévu indépendamment ; le résultat n'est alors **pas** garanti cohérent
+  (`coherent: false`) — utile pour comparer, ou quand seule la vue par niveau intéresse le client.
+- Chaque série (bas + agrégats) traverse le **même** pipeline que sans hiérarchie : backtest en
+  origines glissantes, choix du modèle par RMSE, calibration conforme. La réconciliation n'intervient
+  **qu'en aval**, sur le point final et les bandes, jamais sur `model`/`metrics`/`calibration` (qui
+  restent la performance du modèle propre à ce nœud, utile pour juger si la réconciliation avait un
+  intérêt à cet endroit).
+- **Bandes** : décalées du même delta que le point (`lower/upper += point_réconcilié - point_brut`),
+  puis bornées à 0 en bas si toutes les valeurs historiques du nœud sont ≥ 0. C'est une approximation
+  documentée (pas de réconciliation « exacte » des quantiles, qui n'a pas de solution fermée simple) :
+  la calibration conforme s'applique ensuite normalement sur les bandes décalées.
+- **Scénarios** : réconciliés avec la **même** matrice (même `W`) que la prévision de base, PUIS
+  les `adjustments` du scénario sont appliqués aux séries du **bas** uniquement, et les agrégats sont
+  **recalculés par somme** des bas ajustés (pas re-réconciliés) — sinon un ajustement sur un magasin
+  ne se refléterait pas dans le total du scénario.
+- **Événements sur un agrégat** : chaque agrégat reçoit, période par période, la **moyenne non
+  pondérée de ses enfants DIRECTS** (propagée niveau par niveau, pas la moyenne de toutes les
+  feuilles du sous-arbre — un agrégat à deux niveaux avec un enfant très favorisé par un événement et
+  un autre indifférent aux enfants nombreux de ce dernier ne doit pas diluer le premier). Les
+  événements non applicables à une série (filtrés par `groups` de l'événement) comptent pour 0 dans
+  cette moyenne. La même règle d'apprentissage (écart significatif sur l'historique, § événements)
+  s'applique ensuite à l'agrégat comme à une série du bas.
+- **Limites** : `max_series` compte **toutes** les séries de la réponse, agrégats compris (pas
+  seulement les groupes du bas) ; l'erreur 413 le précise (« agrégats de hiérarchie compris »).
+- Collision de libellé : si une valeur de colonne de hiérarchie coïncide avec `"Total"`, avec une
+  valeur d'une AUTRE colonne de hiérarchie, ou avec une valeur de `group_var`, 400 explicite (deux
+  nœuds de niveaux différents seraient indiscernables dans la réponse, qui n'identifie un nœud que
+  par `group` + `level`). Le même libellé réutilisé par deux PARENTS différents au même niveau
+  (ex. l'état « nsw » sous deux motifs de voyage différents) n'est pas une collision : c'est une
+  hiérarchie normale, seulement pas déductible du libellé seul hors du contexte de la requête.
+- Les séries du bas doivent couvrir exactement les mêmes dates après régularisation (même grille de
+  fréquence) : sinon 400 (`field: "hierarchy"`), qui nomme les séries en cause — la sommation des
+  agrégats l'exige.
+
+Réponse, par série (seulement si la requête contient `hierarchy`) :
+
+```json
+"level": "total",
+"group": "Total"
+```
+
+`level` : `"total"` | `"<colonne de hiérarchie>"` | `"bottom"`. `group` : `"Total"` pour la racine,
+la valeur de la colonne pour un agrégat intermédiaire, la valeur de `group_var` pour une série du
+bas. Ordre des séries dans `series[]` : total, puis chaque niveau intermédiaire (du plus haut au
+plus bas, valeurs dans l'ordre de première apparition parmi les séries du bas), puis le bas.
+
+Racine de la réponse (seulement si `hierarchy`) :
+
+```json
+"reconciliation": {
+  "method": "mint_shrink",
+  "coherent": true,
+  "backtest": {"mase_base": 0.91, "mase_reconciled": 0.87, "points": 36}
+}
+```
+
+`method` : méthode **effectivement** utilisée (`"mint_shrink"` | `"bottom_up"` | `"none"`) — peut
+différer de `reconciliation` demandé en cas de repli. `coherent` : `true` si chaque agrégat est
+garanti égal à la somme de ses enfants (`"mint_shrink"`/`"bottom_up"`), `false` sinon (`"none"`).
+`backtest` (absent si `method: "none"`) : MASE moyen, pooled sur tous les nœuds et toutes les
+fenêtres de backtest, **avant** (`mase_base`, prévisions indépendantes) et **après**
+(`mase_reconciled`) réconciliation ; `W` est ré-estimée à chaque fenêtre en excluant CETTE fenêtre
+(« leave-one-window-out ») pour ne pas se juger sur les erreurs qui ont servi à s'auto-corriger.
+
+**Précision d'implémentation (choix documenté, contrat ambigu sur ce point) :** un ajustement de
+scénario ré-réconcilie/agrège toujours les agrégats par somme des bas, y compris pour un scénario
+sans aucun `adjustments` (l'opération est un no-op dans ce cas, donc sans effet observable, mais
+simplifie l'implémentation en évitant un code séparé pour ce cas).
+
 ### Erreurs
 
 Même format que le contrat : `400/401/404/413`

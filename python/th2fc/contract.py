@@ -43,6 +43,9 @@ class Request:
     events: list = field(default_factory=list)  # context.Event
     scenarios: list = field(default_factory=list)  # context.Scenario
     context_warnings: list[str] = field(default_factory=list)
+    hierarchy_cols: list[str] = field(default_factory=list)  # colonnes de hiérarchie, du plus haut au plus bas
+    reconciliation: str = "none"  # "mint" | "bottom_up" | "none"
+    hierarchy: object = None  # hierarchy.Hierarchy | None (arbre + matrice S, structure seulement)
 
 
 class Invalid(Exception):
@@ -133,6 +136,10 @@ def validate(body, limits: dict) -> Request:
             errors.append(error("confidence_levels", "Les niveaux de confiance doivent être des nombres dans l'intervalle ouvert (0, 1)."))
             levels = [0.8, 0.95]
 
+    from . import hierarchy as hie  # import tardif : hierarchy dépend de ce module
+
+    hierarchy_cols, reconciliation = hie.parse_fields(body.get("hierarchy"), body.get("reconciliation"), group_var, errors)
+
     if errors:
         raise Invalid(400, errors)
 
@@ -150,7 +157,9 @@ def validate(body, limits: dict) -> Request:
         raise Invalid(413, [error("data", "Nombre de lignes (%d) supérieur à la limite autorisée (%d)."
                                   % (len(rows), limits["max_rows"]))])
 
-    for field, col in (("date_var", date_var), ("target_var", target_var), ("group_var", group_var)):
+    cols_to_check = [("date_var", date_var), ("target_var", target_var), ("group_var", group_var)]
+    cols_to_check += [("hierarchy", h) for h in hierarchy_cols]
+    for field, col in cols_to_check:
         if col is not None and col not in columns:
             raise Invalid(400, [error(field, "Colonne '%s' absente ; colonnes disponibles : %s."
                                       % (col, ", ".join(columns)))])
@@ -167,12 +176,16 @@ def validate(body, limits: dict) -> Request:
         raise Invalid(400, [error("target_var", "La colonne cible '%s' doit être numérique." % target_var)])
 
     groups = [_as_character(r.get(group_var)) for r in rows] if group_var else [None] * len(rows)
-    df = pd.DataFrame({"date": dates, "value": values, "group": groups})
+    df = pd.DataFrame({"date": dates, "value": values, "group": groups,
+                       **{h: [_as_character(r.get(h)) for r in rows] for h in hierarchy_cols}})
     order = list(dict.fromkeys(groups))
 
-    if len(order) > limits["max_series"]:
-        raise Invalid(413, [error("group_var", "Nombre de séries (%d) supérieur à la limite autorisée (%d)."
-                                  % (len(order), limits["max_series"]))])
+    hierarchy = hie.build(df, order, hierarchy_cols)  # 400 : parent non unique, collision de libellé
+    n_total = len(hierarchy.nodes) if hierarchy else len(order)
+    if n_total > limits["max_series"]:
+        suffix = ", agrégats de hiérarchie compris" if hierarchy else ""
+        raise Invalid(413, [error("group_var", "Nombre de séries (%d%s) supérieur à la limite autorisée (%d)."
+                                  % (n_total, suffix, limits["max_series"]))])
 
     def label(g):
         return "" if g is None else " pour la série '%s'" % g
@@ -207,7 +220,8 @@ def validate(body, limits: dict) -> Request:
 
     return Request(df=df, horizon=horizon, frequency=frequency, models=models,
                    confidence_levels=sorted(set(float(x) for x in levels)), has_group=bool(group_var),
-                   events=events, scenarios=scenarios, context_warnings=ctx_warnings)
+                   events=events, scenarios=scenarios, context_warnings=ctx_warnings,
+                   hierarchy_cols=hierarchy_cols, reconciliation=reconciliation, hierarchy=hierarchy)
 
 
 def _mask(df: pd.DataFrame, g) -> pd.Series:

@@ -27,6 +27,19 @@ passe tel quel contre les deux services.
   smooth/erratic/intermittent/lumpy (Syntetos-Boylan). `croston`, `tsb`, `imapa` s'ajoutent aux
   modèles disponibles ; sur une série intermittente/lumpy, `auto` bascule l'ensemble sur
   `chronos2, tsb, imapa`, les bandes sont bornées à 0 et les valeurs prévues gardent 2 décimales.
+- **Hiérarchie et réconciliation MinT** (`hierarchy`, `reconciliation`, voir `docs/API.md`) :
+  agrégats (région, total…) au-dessus de `group_var`, prévus comme des séries à part entière puis
+  rendus cohérents (`ŷ_rec = S (Sᵀ W⁻¹ S)⁻¹ Sᵀ W⁻¹ ŷ`, `W` = covariance des erreurs de backtest par
+  l'estimateur à rétrécissement de Schäfer-Strimmer) ; repli automatique sur la somme simple des bas
+  (`bottom_up`) si `W` est singulière. Mesuré sur Tourism (tourisme domestique australien, réel,
+  trimestriel, `Purpose > State > Ville`, 56 séries du bas + 32 agrégats, `ets`, holdout final de
+  8 trimestres hors backtest) : MASE moyen base → MinT — total 0,428 → 0,441, purpose 0,518 → 0,555,
+  **state 0,652 → 0,602**, bas 0,624 → 0,627. Résultat mitigé et assumé comme tel : MinT améliore
+  nettement le niveau intermédiaire « state » mais dégrade légèrement le total, le niveau « purpose »
+  et le bas sur ce jeu précis — cohérent avec la littérature (MinT garantit la cohérence, pas un
+  MASE strictement meilleur à chaque niveau) ; le backtest interne (leave-one-window-out) donne
+  0,687 → 0,671 pooled sur tous les nœuds (script et sorties conservés hors dépôt, avec les preuves
+  de la tâche).
 - Écart connu : une date absente (`null`) est signalée comme non parsable.
 
 ## Mesures (banc M3 mensuel, 100 séries, h = 12, une requête)
