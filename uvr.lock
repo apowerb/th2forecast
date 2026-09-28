@@ -1653,11 +1653,11 @@ checksum = "md5:45c3868fb2f5a7f3817d54d1c75799f9"
 
 [[package]]
 name = "mirai"
-version = "2.7.2"
+version = "2.7.3"
 source = "cran"
-raw_version = "2.7.2"
-url = "https://cran.r-project.org/src/contrib/mirai_2.7.2.tar.gz"
-checksum = "md5:102c286631f6580ce76016a5620b601a"
+raw_version = "2.7.3"
+url = "https://cran.r-project.org/src/contrib/mirai_2.7.3.tar.gz"
+checksum = "md5:84bfa1981bf129efeecfd973c264e146"
 requires = ["nanonext"]
 
 [[package]]
@@ -3331,23 +3331,23 @@ checksum = "md5:ecfcfd15db2d5a79c25b9514748762b5"
 
 [[package]]
 name = "visdat"
-version = "0.6.0"
+version = "0.6.1"
 source = "cran"
-raw_version = "0.6.0"
-url = "https://cran.r-project.org/src/contrib/visdat_0.6.0.tar.gz"
-checksum = "md5:645b1de71ea95fd8b3975e152e7d5976"
+raw_version = "0.6.1"
+url = "https://cran.r-project.org/src/contrib/visdat_0.6.1.tar.gz"
+checksum = "md5:721a2b379a45d8fbaf912158a599d059"
 requires = [
     "ggplot2",
     "tidyr",
     "dplyr",
     "purrr",
     "readr",
-    "magrittr",
     "tibble",
     "glue",
     "forcats",
     "cli",
     "scales",
+    "rlang",
 ]
 
 [[package]]

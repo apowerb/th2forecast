@@ -101,13 +101,14 @@ Identique au contrat (voir `CONTRAT.md`). Précisions :
   `modeltime::modeltime_forecast(..., conf_method = "conformal_split")`,
   calculés sur les résidus du jeu de test (holdout), un appel par niveau de
   `confidence_levels` demandé, fusionnés en colonnes `lower_XX`/`upper_XX`.
-- Prévision finale : produite par le **même modèle calibré sur le holdout**
-  (pas de ré-entraînement sur 100 % des données). C'est le compromis
-  nécessaire pour obtenir des intervalles conformal statistiquement valides
-  (on ne peut pas calibrer les résidus sur les données qui ont servi à
-  entraîner le modèle final). `h = horizon` étend la prévision à partir de
-  la dernière date du jeu de calibration, qui est aussi la dernière date de
-  la série (le holdout est toujours la queue la plus récente de la série).
+- Prévision finale : le modèle retenu est **ré-entraîné sur toute la série**
+  (`modeltime::modeltime_refit()`) avant `modeltime_forecast(h = horizon)`.
+  Sans ce ré-entraînement, `arima` et `ets` prévoient à partir de la fin de
+  leurs données d'entraînement (ils ignorent les dates demandées) : la
+  prévision renvoyée était celle du holdout, datée comme le futur. Les
+  intervalles restent calibrés sur les résidus du holdout (conformal split),
+  donc sur un modèle entraîné avec `holdout` points de moins que le modèle
+  final. Test de régression : `tests/testthat/test-api_v1_forecast_horizon.R`.
 
 ### Découpage backtest / holdout
 
