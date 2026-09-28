@@ -79,17 +79,66 @@ def _tag(level: float) -> str:
     return "%02d" % round(level * 100)
 
 
-def _calibration_body(calibration: dict, points: int) -> dict:
+def _calibration_body(calibration: dict, points: int, adaptive: dict | None) -> dict:
     def r(x):
         return None if x is None else round(x, 4)
 
-    return {
+    body = {
         "method": "split-conformal",
         "points": points,
         "levels": {_tag(lv): {"calibrated": v["factor"] is not None, "pooled": v["pooled"], "factor": r(v["factor"]),
                               "raw_coverage": r(v["raw_coverage"]), "calibrated_coverage": r(v["calibrated_coverage"])}
                    for lv, v in calibration.items()},
     }
+    if adaptive:
+        body["adaptive"] = adaptive
+    return body
+
+
+# -- Feedback (contrat §1) : ACI par nœud, avant réconciliation ------------------------------------
+
+
+def _match_feedback(series: list, feedback: list[dict], warnings: list) -> dict[int, list[dict]]:
+    """Points de feedback appariés à l'index de la série (group, level) correspondante ; une série
+    inconnue est ignorée avec un avertissement global (contrat §1). Sans hiérarchie, `level` est
+    absent/null côté requête : on apparie alors sur `group` seul (un seul nœud par group)."""
+    by_key = {(s["group"], s["level"]): i for i, s in enumerate(series)}
+    by_group: dict = {}
+    for i, s in enumerate(series):
+        by_group.setdefault(s["group"], []).append(i)
+
+    out: dict[int, list[dict]] = {}
+    for item in feedback:
+        g, lv = item["group"], item["level"]
+        if lv is not None:
+            i = by_key.get((g, lv))
+        else:
+            idxs = by_group.get(g, [])
+            i = idxs[0] if len(idxs) == 1 else None
+        if i is None:
+            warnings.append("Feedback ignoré : série inconnue (group=%r, level=%r)." % (g, lv))
+            continue
+        out.setdefault(i, []).extend(item["points"])
+    return out
+
+
+def _apply_adaptive(s: dict, points: list[dict], levels: list[float]) -> tuple[dict, dict]:
+    """ACI (contrat §1) par niveau demandé : au moins 4 points appariés aux dates de l'historique
+    régularisé de CE nœud (les autres dates sont ignorées, silencieusement). Renvoie
+    (level_used par niveau adapté, corps de réponse 'adaptive')."""
+    by_date = dict(zip(s["dates"], s["y"]))
+    adaptive_map, info = {}, {}
+    for lv in levels:
+        tag = _tag(lv)
+        matched = sorted((p for p in points if p["date"] in by_date and tag in p["bounds"]), key=lambda p: p["date"])
+        if len(matched) < 4:
+            continue
+        errs = [0 if b[0] <= by_date[p["date"]] <= b[1] else 1 for p in matched for b in [p["bounds"][tag]]]
+        level_used = cal.adaptive_level(errs, lv)
+        adaptive_map[lv] = level_used
+        info[tag] = {"target": lv, "points": len(matched),
+                    "observed": round(1 - sum(errs) / len(errs), 3), "level_used": round(level_used, 3)}
+    return adaptive_map, info
 
 
 # -- Hiérarchie : construction des séries agrégées et réconciliation MinT -------------------------
@@ -378,14 +427,19 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
         s["scores"] = ({lv: cal.window_scores([(y, *t.out[s["winner"]]) for y, t in tests], lv) for lv in levels}
                        if s["winner"] else None)
 
+    # Feedback (contrat §1) : apparié nœud par nœud, AVANT réconciliation.
+    fb_by_series = _match_feedback(series, req.feedback, warnings)
+
     # Calibration : scores de la série, complétés par ceux des autres séries s'ils manquent.
     for i, s in enumerate(series):
         if s["scores"] is None:
-            s["calibration"] = None
+            s["calibration"], s["adaptive"] = None, None
             continue
         pool = {lv: np.concatenate([x for j, o in enumerate(series) if j != i and o["scores"] for x in o["scores"][lv]]
                                    or [np.array([])]) for lv in levels}
-        s["calibration"] = cal.calibrate(s["scores"], levels, pool)
+        adaptive_map, adaptive_info = _apply_adaptive(s, fb_by_series.get(i, []), levels)
+        s["calibration"] = cal.calibrate(s["scores"], levels, pool, adaptive=adaptive_map or None)
+        s["adaptive"] = adaptive_info or None
 
     # 2) Prévision finale : modèle retenu ré-entraîné sur toute la série.
     # Scénarios : mêmes modèles, événements futurs remplacés (les ajustements viennent après).
@@ -549,7 +603,7 @@ def run_forecast(body, limits: dict, engine: Engine) -> tuple[int, dict]:
             "baseline": {"model": baseline, "metrics": b},
             "beats_baseline": model_mase is not None and base_mase is not None and model_mase < base_mase,
             "reliability": reliability(model_mase, base_mase, s["holdout_points"]),
-            "calibration": _calibration_body(s["calibration"], s["holdout_points"]),
+            "calibration": _calibration_body(s["calibration"], s["holdout_points"], s.get("adaptive")),
             "demand": s["demand"],
             "warnings": s["warnings"],
         }
