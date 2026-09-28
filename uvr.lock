@@ -1927,11 +1927,11 @@ checksum = "md5:09d3363a41dbd28101ad838d9c0d2825"
 
 [[package]]
 name = "parsnip"
-version = "1.6.0"
+version = "1.6.1"
 source = "cran"
-raw_version = "1.6.0"
-url = "https://cran.r-project.org/src/contrib/parsnip_1.6.0.tar.gz"
-checksum = "md5:cde20f3081db2b0c1bfb86fe7925da72"
+raw_version = "1.6.1"
+url = "https://cran.r-project.org/src/contrib/parsnip_1.6.1.tar.gz"
+checksum = "md5:99340bcc371fbce7094176074f420177"
 requires = [
     "cli",
     "dplyr",
@@ -3575,9 +3575,9 @@ requires = [
 
 [[package]]
 name = "zoo"
-version = "1.9.0"
+version = "1.9.1"
 source = "cran"
-raw_version = "1.9-0"
-url = "https://cran.r-project.org/src/contrib/zoo_1.9-0.tar.gz"
-checksum = "md5:fba440a280e772990f55aeec7257ef85"
+raw_version = "1.9-1"
+url = "https://cran.r-project.org/src/contrib/zoo_1.9-1.tar.gz"
+checksum = "md5:d948b0cd582fea7c99faa2cdbe5cf305"
 requires = ["lattice"]
