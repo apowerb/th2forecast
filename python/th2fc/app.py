@@ -20,11 +20,12 @@ from fastapi.responses import JSONResponse
 from . import __version__
 from . import contract as c
 from .engine import Engine
+from .env import env_int, env_str
 from .forecast import run_forecast
 
 AUTH_MESSAGE = "Authentification requise : en-tête 'Authorization: Bearer <token>' manquant ou invalide."
 ENGINE = Engine()
-WORKERS = int(os.environ.get("TH2FORECAST_WORKERS", "2"))
+WORKERS = env_int("TH2FORECAST_WORKERS", 2)
 _pool = ThreadPoolExecutor(max_workers=WORKERS) if WORKERS > 0 else None
 _jobs: dict[str, dict] = {}
 _jobs_lock = threading.Lock()
@@ -89,7 +90,7 @@ def _describe(body):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if os.environ.get("TH2FORECAST_PRELOAD", "1") == "1":
+    if env_str("TH2FORECAST_PRELOAD", "1") == "1":
         ENGINE.chronos()
     yield
 

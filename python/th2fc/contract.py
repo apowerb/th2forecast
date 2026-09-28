@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import math
-import os
 import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
+
+from .env import env_int
 
 ALLOWED_MODELS = ["prophet", "arima", "ets", "snaive", "naive", "croston", "tsb", "imapa", "auto"]
 ALLOWED_FREQUENCIES = ["day", "week", "month", "quarter", "year"]
@@ -26,9 +27,9 @@ def error_body(errors: list[dict]) -> dict:
 
 def limits_from_env() -> dict:
     return {
-        "max_rows": int(os.environ.get("TH2FORECAST_MAX_ROWS", "100000")),
-        "max_series": int(os.environ.get("TH2FORECAST_MAX_SERIES", "200")),
-        "max_horizon": int(os.environ.get("TH2FORECAST_MAX_HORIZON", "366")),
+        "max_rows": env_int("TH2FORECAST_MAX_ROWS", 100000),
+        "max_series": env_int("TH2FORECAST_MAX_SERIES", 200),
+        "max_horizon": env_int("TH2FORECAST_MAX_HORIZON", 366),
     }
 
 

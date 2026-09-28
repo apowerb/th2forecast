@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from .env import env_int
+
 log = logging.getLogger("th2fc")
 
 ENSEMBLE = ("chronos2", "ets", "arima", "theta")
@@ -69,7 +71,7 @@ class Engine:
         self._chronos = None
         self._chronos_path = chronos_path or os.environ.get("TH2FORECAST_CHRONOS_PATH", "/opt/models/chronos-2")
         self._lock = threading.RLock()  # chronos() est aussi appelé sous ce verrou
-        self.n_jobs = int(os.environ.get("TH2FORECAST_SF_JOBS", "1"))
+        self.n_jobs = env_int("TH2FORECAST_SF_JOBS", 1)
 
     # -- Chronos-2 ------------------------------------------------------------
     def chronos(self):
@@ -78,7 +80,7 @@ class Engine:
                 import torch
                 from chronos import BaseChronosPipeline
 
-                torch.set_num_threads(int(os.environ.get("TH2FORECAST_TORCH_THREADS", os.cpu_count() or 1)))
+                torch.set_num_threads(env_int("TH2FORECAST_TORCH_THREADS", os.cpu_count() or 1))
                 self._chronos = BaseChronosPipeline.from_pretrained(self._chronos_path, device_map="cpu")
             return self._chronos
 
