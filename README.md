@@ -1,44 +1,43 @@
 # th2Forecast
 
-`th2Forecast` est un package R pour la prévision automatisée de séries
-temporelles et l'évaluation de modèles de machine learning. Il fournit un
-framework intégré couvrant l'ensemble du pipeline de prévision, de la
-préparation des données à la visualisation des prédictions finales.
+`th2Forecast` is an R package for automated time series forecasting and
+machine learning model evaluation. It provides an integrated framework that
+covers the entire forecasting pipeline, from data preparation to the
+visualization of the final predictions.
 
-## Fonctionnalités principales
+## Main features
 
-- **Prétraitement automatisé** : nettoyage des séries temporelles, gestion
-  des valeurs manquantes, détection d'anomalies et de ruptures de niveau.
-- **Ingénierie de features avancée** : modules spécialisés pour les
-  variables retardées (lags) et l'intégration de données exogènes (jours
-  fériés, météo).
-- **Modèles variés** : ARIMA, Prophet, ETS, MARS, régression linéaire,
-  Random Forest, XGBoost, baselines naive/snaive.
-- **Interface interactive** : module Shiny pour le chargement de données,
-  la configuration des modèles et la visualisation des performances.
+- **Automated preprocessing**: time series cleaning, missing value
+  handling, detection of anomalies and level shifts.
+- **Advanced feature engineering**: dedicated modules for lagged variables
+  (lags) and the integration of exogenous data (public holidays, weather).
+- **A wide range of models**: ARIMA, Prophet, ETS, MARS, linear regression,
+  Random Forest, XGBoost, naive/snaive baselines.
+- **Interactive interface**: Shiny module for loading data, configuring
+  models and visualizing performance.
 
 ## API HTTP (`plumber2`)
 
-Le package expose une API REST (`plumber.R` + `entrypoint.R`, servie sur le
-port `8000`) implémentant le contrat v1 décrit dans
+The package exposes a REST API (`plumber.R` + `entrypoint.R`, served on port
+`8000`) implementing the v1 contract described in
 [`docs/API.md`](docs/API.md).
 
-### Démarrer le service
+### Start the service
 
 ```bash
 docker build -t th2forecast:dev .
 docker run -d --name th2forecast -p 127.0.0.1:8000:8000 \
-  -e TH2FORECAST_API_TOKEN=change-moi \
+  -e TH2FORECAST_API_TOKEN=change-me \
   th2forecast:dev
 ```
 
-### Exemple `curl` (prévision synchrone)
+### `curl` example (synchronous forecast)
 
 ```bash
 curl -s http://127.0.0.1:8000/health
 
 curl -s -X POST http://127.0.0.1:8000/v1/forecast \
-  -H "Authorization: Bearer change-moi" \
+  -H "Authorization: Bearer change-me" \
   -H "Content-Type: application/json" \
   -d '{
     "data": [
@@ -57,17 +56,17 @@ curl -s -X POST http://127.0.0.1:8000/v1/forecast \
   }'
 ```
 
-Voir [`docs/API.md`](docs/API.md) pour le contrat complet (endpoints,
-authentification, limites, format des erreurs, jobs asynchrones).
+See [`docs/API.md`](docs/API.md) for the full contract (endpoints,
+authentication, limits, error format, asynchronous jobs).
 
-## Installation (usage package R, hors API)
+## Installation (R package usage, without the API)
 
 ```r
 # install.packages("devtools")
 devtools::install_github("apowerb/th2forecast")
 ```
 
-## Interface Shiny
+## Shiny interface
 
 ```r
 library(th2forecast)
@@ -80,26 +79,26 @@ run_app()
 docker run --rm th2forecast:dev Rscript -e 'testthat::test_dir("tests/testthat")'
 ```
 
-Test de bout en bout (contre un conteneur démarré) :
+End-to-end test (against a running container):
 
 ```bash
-TH2FORECAST_BASE_URL=http://127.0.0.1:8000 TH2FORECAST_API_TOKEN=change-moi \
+TH2FORECAST_BASE_URL=http://127.0.0.1:8000 TH2FORECAST_API_TOKEN=change-me \
   bash tests/e2e/smoke.sh
 ```
 
-## Publication des images
+## Image publishing
 
-La CI (`.github/workflows/docker-build.yml`) construit et teste les deux images (API R `apowerb/th2forecast`,
-moteur Python `apowerb/th2forecast-py`) à chaque PR vers `main`, puis les publie :
+The CI (`.github/workflows/docker-build.yml`) builds and tests both images (R API `apowerb/th2forecast`,
+Python engine `apowerb/th2forecast-py`) on every PR to `main`, then publishes them:
 
-- push sur `main` : image étiquetée par le SHA du commit ;
-- tag `vX.Y.Z` : images étiquetées `X.Y.Z` et `latest`. C'est ce tag que les déploiements (chart Helm,
-  compose d'apowerb-hosting) épinglent.
+- push to `main`: image tagged with the commit SHA;
+- tag `vX.Y.Z`: images tagged `X.Y.Z` and `latest`. This is the tag that deployments (Helm chart,
+  apowerb-hosting compose) pin.
 
 ```bash
 git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-## Licence
+## License
 
-Apache License 2.0 — voir [`LICENSE`](LICENSE).
+Apache License 2.0 — see [`LICENSE`](LICENSE).

@@ -1,63 +1,63 @@
-# API th2forecast v1
+# th2forecast API v1
 
-Contrat source : voir `../CONTRAT.md` du dépôt de coordination `th2fc`
-(section « Service R »), fixé le 24/09/2026. Ce document en reprend le
-contenu et précise les choix d'implémentation pris pour le lot A.
+This document describes the v1 API contract (fixed on 2026-09-24) and the
+implementation choices made for batch A.
 
-## Authentification
+## Authentication
 
-Si la variable d'environnement `TH2FORECAST_API_TOKEN` est définie, toutes
-les routes sauf `GET /health` exigent l'en-tête `Authorization: Bearer <token>`.
-Sinon, l'authentification est désactivée (usage local/dev uniquement).
+If the `TH2FORECAST_API_TOKEN` environment variable is set, all routes
+except `GET /health` require the `Authorization: Bearer <token>` header.
+Otherwise, authentication is disabled (local/dev use only).
 
-Réponse en cas d'échec : `401` avec le format d'erreur standard (voir plus bas).
+Response on failure: `401` with the standard error format (see below).
 
-## Limites (variables d'environnement, valeurs par défaut)
+## Limits (environment variables, default values)
 
-| Variable | Défaut | Effet si dépassé |
+| Variable | Default | Effect when exceeded |
 |---|---|---|
 | `TH2FORECAST_MAX_ROWS` | 100000 | 413 |
 | `TH2FORECAST_MAX_SERIES` | 200 | 413 |
 | `TH2FORECAST_MAX_HORIZON` | 366 | 413 |
 
-Ces limites portent sur le contenu métier de la requête déjà désérialisée
-(nombre de lignes, nombre de séries distinctes, horizon demandé) : plumber2
-ne documente pas de mécanisme natif de limite de taille brute en octets, ce
-choix est donc documenté comme un écart mineur au libellé du contrat.
+These limits apply to the business content of the already-deserialized
+request (number of rows, number of distinct series, requested horizon):
+plumber2 does not document a native mechanism for limiting the raw size in
+bytes, so this choice is documented as a minor deviation from the wording
+of the contract.
 
 ## Endpoints
 
-- `GET /health` → `{"status":"UP","version":"<version du package>"}`
-- `POST /v1/forecast` (synchrone) → 200, réponse décrite plus bas.
+- `GET /health` → `{"status":"UP","version":"<package version>"}`
+- `POST /v1/forecast` (synchronous) → 200, response described below.
 - `POST /v1/jobs` → 202 `{"job_id":"…","status":"queued"}`.
-  `GET /v1/jobs/{id}` → `{"job_id","status":"queued|running|succeeded|failed","result":<réponse>|null,"error":<erreur>|null}` ;
-  404 si `id` inconnu.
-- **Écart au contrat, documenté** : l'ancien `POST /forecast` (base64 R,
-  `plumber` v1) a été **retiré** plutôt que conservé. Le fichier
-  `R/plumber_th2_forecast.R` était écrit pour l'API plumber v1
-  (`function(res, input_data, ...)`), incompatible avec plumber2 installé
-  (voir NEWS.md), et ses `tryCatch(..., error = ...)` ne stoppaient pas
-  l'exécution de `forecast()` (un renvoi de type erreur dans un callback
-  `tryCatch` ne fait pas sortir la fonction englobante), ce qui produisait un
-  `500` opaque sur toute entrée invalide. Le remplacer proprement aurait
-  dupliqué toute la logique de validation déjà écrite pour `/v1/forecast`
-  sans bénéfice pour les lots B/C, qui consomment exclusivement le JSON v1.
+  `GET /v1/jobs/{id}` → `{"job_id","status":"queued|running|succeeded|failed","result":<response>|null,"error":<error>|null}` ;
+  404 if `id` is unknown.
+- **Deviation from the contract, documented**: the old `POST /forecast` (R
+  base64, `plumber` v1) was **removed** rather than kept. The file
+  `R/plumber_th2_forecast.R` was written for the plumber v1 API
+  (`function(res, input_data, ...)`), incompatible with the installed
+  plumber2 (see NEWS.md), and its `tryCatch(..., error = ...)` calls did not
+  stop the execution of `forecast()` (an error-type return in a `tryCatch`
+  callback does not make the enclosing function exit), which produced an
+  opaque `500` on any invalid input. Replacing it properly would have
+  duplicated all the validation logic already written for `/v1/forecast`
+  with no benefit for batches B/C, which consume the v1 JSON exclusively.
 
-### Asynchrone (`/v1/jobs`)
+### Asynchronous (`/v1/jobs`)
 
-Implémenté avec le package `mirai` (daemons lancés dans `entrypoint.R` via
-`mirai::daemons()`), recommandé par la documentation plumber2 pour
-l'exécution asynchrone. `POST /v1/jobs` valide la requête de façon
-**synchrone** (échec rapide en 400/413 sans créer de job), puis délègue le
-calcul à un processus `mirai` séparé si des daemons sont configurés. Repli
-documenté : si aucun daemon mirai n'est disponible au démarrage (variable
-`TH2FORECAST_WORKERS=0` ou échec de `mirai::daemons()`), le job est exécuté
-en synchrone au moment du `POST` et immédiatement renvoyé comme
-`"succeeded"`/`"failed"` au premier `GET` — le contrat HTTP (202 puis
-`GET /v1/jobs/{id}`) reste respecté, seule la parallélisation réelle est
-perdue dans ce cas de repli.
+Implemented with the `mirai` package (daemons launched in `entrypoint.R` via
+`mirai::daemons()`), recommended by the plumber2 documentation for
+asynchronous execution. `POST /v1/jobs` validates the request
+**synchronously** (fast failure with 400/413 without creating a job), then
+delegates the computation to a separate `mirai` process if daemons are
+configured. Documented fallback: if no mirai daemon is available at startup
+(`TH2FORECAST_WORKERS=0` variable or failure of `mirai::daemons()`), the job
+is run synchronously at `POST` time and immediately returned as
+`"succeeded"`/`"failed"` on the first `GET` — the HTTP contract (202 then
+`GET /v1/jobs/{id}`) is still honored, only the real parallelization is
+lost in this fallback case.
 
-### Requête (JSON) — `POST /v1/forecast` et `POST /v1/jobs`
+### Request (JSON) — `POST /v1/forecast` and `POST /v1/jobs`
 
 ```json
 {
@@ -73,79 +73,78 @@ perdue dans ce cas de repli.
 }
 ```
 
-- `data` : tableau d'objets (lignes).
-- `frequency` : `null` (détection automatique) ou une valeur explicite parmi
-  `day`, `week`, `month`, `quarter`, `year`. Une fréquence explicite est
-  toujours prioritaire sur la détection.
-- `models` : sous-ensemble de `["prophet","arima","ets","snaive","naive","auto"]`. Le moteur
-  Python (`python/`) accepte en plus `"croston"` (CrostonSBA), `"tsb"` (TSB, `alpha_d = alpha_p =
-  0,1`) et `"imapa"` (IMAPA), dédiés à la demande intermittente ; voir « Champ `demand` » plus bas.
+- `data`: array of objects (rows).
+- `frequency`: `null` (automatic detection) or an explicit value among
+  `day`, `week`, `month`, `quarter`, `year`. An explicit frequency always
+  takes precedence over detection.
+- `models`: subset of `["prophet","arima","ets","snaive","naive","auto"]`. The Python
+  engine (`python/`) additionally accepts `"croston"` (CrostonSBA), `"tsb"` (TSB, `alpha_d = alpha_p =
+  0.1`) and `"imapa"` (IMAPA), dedicated to intermittent demand; see "`demand` field" below.
 
-**Précision d'implémentation (choix documenté, contrat ambigu sur ce point) :**
-le schéma de réponse ne renvoie **qu'un seul** `model` par série. Le service
-compare donc systématiquement, au backtest (RMSE), tous les modèles
-demandés (`"auto"` = `{arima, prophet, ets}` en plus des modèles explicites
-listés) et ne renvoie que le meilleur. La baseline (`snaive`/`naive`) est
-toujours calculée séparément, indépendamment des modèles demandés, pour le
-seul usage de `beats_baseline`/`reliability`.
+**Implementation note (documented choice, the contract is ambiguous on this point):**
+the response schema returns **only one** `model` per series. The service
+therefore systematically compares, at backtest (RMSE), all the requested
+models (`"auto"` = `{arima, prophet, ets}` in addition to the explicit models
+listed) and returns only the best one. The baseline (`snaive`/`naive`) is
+always computed separately, independently of the requested models, for the
+sole purpose of `beats_baseline`/`reliability`.
 
-### Réponse `200`
+### `200` response
 
-Identique au contrat (voir `CONTRAT.md`). Précisions :
+Details:
 
-- `frequency` : fréquence effective utilisée (détectée ou fournie).
-- Historique régularisé : les trous du calendrier au pas de fréquence
-  détecté/fourni sont comblés par `timetk::pad_by_time()`, puis les valeurs
-  manquantes introduites sont interpolées linéairement
-  (`stats::approx(..., rule = 2)`). Un avertissement `warnings[]` (au niveau
-  série) précise le nombre de points comblés.
-- Intervalles de confiance : **conformal split** via
+- `frequency`: effective frequency used (detected or provided).
+- Regularized history: calendar gaps at the detected/provided frequency step
+  are filled by `timetk::pad_by_time()`, then the introduced missing values
+  are linearly interpolated (`stats::approx(..., rule = 2)`). A `warnings[]`
+  warning (at series level) states the number of filled points.
+- Confidence intervals: **split conformal** via
   `modeltime::modeltime_forecast(..., conf_method = "conformal_split")`,
-  calculés sur les résidus du jeu de test (holdout), un appel par niveau de
-  `confidence_levels` demandé, fusionnés en colonnes `lower_XX`/`upper_XX`.
-- Prévision finale : le modèle retenu est **ré-entraîné sur toute la série**
-  (`modeltime::modeltime_refit()`) avant `modeltime_forecast(h = horizon)`.
-  Sans ce ré-entraînement, `arima` et `ets` prévoient à partir de la fin de
-  leurs données d'entraînement (ils ignorent les dates demandées) : la
-  prévision renvoyée était celle du holdout, datée comme le futur. Les
-  intervalles restent calibrés sur les résidus du holdout (conformal split),
-  donc sur un modèle entraîné avec `holdout` points de moins que le modèle
-  final. Test de régression : `tests/testthat/test-api_v1_forecast_horizon.R`.
+  computed on the residuals of the test set (holdout), one call per requested
+  level in `confidence_levels`, merged into `lower_XX`/`upper_XX` columns.
+- Final forecast: the selected model is **retrained on the whole series**
+  (`modeltime::modeltime_refit()`) before `modeltime_forecast(h = horizon)`.
+  Without this retraining, `arima` and `ets` forecast from the end of
+  their training data (they ignore the requested dates): the forecast
+  returned was that of the holdout, dated as the future. The
+  intervals remain calibrated on the holdout residuals (split conformal),
+  hence on a model trained with `holdout` fewer points than the final
+  model. Regression test: `tests/testthat/test-api_v1_forecast_horizon.R`.
 
-### Découpage backtest / holdout
+### Backtest / holdout split
 
-`holdout = max(2, min(horizon, floor(0.2 * n)))`, borné à `n - 3` points
-d'entraînement minimum. `min_points = max(10, horizon + 1)` est exigé en
-validation (400 sinon) pour garantir un découpage exploitable.
+`holdout = max(2, min(horizon, floor(0.2 * n)))`, bounded to a minimum of
+`n - 3` training points. `min_points = max(10, horizon + 1)` is required in
+validation (400 otherwise) to guarantee a usable split.
 
-### Métriques et baseline
+### Metrics and baseline
 
-`modeltime::modeltime_accuracy()` (jeu de métriques par défaut) sur le jeu
-de test : `mape`, `smape`, `mase`, `rmse`. **Unités** : `mape` et `smape`
-sont des **fractions** (`0.08` = 8 %), pas des pourcentages —
-`yardstick::mape()`/`yardstick::smape()` renvoient des points de
-pourcentage (`8.0` pour 8 %), divisés par 100 avant de sortir dans la
-réponse (`mase`, `rmse` restent des mesures d'échelle, non concernées).
-`holdout_points` = nombre de points du jeu de test. Baseline : `snaive` si
-la fréquence a une saisonnalité (`day` → 7, `week` → 52, `month` → 12,
-`quarter` → 4), `naive` sinon (`year`, pas de cycle saisonnier annuel
-exploitable).
+`modeltime::modeltime_accuracy()` (default metric set) on the test set:
+`mape`, `smape`, `mase`, `rmse`. **Units**: `mape` and `smape`
+are **fractions** (`0.08` = 8%), not percentages —
+`yardstick::mape()`/`yardstick::smape()` return percentage points
+(`8.0` for 8%), divided by 100 before being output in the
+response (`mase`, `rmse` remain scale measures, not concerned).
+`holdout_points` = number of points in the test set. Baseline: `snaive` if
+the frequency has seasonality (`day` → 7, `week` → 52, `month` → 12,
+`quarter` → 4), `naive` otherwise (`year`, no usable annual seasonal
+cycle).
 
-### Règle `reliability`
+### `reliability` rule
 
-Fonction `api_v1_reliability(model_mase, baseline_mase, holdout_points)` :
+Function `api_v1_reliability(model_mase, baseline_mase, holdout_points)`:
 
-- `"unknown"` : métriques indisponibles ou `holdout_points < 2`.
-- `"poor"` : le modèle ne bat pas la baseline (`model_mase >= baseline_mase`).
-- `"good"` : le modèle bat la baseline **et** `holdout_points >= 6` **et**
+- `"unknown"`: metrics unavailable or `holdout_points < 2`.
+- `"poor"`: the model does not beat the baseline (`model_mase >= baseline_mase`).
+- `"good"`: the model beats the baseline **and** `holdout_points >= 6` **and**
   `model_mase / baseline_mase <= 0.8`.
-- `"fair"` : le modèle bat la baseline mais ne remplit pas les deux
-  conditions de `"good"`.
+- `"fair"`: the model beats the baseline but does not meet both
+  conditions of `"good"`.
 
-### Champ optionnel `calibration` (moteur Python uniquement)
+### Optional `calibration` field (Python engine only)
 
-Le moteur Python (`python/`) ajoute à chaque série un champ `calibration` ; l'API R ne le
-renvoie pas, un client doit donc tolérer son absence (ou `null` pour une série en échec).
+The Python engine (`python/`) adds a `calibration` field to each series; the R API does not
+return it, so a client must tolerate its absence (or `null` for a failed series).
 
 ```json
 "calibration": {
@@ -158,20 +157,20 @@ renvoie pas, un client doit donc tolérer son absence (ou `null` pour une série
 }
 ```
 
-- Score de chaque point du backtest : facteur d'élargissement de la bande du modèle qu'il aurait
-  fallu pour contenir la valeur réelle. `factor` = quantile conforme d'ordre
-  `ceil((n + 1) × niveau)` de ces scores ; les bandes renvoyées sont celles du modèle multipliées
-  par ce facteur autour de la prévision (élargies si `factor > 1`, resserrées sinon).
-- `pooled: true` : la série seule n'avait pas assez de points pour ce niveau (il en faut 4 pour
-  80 %, 19 pour 95 %) ; ses scores ont été complétés par ceux des autres séries de la requête.
-- `calibrated: false` : points insuffisants même ainsi ; bandes du modèle inchangées.
-- `raw_coverage` : part des valeurs réelles du backtest dans les bandes brutes du modèle.
-- `calibrated_coverage` : même mesure pour les bandes calibrées, estimée hors échantillon
-  (chaque fenêtre recalibrée sans ses propres points) ; `null` s'il n'y a qu'une fenêtre.
+- Score of each backtest point: the widening factor of the model's band that
+  would have been needed to contain the actual value. `factor` = conformal quantile of order
+  `ceil((n + 1) × level)` of these scores; the returned bands are those of the model multiplied
+  by this factor around the forecast (widened if `factor > 1`, tightened otherwise).
+- `pooled: true`: the series alone did not have enough points for this level (4 are needed for
+  80%, 19 for 95%); its scores were supplemented with those of the other series in the request.
+- `calibrated: false`: insufficient points even so; model bands unchanged.
+- `raw_coverage`: share of the backtest actual values within the model's raw bands.
+- `calibrated_coverage`: same measure for the calibrated bands, estimated out of sample
+  (each window recalibrated without its own points); `null` if there is only one window.
 
-### Champ optionnel `feedback` et `calibration.adaptive` (ACI, moteur Python uniquement)
+### Optional `feedback` field and `calibration.adaptive` (ACI, Python engine only)
 
-Requête :
+Request:
 
 ```json
 "feedback": [
@@ -181,27 +180,27 @@ Requête :
 ]
 ```
 
-- Bandes prévues **passées** (relayées par le cœur depuis ses instantanés), une entrée par nœud
-  (`group`/`level` comme dans la réponse ; `level` absent ou `null` sans hiérarchie). `points` :
-  dates au format de la réponse, avec les bornes `lower_XX`/`upper_XX` des niveaux à réévaluer.
-- Le moteur apparie ces dates à **son propre historique régularisé** (mêmes dates que
-  `series[].history`) ; les dates hors de cet historique sont ignorées silencieusement. 400
-  explicite (`field: "feedback"`) si la forme de la requête est invalide ; une entrée dont
-  `(group, level)` ne correspond à aucun nœud est ignorée avec un avertissement global (pas 400).
-- Pour chaque niveau `L` présent (au moins 4 points appariés, sinon aucune adaptation pour ce
-  niveau) : `err_t = 1` si le réel régularisé de cette date est sorti de `[lower_L, upper_L]`,
-  sinon `0`, dans l'ordre des dates. ACI (Gibbs & Candès, 2021) :
-  `α_1 = 1 − L`, `α_{t+1} = α_t + γ((1 − L) − err_t)`, `γ = 0,05`,
-  `level_used = clip(1 − α_final, L, 0,995)` — jamais de resserrement sous le niveau demandé (peu
-  de points, asymétrie du risque entre bande trop étroite et bande trop large).
-- La calibration conforme existante prend alors le quantile de ses scores (mêmes scores, même
-  mise en commun entre séries) à l'ordre `level_used` au lieu de `L`. Si ce quantile n'existe pas
-  (trop peu de scores pour ce niveau, y compris mis en commun), repli sur le facteur du niveau `L`
-  multiplié par `z(level_used) / z(L)` (approximation gaussienne d'un intervalle symétrique,
-  documentée dans le code).
-- **Hiérarchie** : appliqué nœud par nœud (bas et agrégats), **avant** réconciliation — comme le
-  reste de la calibration, c'est une propriété du nœud, pas de la vue réconciliée.
-- Réponse, dans l'objet `calibration` existant (même emplacement que les autres champs) :
+- **Past** forecast bands (relayed by the core from its snapshots), one entry per node
+  (`group`/`level` as in the response; `level` absent or `null` without a hierarchy). `points`:
+  dates in the response format, with the `lower_XX`/`upper_XX` bounds of the levels to re-evaluate.
+- The engine matches these dates against **its own regularized history** (same dates as
+  `series[].history`); dates outside this history are silently ignored. Explicit 400
+  (`field: "feedback"`) if the request shape is invalid; an entry whose
+  `(group, level)` matches no node is ignored with a global warning (not a 400).
+- For each level `L` present (at least 4 matched points, otherwise no adaptation for this
+  level): `err_t = 1` if the regularized actual value for this date fell outside `[lower_L, upper_L]`,
+  otherwise `0`, in date order. ACI (Gibbs & Candès, 2021):
+  `α_1 = 1 − L`, `α_{t+1} = α_t + γ((1 − L) − err_t)`, `γ = 0.05`,
+  `level_used = clip(1 − α_final, L, 0.995)` — never tightening below the requested level (few
+  points, asymmetry of risk between a band that is too narrow and one that is too wide).
+- The existing conformal calibration then takes the quantile of its scores (same scores, same
+  pooling across series) at order `level_used` instead of `L`. If this quantile does not exist
+  (too few scores for this level, even pooled), it falls back to the factor of level `L`
+  multiplied by `z(level_used) / z(L)` (Gaussian approximation of a symmetric interval,
+  documented in the code).
+- **Hierarchy**: applied node by node (bottom and aggregates), **before** reconciliation — like the
+  rest of the calibration, it is a property of the node, not of the reconciled view.
+- Response, in the existing `calibration` object (same location as the other fields):
 
 ```json
 "calibration": {
@@ -210,44 +209,44 @@ Requête :
 }
 ```
 
-  `target` = niveau demandé, `points` = nombre de points de feedback appariés pour ce niveau,
-  `observed` = couverture observée sur ces points (`1 - moyenne(err_t)`), `level_used` = niveau
-  effectivement calibré (arrondis 3 décimales). Absent (`calibration.adaptive` n'existe pas) si
-  aucun feedback n'est applicable à cette série ; **sans le champ `feedback` dans la requête, la
-  réponse est strictement inchangée**.
+  `target` = requested level, `points` = number of feedback points matched for this level,
+  `observed` = coverage observed on these points (`1 - mean(err_t)`), `level_used` = level
+  actually calibrated (rounded to 3 decimals). Absent (`calibration.adaptive` does not exist) if
+  no feedback is applicable to this series; **without the `feedback` field in the request, the
+  response is strictly unchanged**.
 
-### Champ `demand` (moteur Python uniquement)
+### `demand` field (Python engine only)
 
-Le moteur Python classe chaque série sur son historique régularisé selon la méthode
-Syntetos-Boylan (2005), et renvoie toujours ce champ, y compris pour une série en échec :
+The Python engine classifies each series on its regularized history using the
+Syntetos-Boylan (2005) method, and always returns this field, including for a failed series:
 
 ```json
 "demand": {"type": "intermittent", "adi": 2.4, "cv2": 0.31, "zero_share": 0.58}
 ```
 
-- `adi` (average inter-demand interval) = nb de périodes / nb de périodes non nulles ; `null` si
-  aucune valeur non nulle. `cv2` = (écart-type / moyenne)² des valeurs non nulles ; `null` si moins
-  de deux valeurs non nulles. `zero_share` = part de périodes à zéro. Les trois sont arrondis à 4
-  décimales.
-- `type`, seuils ADI = 1,32 et CV² = 0,49 : `smooth` (ADI < 1,32, CV² < 0,49), `erratic` (ADI <
-  1,32, CV² ≥ 0,49), `intermittent` (ADI ≥ 1,32, CV² < 0,49), `lumpy` (ADI ≥ 1,32, CV² ≥ 0,49).
-  Une valeur négative dans l'historique, ou moins de deux valeurs non nulles, classe toujours la
-  série `smooth` (CV² non fiable dans ces cas) même si `adi`/`cv2` restent calculables.
-- Sur une série `intermittent`/`lumpy`, `models: ["auto"]` remplace l'ensemble par défaut
-  (`chronos2, ets, arima, theta`) par `chronos2, tsb, imapa` (avec événements déclarés :
-  `chronos2` seul, comme pour l'ensemble par défaut). Le champ `model` de la série reste
-  `"ensemble"` dans les deux cas ; `demand.type` indique lequel a servi.
-- `croston`/`tsb`/`imapa` n'ont pas de bande native : la bande brute est
-  `point ± z(niveau) × écart-type des valeurs d'entraînement`, bornée à 0 en bas. Sur une série
-  `intermittent`/`lumpy`, la borne basse de la bande finale (même calibrée) est toujours bornée à
-  0. Les valeurs prévues ne sont jamais arrondies à l'entier (2 décimales), même si l'historique
-  est entier. Un avertissement `warnings[]` accompagne systématiquement ces séries ; un modèle
-  explicite (`prophet`, `arima`, ...) demandé sur une série intermittente est exécuté quand même,
-  avec un avertissement suggérant `auto`, `tsb` ou `imapa`.
+- `adi` (average inter-demand interval) = number of periods / number of non-zero periods; `null` if
+  there is no non-zero value. `cv2` = (standard deviation / mean)² of the non-zero values; `null` if fewer
+  than two non-zero values. `zero_share` = share of zero periods. All three are rounded to 4
+  decimals.
+- `type`, ADI thresholds = 1.32 and CV² = 0.49: `smooth` (ADI < 1.32, CV² < 0.49), `erratic` (ADI <
+  1.32, CV² ≥ 0.49), `intermittent` (ADI ≥ 1.32, CV² < 0.49), `lumpy` (ADI ≥ 1.32, CV² ≥ 0.49).
+  A negative value in the history, or fewer than two non-zero values, always classifies the
+  series as `smooth` (CV² unreliable in these cases) even if `adi`/`cv2` remain computable.
+- On an `intermittent`/`lumpy` series, `models: ["auto"]` replaces the default ensemble
+  (`chronos2, ets, arima, theta`) with `chronos2, tsb, imapa` (with declared events:
+  `chronos2` alone, as for the default ensemble). The series' `model` field remains
+  `"ensemble"` in both cases; `demand.type` indicates which one was used.
+- `croston`/`tsb`/`imapa` have no native band: the raw band is
+  `point ± z(level) × standard deviation of the training values`, floored at 0. On an
+  `intermittent`/`lumpy` series, the lower bound of the final band (even calibrated) is always floored at
+  0. Forecast values are never rounded to the integer (2 decimals), even if the history
+  is integer. A `warnings[]` warning systematically accompanies these series; an
+  explicit model (`prophet`, `arima`, ...) requested on an intermittent series is run anyway,
+  with a warning suggesting `auto`, `tsb` or `imapa`.
 
-### Champs optionnels `events` et `scenarios` (moteur Python uniquement)
+### Optional `events` and `scenarios` fields (Python engine only)
 
-Requête :
+Request:
 
 ```json
 "events": [
@@ -260,21 +259,21 @@ Requête :
 ]
 ```
 
-- **Événement** : dates ou plages sur l'historique **et** l'horizon ; `groups` (facultatif) limite
-  l'événement à certaines séries. Chaque période reçoit la part de ses jours couverte (0 à 1), utilisée
-  comme covariable connue par Chronos-2, ARIMA (ARIMAX) et Prophet (régresseur). Avec des événements,
-  `auto` = ensemble Chronos-2 + ARIMA (ETS et Theta ne les exploitent pas).
-- Un événement **sans précédent dans l'historique** d'une série est ignoré pour elle (avertissement) :
-  son effet ne peut pas être appris ; le simuler avec un ajustement. Il en va de même d'un événement qui
-  touche presque également chaque période (écart entre ses parts extrêmes ≤ 20 % de la plus forte,
-  ex. « le 1er de chaque mois » sur des données mensuelles) : son effet se confond avec le niveau.
-- **Scénario** : `events` (facultatif) remplace les événements **futurs** (liste vide = aucun) ; les
-  noms inconnus de `events` sont ignorés avec un avertissement. `adjustments` impose ensuite un
-  effet explicite, `percent` (> -100) ou `add`, au prorata des jours couverts de chaque période.
-  Les bandes du scénario reçoivent la même calibration que la prévision de base.
-- Limites : 20 événements, 400 plages par événement, 5 scénarios, 20 ajustements par scénario.
+- **Event**: dates or ranges over the history **and** the horizon; `groups` (optional) restricts
+  the event to certain series. Each period receives the share of its days covered (0 to 1), used
+  as a known covariate by Chronos-2, ARIMA (ARIMAX) and Prophet (regressor). With events,
+  `auto` = Chronos-2 + ARIMA ensemble (ETS and Theta do not exploit them).
+- An event **with no precedent in a series' history** is ignored for that series (warning):
+  its effect cannot be learned; simulate it with an adjustment. The same goes for an event that
+  affects almost every period equally (gap between its extreme shares ≤ 20% of the largest,
+  e.g. "the 1st of each month" on monthly data): its effect is confounded with the level.
+- **Scenario**: `events` (optional) replaces the **future** events (empty list = none); unknown
+  names in `events` are ignored with a warning. `adjustments` then applies an explicit
+  effect, `percent` (> -100) or `add`, pro rata to the covered days of each period.
+  Scenario bands receive the same calibration as the base forecast.
+- Limits: 20 events, 400 ranges per event, 5 scenarios, 20 adjustments per scenario.
 
-Réponse, par série (seulement si la requête en contient) :
+Response, per series (only if the request contains them):
 
 ```json
 "events": [{"name": "promo", "history_share": 0.11, "used": true}],
@@ -282,12 +281,12 @@ Réponse, par série (seulement si la requête en contient) :
                "difference": {"total": -1840, "percent": -6.2}}]
 ```
 
-`history_share` : part des périodes de l'historique touchées par l'événement. `difference` :
-total du scénario moins total de la prévision de base sur l'horizon.
+`history_share`: share of history periods affected by the event. `difference`:
+scenario total minus base forecast total over the horizon.
 
-### Champs optionnels `hierarchy` et `reconciliation` (moteur Python uniquement)
+### Optional `hierarchy` and `reconciliation` fields (Python engine only)
 
-Requête :
+Request:
 
 ```json
 "group_var": "store",
@@ -295,67 +294,67 @@ Requête :
 "reconciliation": "mint"
 ```
 
-- **`hierarchy`** : colonnes de `data`, du niveau le plus haut au plus bas, **au-dessus** de
-  `group_var` (qui reste le niveau le plus bas). Exige `group_var`. Un niveau « Total » racine est
-  toujours ajouté. Chaque groupe (valeur de `group_var`) doit avoir une seule valeur par colonne de
-  hiérarchie sur tout son historique, sinon 400 (`field: "hierarchy"`). Absent/`null`/`[]` : pas de
-  hiérarchie, réponse strictement identique à avant (pas de champ `level` par série, pas de champ
-  racine `reconciliation`).
-- **`reconciliation`** : `"mint"` (défaut dès que `hierarchy` est fourni), `"bottom_up"` ou
-  `"none"`. `"mint"` estime la covariance des erreurs de backtest par l'estimateur à rétrécissement
-  de Schäfer-Strimmer (comme `hierarchicalforecast`'s `MinTrace(method="mint_shrink")`, rétrécit la
-  **corrélation** vers l'identité, pas la covariance brute) puis réconcilie par
-  `ŷ_rec = S (Sᵀ W⁻¹ S)⁻¹ Sᵀ W⁻¹ ŷ` (numpy seul, aucune dépendance ajoutée). Repli automatique sur
-  `bottom_up` (avec avertissement au niveau racine) si la matrice est singulière ou si trop peu de
-  points de backtest sont disponibles pour l'estimer. `"bottom_up"` ignore la prévision propre des
-  agrégats et les recalcule comme la somme des séries du bas réconciliées. `"none"` laisse chaque
-  nœud (bas et agrégats) prévu indépendamment ; le résultat n'est alors **pas** garanti cohérent
-  (`coherent: false`) — utile pour comparer, ou quand seule la vue par niveau intéresse le client.
-- Chaque série (bas + agrégats) traverse le **même** pipeline que sans hiérarchie : backtest en
-  origines glissantes, choix du modèle par RMSE, calibration conforme. La réconciliation n'intervient
-  **qu'en aval**, sur le point final et les bandes, jamais sur `model`/`metrics`/`calibration` (qui
-  restent la performance du modèle propre à ce nœud, utile pour juger si la réconciliation avait un
-  intérêt à cet endroit).
-- **Bandes** : décalées du même delta que le point (`lower/upper += point_réconcilié - point_brut`),
-  puis bornées à 0 en bas si toutes les valeurs historiques du nœud sont ≥ 0. C'est une approximation
-  documentée (pas de réconciliation « exacte » des quantiles, qui n'a pas de solution fermée simple) :
-  la calibration conforme s'applique ensuite normalement sur les bandes décalées.
-- **Scénarios** : réconciliés avec la **même** matrice (même `W`) que la prévision de base, PUIS
-  les `adjustments` du scénario sont appliqués aux séries du **bas** uniquement, et les agrégats sont
-  **recalculés par somme** des bas ajustés (pas re-réconciliés) — sinon un ajustement sur un magasin
-  ne se refléterait pas dans le total du scénario.
-- **Événements sur un agrégat** : chaque agrégat reçoit, période par période, la **moyenne non
-  pondérée de ses enfants DIRECTS** (propagée niveau par niveau, pas la moyenne de toutes les
-  feuilles du sous-arbre — un agrégat à deux niveaux avec un enfant très favorisé par un événement et
-  un autre indifférent aux enfants nombreux de ce dernier ne doit pas diluer le premier). Les
-  événements non applicables à une série (filtrés par `groups` de l'événement) comptent pour 0 dans
-  cette moyenne. La même règle d'apprentissage (écart significatif sur l'historique, § événements)
-  s'applique ensuite à l'agrégat comme à une série du bas.
-- **Limites** : `max_series` compte **toutes** les séries de la réponse, agrégats compris (pas
-  seulement les groupes du bas) ; l'erreur 413 le précise (« agrégats de hiérarchie compris »).
-- Collision de libellé : si une valeur de colonne de hiérarchie coïncide avec `"Total"`, avec une
-  valeur d'une AUTRE colonne de hiérarchie, ou avec une valeur de `group_var`, 400 explicite (deux
-  nœuds de niveaux différents seraient indiscernables dans la réponse, qui n'identifie un nœud que
-  par `group` + `level`). Le même libellé réutilisé par deux PARENTS différents au même niveau
-  (ex. l'état « nsw » sous deux motifs de voyage différents) n'est pas une collision : c'est une
-  hiérarchie normale, seulement pas déductible du libellé seul hors du contexte de la requête.
-- Les séries du bas doivent couvrir exactement les mêmes dates après régularisation (même grille de
-  fréquence) : sinon 400 (`field: "hierarchy"`), qui nomme les séries en cause — la sommation des
-  agrégats l'exige.
+- **`hierarchy`**: columns of `data`, from the highest level to the lowest, **above**
+  `group_var` (which remains the lowest level). Requires `group_var`. A root "Total" level is
+  always added. Each group (value of `group_var`) must have a single value per hierarchy
+  column across its whole history, otherwise 400 (`field: "hierarchy"`). Absent/`null`/`[]`: no
+  hierarchy, response strictly identical to before (no `level` field per series, no root
+  `reconciliation` field).
+- **`reconciliation`**: `"mint"` (default as soon as `hierarchy` is provided), `"bottom_up"` or
+  `"none"`. `"mint"` estimates the covariance of the backtest errors with the Schäfer-Strimmer
+  shrinkage estimator (like `hierarchicalforecast`'s `MinTrace(method="mint_shrink")`, it shrinks the
+  **correlation** toward the identity, not the raw covariance) then reconciles with
+  `ŷ_rec = S (Sᵀ W⁻¹ S)⁻¹ Sᵀ W⁻¹ ŷ` (numpy only, no added dependency). Automatic fallback to
+  `bottom_up` (with a warning at root level) if the matrix is singular or if too few
+  backtest points are available to estimate it. `"bottom_up"` ignores the aggregates' own forecast
+  and recomputes them as the sum of the reconciled bottom series. `"none"` leaves each
+  node (bottom and aggregates) forecast independently; the result is then **not** guaranteed to be coherent
+  (`coherent: false`) — useful for comparison, or when the client only cares about the per-level view.
+- Each series (bottom + aggregates) goes through the **same** pipeline as without a hierarchy: backtest with
+  rolling origins, model selection by RMSE, conformal calibration. Reconciliation only comes in
+  **downstream**, on the final point and the bands, never on `model`/`metrics`/`calibration` (which
+  remain the performance of the model specific to that node, useful for judging whether reconciliation
+  was worthwhile at that spot).
+- **Bands**: shifted by the same delta as the point (`lower/upper += reconciled_point - raw_point`),
+  then floored at 0 if all the node's historical values are ≥ 0. This is a documented
+  approximation (no "exact" reconciliation of quantiles, which has no simple closed-form solution):
+  conformal calibration then applies normally on the shifted bands.
+- **Scenarios**: reconciled with the **same** matrix (same `W`) as the base forecast, THEN
+  the scenario's `adjustments` are applied to the **bottom** series only, and the aggregates are
+  **recomputed by summation** of the adjusted bottom series (not re-reconciled) — otherwise an adjustment on a
+  store would not be reflected in the scenario total.
+- **Events on an aggregate**: each aggregate receives, period by period, the **unweighted
+  average of its DIRECT children** (propagated level by level, not the average of all
+  the leaves of the subtree — a two-level aggregate with one child strongly favored by an event and
+  another indifferent to the numerous children of the former must not dilute the first). Events
+  not applicable to a series (filtered by the event's `groups`) count as 0 in
+  this average. The same learning rule (significant gap over the history, § events)
+  then applies to the aggregate as to a bottom series.
+- **Limits**: `max_series` counts **all** the series in the response, aggregates included (not
+  only the bottom groups); the 413 error states this (French message: "agrégats de hiérarchie compris").
+- Label collision: if a hierarchy column value coincides with `"Total"`, with a
+  value of ANOTHER hierarchy column, or with a value of `group_var`, explicit 400 (two
+  nodes of different levels would be indistinguishable in the response, which identifies a node only
+  by `group` + `level`). The same label reused by two different PARENTS at the same level
+  (e.g. the state "nsw" under two different travel purposes) is not a collision: it is a normal
+  hierarchy, just not deducible from the label alone outside the context of the request.
+- The bottom series must cover exactly the same dates after regularization (same frequency grid):
+  otherwise 400 (`field: "hierarchy"`), which names the series concerned — summing the
+  aggregates requires it.
 
-Réponse, par série (seulement si la requête contient `hierarchy`) :
+Response, per series (only if the request contains `hierarchy`):
 
 ```json
 "level": "total",
 "group": "Total"
 ```
 
-`level` : `"total"` | `"<colonne de hiérarchie>"` | `"bottom"`. `group` : `"Total"` pour la racine,
-la valeur de la colonne pour un agrégat intermédiaire, la valeur de `group_var` pour une série du
-bas. Ordre des séries dans `series[]` : total, puis chaque niveau intermédiaire (du plus haut au
-plus bas, valeurs dans l'ordre de première apparition parmi les séries du bas), puis le bas.
+`level`: `"total"` | `"<hierarchy column>"` | `"bottom"`. `group`: `"Total"` for the root,
+the column value for an intermediate aggregate, the `group_var` value for a
+bottom series. Order of the series in `series[]`: total, then each intermediate level (from highest to
+lowest, values in order of first appearance among the bottom series), then the bottom.
 
-Racine de la réponse (seulement si `hierarchy`) :
+Response root (only if `hierarchy`):
 
 ```json
 "reconciliation": {
@@ -365,51 +364,51 @@ Racine de la réponse (seulement si `hierarchy`) :
 }
 ```
 
-`method` : méthode **effectivement** utilisée (`"mint_shrink"` | `"bottom_up"` | `"none"`) — peut
-différer de `reconciliation` demandé en cas de repli. `coherent` : `true` si chaque agrégat est
-garanti égal à la somme de ses enfants (`"mint_shrink"`/`"bottom_up"`), `false` sinon (`"none"`).
-`backtest` (absent si `method: "none"`) : MASE moyen, pooled sur tous les nœuds et toutes les
-fenêtres de backtest, **avant** (`mase_base`, prévisions indépendantes) et **après**
-(`mase_reconciled`) réconciliation ; `W` est ré-estimée à chaque fenêtre en excluant CETTE fenêtre
-(« leave-one-window-out ») pour ne pas se juger sur les erreurs qui ont servi à s'auto-corriger.
+`method`: method **actually** used (`"mint_shrink"` | `"bottom_up"` | `"none"`) — may
+differ from the requested `reconciliation` in case of fallback. `coherent`: `true` if each aggregate is
+guaranteed equal to the sum of its children (`"mint_shrink"`/`"bottom_up"`), `false` otherwise (`"none"`).
+`backtest` (absent if `method: "none"`): mean MASE, pooled over all nodes and all backtest
+windows, **before** (`mase_base`, independent forecasts) and **after**
+(`mase_reconciled`) reconciliation; `W` is re-estimated at each window excluding THAT window
+("leave-one-window-out") so as not to be judged on the errors that were used to self-correct.
 
-**Précision d'implémentation (choix documenté, contrat ambigu sur ce point) :** un ajustement de
-scénario ré-réconcilie/agrège toujours les agrégats par somme des bas, y compris pour un scénario
-sans aucun `adjustments` (l'opération est un no-op dans ce cas, donc sans effet observable, mais
-simplifie l'implémentation en évitant un code séparé pour ce cas).
+**Implementation note (documented choice, the contract is ambiguous on this point):** a
+scenario adjustment always re-reconciles/aggregates the aggregates by summing the bottom series, including for a scenario
+without any `adjustments` (the operation is a no-op in that case, so it has no observable effect, but
+it simplifies the implementation by avoiding separate code for this case).
 
-### Erreurs
+### Errors
 
-Même format que le contrat : `400/401/404/413`
-`{"status":"error","errors":[{"field":..., "message":"..."}]}` — `field` vaut
-`null` (JSON) quand l'erreur ne porte pas sur un champ précis (pas `{}` :
-tous les endpoints sérialisent en `application/json;charset=utf-8` via
-`reqres::format_json(auto_unbox = TRUE, null = "null")`, qui rend les `NULL`
-R comme `null` JSON plutôt que le défaut de plumber2 — `{}` — voir
-`plumber.R`). Messages en français, accentués (UTF-8), actionnables
-(colonnes disponibles listées, modèles disponibles listés, etc.). Aucune
-entrée invalide ne produit de `500` : toute erreur prévisible est
-interceptée en amont de l'ajustement des modèles
-(`api_v1_validate_request()`), et un échec d'ajustement isolé sur une série
-(dans un cas multi-groupes) est reporté comme avertissement au niveau de
-cette série plutôt que de faire échouer toute la requête.
+Same format as the contract: `400/401/404/413`
+`{"status":"error","errors":[{"field":..., "message":"..."}]}` — `field` is
+`null` (JSON) when the error does not concern a specific field (not `{}`:
+all endpoints serialize as `application/json;charset=utf-8` via
+`reqres::format_json(auto_unbox = TRUE, null = "null")`, which renders R
+`NULL` as JSON `null` rather than plumber2's default — `{}` — see
+`plumber.R`). Messages are in French, accented (UTF-8), actionable
+(available columns listed, available models listed, etc.). No
+invalid input produces a `500`: every foreseeable error is
+intercepted upstream of model fitting
+(`api_v1_validate_request()`), and an isolated fitting failure on one series
+(in a multi-group case) is reported as a warning at the level of
+that series rather than making the whole request fail.
 
 ## Logs
 
-Une ligne JSON par requête sur `stdout` (`api_v1_log_request()`) :
-`ts, id, route, status, duration_ms, n_rows, n_series, models`. Aucune
-donnée utilisateur (pas de valeurs de `data`, pas d'IP, pas de token).
+One JSON line per request on `stdout` (`api_v1_log_request()`):
+`ts, id, route, status, duration_ms, n_rows, n_series, models`. No
+user data (no `data` values, no IP, no token).
 
-## Limite connue (contournement documenté)
+## Known limitation (documented workaround)
 
-`modeltime` enregistre ses implémentations de modèles personnalisés
-(`naive_reg`, `arima_reg`, `exp_smoothing`, `prophet_reg`, ...) auprès de
-`parsnip` d'une manière qui exige, en pratique, que le namespace `modeltime`
-soit **attaché** (`library(modeltime)`) et pas seulement chargé via
-`modeltime::...` : sans cela, `parsnip::fit()` échoue avec
-`could not find function '..._fit_impl'`. Vérifié par reproduction directe
-(appel identique avec et sans `library(modeltime)` préalable). `entrypoint.R`
-et `tests/testthat/setup.R` attachent donc explicitement `modeltime` et
-`parsnip` (y compris dans les daemons `mirai` via `mirai::everywhere()`).
-Ce comportement affecte toutes les fonctions `th2_*_engine()` du package,
-pas seulement le code de l'API v1.
+`modeltime` registers its custom model implementations
+(`naive_reg`, `arima_reg`, `exp_smoothing`, `prophet_reg`, ...) with
+`parsnip` in a way that in practice requires the `modeltime` namespace to be
+**attached** (`library(modeltime)`) and not just loaded via
+`modeltime::...`: without this, `parsnip::fit()` fails with
+`could not find function '..._fit_impl'`. Verified by direct reproduction
+(identical call with and without a prior `library(modeltime)`). `entrypoint.R`
+and `tests/testthat/setup.R` therefore explicitly attach `modeltime` and
+`parsnip` (including in the `mirai` daemons via `mirai::everywhere()`).
+This behavior affects all the `th2_*_engine()` functions of the package,
+not just the API v1 code.

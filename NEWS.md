@@ -2,56 +2,54 @@
 
 ## API v1 (`feat/api-v1-json`)
 
-- **Ajout** : implémentation du contrat API v1 (`GET /health`,
-  `POST /v1/forecast`, `POST /v1/jobs` + `GET /v1/jobs/{id}`) en JSON, avec
-  authentification Bearer optionnelle (`TH2FORECAST_API_TOKEN`), limites
-  configurables (`TH2FORECAST_MAX_ROWS`, `TH2FORECAST_MAX_SERIES`,
-  `TH2FORECAST_MAX_HORIZON`), validation complète des entrées avec erreurs
-  400 actionnables en français, détection de fréquence et régularisation
-  des trous (`timetk`), intervalles conformal (`modeltime`), backtest et
-  comparaison de modèles avec baseline naive/snaive.
-- **Retrait** : l'ancien endpoint `POST /forecast` (entrée base64 R
-  sérialisée, `R/plumber_th2_forecast.R`) est supprimé. Il était écrit pour
-  l'API `plumber` v1 (`function(res, input_data, ...)` + tags `@param`)
-  alors que le service tourne sous **plumber2**, dont le modèle de
-  handler est différent (`body`/`query`/`response` en arguments nommés) :
-  le fichier n'était donc jamais exécutable tel quel. Ses
-  `tryCatch(..., error = function(e) {...; return(...)})` ne stoppaient de
-  toute façon pas l'exécution de `forecast()` en cas d'erreur (un `return()`
-  dans le callback `error` d'un `tryCatch` ne fait pas sortir la fonction
-  appelante), ce qui aurait produit un `500` opaque sur toute entrée
-  invalide même corrigé pour plumber2.
-- **Correction critique** : `uvr.toml` déclarait `th2forecast` comme sa
-  propre dépendance Git (`[dependencies.th2forecast] git =
-  "apowerb/th2forecast"`), figée par `uvr.lock` sur un commit précis de
-  GitHub. Résultat : `uvr sync` installait le package depuis un tarball
-  GitHub distant, **jamais depuis les sources locales du dépôt** — tout
-  changement local à `R/` était donc invisible dans l'image Docker
-  construite. Corrigé : la dépendance auto-référentielle est retirée du
-  manifeste ; le `Dockerfile` installe désormais `th2forecast` depuis les
-  sources locales (`install.packages('.', repos = NULL, type = 'source')`)
-  après `uvr sync` (qui n'installe plus que les dépendances tierces).
-- **Correction** : `DESCRIPTION` déclarait `bizdays` et `echarts4r` dans
-  `Imports` (utilisés par `R/evaluation_models.R`,
-  `R/mod_basic_fcast_viewer.R`, `R/preprocessing_dataset.R`,
-  `R/forecast_viewer_helpers.R`) sans que `uvr.toml` ne les installe : le
-  package n'était donc **jamais réellement installable depuis les
-  sources** avant ce correctif (masqué jusqu'ici par la dépendance
-  auto-référentielle ci-dessus, qui contournait toute installation
-  locale réelle). Ajoutés à `uvr.toml`/`uvr.lock`.
-- **Correction** : licence `GLP-3` (typo) corrigée en
-  `Apache License (== 2.0)` dans `DESCRIPTION`, conforme au fichier
-  `LICENSE` réellement présent dans le dépôt (Apache-2.0), et non MIT.
-- **Correction** : `Dockerfile` épinglait `uvr` via
-  `.../main/install.sh` (non reproductible) ; épinglé sur le tag `v0.4.6`.
-  Point d'entrée unique (`entrypoint.R`) ; `run_api.R` (doublon) et
-  `main_service.R` (fichier corrompu en UTF-16, non exécutable) supprimés.
-- **Ajout** : `.Rhistory` retiré du suivi Git (déjà dans `.gitignore` mais
-  resté indexé depuis un commit antérieur).
-- **Limite connue** : `/v1/jobs` utilise `mirai` pour une exécution
-  asynchrone réelle (daemons créés dans `entrypoint.R`) ; en l'absence de
-  daemon disponible au démarrage, le calcul est exécuté en synchrone au
-  moment du `POST` (repli documenté dans `docs/API.md`).
+- **Added**: implementation of the API v1 contract (`GET /health`,
+  `POST /v1/forecast`, `POST /v1/jobs` + `GET /v1/jobs/{id}`) in JSON, with
+  optional Bearer authentication (`TH2FORECAST_API_TOKEN`), configurable
+  limits (`TH2FORECAST_MAX_ROWS`, `TH2FORECAST_MAX_SERIES`,
+  `TH2FORECAST_MAX_HORIZON`), full input validation with actionable 400
+  errors in French, frequency detection and gap regularization
+  (`timetk`), conformal intervals (`modeltime`), backtest and model
+  comparison with a naive/snaive baseline.
+- **Removed**: the old `POST /forecast` endpoint (serialized R base64 input,
+  `R/plumber_th2_forecast.R`) is deleted. It was written for the `plumber`
+  v1 API (`function(res, input_data, ...)` + `@param` tags) whereas the
+  service runs under **plumber2**, whose handler model is different
+  (`body`/`query`/`response` as named arguments): the file could therefore
+  never be run as is. Its `tryCatch(..., error = function(e) {...;
+  return(...)})` calls did not stop the execution of `forecast()` on error
+  anyway (a `return()` in the `error` callback of a `tryCatch` does not make
+  the calling function exit), which would have produced an opaque `500` on
+  any invalid input even if it had been fixed for plumber2.
+- **Critical fix**: `uvr.toml` declared `th2forecast` as its own Git
+  dependency (`[dependencies.th2forecast] git =
+  "apowerb/th2forecast"`), pinned by `uvr.lock` to a specific GitHub commit.
+  As a result, `uvr sync` installed the package from a remote GitHub
+  tarball, **never from the repository's local sources** — any local change
+  to `R/` was therefore invisible in the built Docker image. Fixed: the
+  self-referential dependency is removed from the manifest; the `Dockerfile`
+  now installs `th2forecast` from the local sources
+  (`install.packages('.', repos = NULL, type = 'source')`) after `uvr sync`
+  (which now only installs third-party dependencies).
+- **Fix**: `DESCRIPTION` declared `bizdays` and `echarts4r` in `Imports`
+  (used by `R/evaluation_models.R`, `R/mod_basic_fcast_viewer.R`,
+  `R/preprocessing_dataset.R`, `R/forecast_viewer_helpers.R`) without
+  `uvr.toml` installing them: the package was therefore **never actually
+  installable from the sources** before this fix (masked until now by the
+  self-referential dependency above, which bypassed any real local
+  installation). Added to `uvr.toml`/`uvr.lock`.
+- **Fix**: license `GLP-3` (typo) corrected to
+  `Apache License (== 2.0)` in `DESCRIPTION`, consistent with the `LICENSE`
+  file actually present in the repository (Apache-2.0), and not MIT.
+- **Fix**: `Dockerfile` pinned `uvr` via
+  `.../main/install.sh` (not reproducible); now pinned to the `v0.4.6` tag.
+  Single entry point (`entrypoint.R`); `run_api.R` (duplicate) and
+  `main_service.R` (file corrupted in UTF-16, not runnable) deleted.
+- **Added**: `.Rhistory` removed from Git tracking (already in `.gitignore`
+  but still indexed since an earlier commit).
+- **Known limitation**: `/v1/jobs` uses `mirai` for real asynchronous
+  execution (daemons created in `entrypoint.R`); when no daemon is
+  available at startup, the computation is run synchronously at `POST` time
+  (fallback documented in `docs/API.md`).
 
 # th2test (development version)
 
