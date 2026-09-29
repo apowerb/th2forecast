@@ -27,7 +27,7 @@ This module performs forecasting through different machine learning models, show
 -   Forecasting: once the target time series and ML models are selected, the forecasts and performance of each model will be displayed according to the selected dates and forecast horizon.
 ### Permissions
 
-### Votre équipe de support thaink²
+### Your thaink² support team
 
 [Contact Us](mailto:contact@thaink2.com)
 
