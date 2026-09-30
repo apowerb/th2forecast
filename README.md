@@ -98,6 +98,10 @@ them. Images are published per release:
 - pre-release (`vX.Y.Z-rc.1`, or a release marked "pre-release"): its exact version only, `X.Y`
   and `latest` do not move.
 
+Architectures: `apowerb/th2forecast-py` (the image apowerb-hosting deploys) is published for
+`linux/amd64` and `linux/arm64`, each built and tested on a native runner; the R image
+`apowerb/th2forecast` is `linux/amd64` only.
+
 ```bash
 gh release create vX.Y.Z --target main --generate-notes
 ```

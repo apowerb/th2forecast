@@ -109,7 +109,7 @@ jobs:
 
       - name: Wait for the API to be ready
         run: |
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf http://127.0.0.1:18000/health && exit 0
             sleep 2
           done
@@ -146,16 +146,39 @@ jobs:
             docker push apowerb/th2forecast:"$tag"
           done
 
+  # The Python engine is the image apowerb-hosting deploys (compose and Helm),
+  # so it is published for amd64 and arm64. Each architecture is built and
+  # tested on a native runner; on a release each one pushes an untagged image
+  # by digest, and `publish-python` tags the manifest list once both exist, so
+  # a half-failed release never moves a tag to a single-architecture image.
+  # The R image stays amd64-only: its R packages are compiled from source.
   build-python:
+    name: build-python (${{ matrix.arch }})
     needs: tags
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.tags.outputs.ref || github.ref }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build Python engine image (Chronos-2 + statsforecast)
-        run: docker build -t th2forecast-py:ci python
+        uses: docker/build-push-action@v6
+        with:
+          context: python
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: th2forecast-py:ci
 
       - name: Run unit tests (pytest) in the built image
         run: docker run --rm th2forecast-py:ci python -m pytest -q -p no:cacheprovider
@@ -168,7 +191,7 @@ jobs:
 
       - name: Wait for the API to be ready
         run: |
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             curl -sf http://127.0.0.1:18001/health && exit 0
             sleep 2
           done
@@ -195,12 +218,68 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push the release tags
+      # Same builder and cache as the tested image: this step rebuilds nothing.
+      - name: Push the tested image by digest
+        id: push
+        if: needs.tags.outputs.tags != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: python
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=apowerb/th2forecast-py,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export the digest
         if: needs.tags.outputs.tags != ''
         env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+
+      - name: Upload the digest
+        if: needs.tags.outputs.tags != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-digest-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-python:
+    name: Publish the Python engine image
+    needs: [tags, build-python]
+    if: needs.tags.outputs.tags != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download the digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: python-digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create the multi-architecture manifest with the release tags
+        working-directory: /tmp/digests
+        env:
+          IMAGE: apowerb/th2forecast-py
           TAGS: ${{ needs.tags.outputs.tags }}
         run: |
-          for tag in $TAGS; do
-            docker tag th2forecast-py:ci apowerb/th2forecast-py:"$tag"
-            docker push apowerb/th2forecast-py:"$tag"
-          done
+          args=()
+          for tag in $TAGS; do args+=(-t "$IMAGE:$tag"); done
+          # shellcheck disable=SC2046  # one digest file per architecture
+          docker buildx imagetools create "${args[@]}" $(printf "$IMAGE@sha256:%s " *)
+
+      - name: Inspect the published image
+        env:
+          IMAGE: apowerb/th2forecast-py
+          TAGS: ${{ needs.tags.outputs.tags }}
+        run: docker buildx imagetools inspect "$IMAGE:${TAGS%% *}"
