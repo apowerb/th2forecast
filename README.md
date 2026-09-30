@@ -89,15 +89,22 @@ TH2FORECAST_BASE_URL=http://127.0.0.1:8000 TH2FORECAST_API_TOKEN=change-me \
 ## Image publishing
 
 The CI (`.github/workflows/docker-build.yml`) builds and tests both images (R API `apowerb/th2forecast`,
-Python engine `apowerb/th2forecast-py`) on every PR to `main`, then publishes them:
+Python engine `apowerb/th2forecast-py`) on every pull request and push to `main`, without publishing
+them. Images are published per release:
 
-- push to `main`: image tagged with the commit SHA;
-- tag `vX.Y.Z`: images tagged `X.Y.Z` and `latest`. This is the tag that deployments (Helm chart,
-  apowerb-hosting compose) pin.
+- stable release `vX.Y.Z`: both images tagged `X.Y.Z`, `X.Y` and `latest` (`latest` only if it is
+  the release GitHub marks as latest, so a fix on an older line does not move it back). Deployments
+  (Helm chart, apowerb-hosting compose) pin `X.Y.Z`;
+- pre-release (`vX.Y.Z-rc.1`, or a release marked "pre-release"): its exact version only, `X.Y`
+  and `latest` do not move.
 
 ```bash
-git tag vX.Y.Z && git push origin vX.Y.Z
+gh release create vX.Y.Z --target main --generate-notes
 ```
+
+A GitHub release (not a bare tag) is what triggers the publication; it is also what
+apowerb-hosting's `bump-images` workflow looks up (`releases/latest`) for the images it pins. To republish an existing release: `gh workflow run docker-build.yml
+-f version=X.Y.Z`. The commit-SHA tags published before September 30, 2026 remain on Docker Hub.
 
 ## License
 

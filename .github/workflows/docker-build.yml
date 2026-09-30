@@ -1,31 +1,111 @@
 name: Build Docker Image
 
+# Images are published per release, not per commit.
+#
+# - pull request / push to main: both images are built and tested, nothing is
+#   pushed.
+# - release published (vX.Y.Z): both images are rebuilt from the tag, tested,
+#   then pushed as X.Y.Z, X.Y and latest. A pre-release (vX.Y.Z-rc.1, or the
+#   GitHub "pre-release" flag) only gets its exact version: X.Y and latest
+#   move with stable releases only. Rules and tests: .github/scripts/.
+# - workflow_dispatch: republishes an existing release from its tag.
+#
+# The commit-SHA tags pushed before this change stay on Docker Hub and remain
+# pullable; nothing deletes them.
 on:
   push:
     branches: [ main ]
-    # Release : un tag vX.Y.Z publie les deux images en X.Y.Z et latest.
-    # Les pushes sur main continuent de publier l'image par SHA (déploiement actuel).
-    tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
   pull_request:
     branches: [ main ]
+  release:
+    types: [ published ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release to republish, without the leading v (its vX.Y.Z tag is built)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  tags:
+    name: Resolve the image tags
     runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.resolve.outputs.ref }}
+      tags: ${{ steps.resolve.outputs.tags }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test the tag rules
+        run: bash .github/scripts/test-image-tags.sh
+
+      # Empty outputs on pull requests and pushes to main: the build jobs then
+      # build and test without pushing. Values go through env, not ${{ }} in
+      # the script body, so a crafted tag or input cannot inject commands.
+      - name: Resolve the release and its tags
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          case "$EVENT_NAME" in
+            release)
+              tag="$RELEASE_TAG"
+              prerelease="$RELEASE_PRERELEASE"
+              ;;
+            workflow_dispatch)
+              tag="v${INPUT_VERSION#v}"
+              # Republish only what was released, with its pre-release flag.
+              prerelease="$(gh release view "$tag" -R "$GITHUB_REPOSITORY" --json isPrerelease --jq .isPrerelease)"
+              ;;
+            *)
+              echo "Not a release: build and test only."
+              exit 0
+              ;;
+          esac
+          tags="$(bash .github/scripts/image-tags.sh "$tag" "$prerelease" | tr '\n' ' ')"
+          # A fix on an older line (v0.1.5 after v0.2.0) or a republished old
+          # version must not move `latest` back: keep it only for the release
+          # GitHub marks as latest, the one apowerb-hosting's bump reads.
+          # Only queried for a stable release: with pre-releases only, the
+          # endpoint answers 404.
+          if [[ " $tags " == *" latest "* ]]; then
+            current_latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+            if [ "$current_latest" != "$tag" ]; then
+              echo "$tag is not the latest release ($current_latest): latest is left alone."
+              tags="${tags/latest/}"
+            fi
+          fi
+          echo "Image tags for $tag: $tags"
+          echo "ref=refs/tags/$tag" >> "$GITHUB_OUTPUT"
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: tags
+    runs-on: ubuntu-latest
+    steps:
+      # On a release, the tag itself; a dispatch would otherwise build main.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tags.outputs.ref || github.ref }}
+
       - name: Build Docker Image
-        run: docker build -t apowerb/th2forecast:${{ github.sha }} .
+        run: docker build -t th2forecast:ci .
 
       - name: Run unit tests (testthat) in the built image
-        run: docker run --rm apowerb/th2forecast:${{ github.sha }} Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'
+        run: docker run --rm th2forecast:ci Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'
 
       - name: Start container for smoke test
         run: |
           docker run -d --name th2forecast-ci -p 127.0.0.1:18000:8000 \
             -e TH2FORECAST_API_TOKEN=ci-smoke-token \
-            apowerb/th2forecast:${{ github.sha }}
+            th2forecast:ci
 
       - name: Wait for the API to be ready
         run: |
@@ -50,41 +130,41 @@ jobs:
         run: docker rm -f th2forecast-ci || true
 
       - name: Log in to Docker Hub
-        if: github.event_name == 'push'
+        if: needs.tags.outputs.tags != ''
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push Docker Image
-        if: github.event_name == 'push'
+      - name: Push the release tags
+        if: needs.tags.outputs.tags != ''
+        env:
+          TAGS: ${{ needs.tags.outputs.tags }}
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            version="${GITHUB_REF_NAME#v}"
-            for tag in "$version" latest; do
-              docker tag apowerb/th2forecast:${{ github.sha }} apowerb/th2forecast:"$tag"
-              docker push apowerb/th2forecast:"$tag"
-            done
-          else
-            docker push apowerb/th2forecast:${{ github.sha }}
-          fi
+          for tag in $TAGS; do
+            docker tag th2forecast:ci apowerb/th2forecast:"$tag"
+            docker push apowerb/th2forecast:"$tag"
+          done
 
   build-python:
+    needs: tags
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tags.outputs.ref || github.ref }}
 
       - name: Build Python engine image (Chronos-2 + statsforecast)
-        run: docker build -t apowerb/th2forecast-py:${{ github.sha }} python
+        run: docker build -t th2forecast-py:ci python
 
       - name: Run unit tests (pytest) in the built image
-        run: docker run --rm apowerb/th2forecast-py:${{ github.sha }} python -m pytest -q -p no:cacheprovider
+        run: docker run --rm th2forecast-py:ci python -m pytest -q -p no:cacheprovider
 
       - name: Start container for smoke test
         run: |
           docker run -d --name th2forecast-py-ci -p 127.0.0.1:18001:8000 \
             -e TH2FORECAST_API_TOKEN=ci-smoke-token \
-            apowerb/th2forecast-py:${{ github.sha }}
+            th2forecast-py:ci
 
       - name: Wait for the API to be ready
         run: |
@@ -109,21 +189,18 @@ jobs:
         run: docker rm -f th2forecast-py-ci || true
 
       - name: Log in to Docker Hub
-        if: github.event_name == 'push'
+        if: needs.tags.outputs.tags != ''
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push Docker Image
-        if: github.event_name == 'push'
+      - name: Push the release tags
+        if: needs.tags.outputs.tags != ''
+        env:
+          TAGS: ${{ needs.tags.outputs.tags }}
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            version="${GITHUB_REF_NAME#v}"
-            for tag in "$version" latest; do
-              docker tag apowerb/th2forecast-py:${{ github.sha }} apowerb/th2forecast-py:"$tag"
-              docker push apowerb/th2forecast-py:"$tag"
-            done
-          else
-            docker push apowerb/th2forecast-py:${{ github.sha }}
-          fi
+          for tag in $TAGS; do
+            docker tag th2forecast-py:ci apowerb/th2forecast-py:"$tag"
+            docker push apowerb/th2forecast-py:"$tag"
+          done
