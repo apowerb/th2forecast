@@ -14,7 +14,17 @@ from .env import env_int
 ALLOWED_MODELS = ["prophet", "arima", "ets", "snaive", "naive", "croston", "tsb", "imapa", "auto"]
 ALLOWED_FREQUENCIES = ["day", "week", "month", "quarter", "year"]
 SEASONAL_PERIOD = {"day": 7, "week": 52, "month": 12, "quarter": 4, "year": 1}
-_DATE_RE = re.compile(r"^\s*(\d{4})[-/](\d{1,2})[-/](\d{1,2})")
+# Année-d'abord ISO (non ambigu, prioritaire) ; une heure éventuelle en suffixe
+# est ignorée car la regex n'ancre que le préfixe.
+_DATE_ISO_RE = re.compile(r"^\s*(\d{4})[-/](\d{1,2})[-/](\d{1,2})")
+# Jour-d'abord européen (06/01/2026) : seulement si l'ISO ne correspond pas.
+# Année à 4 chiffres exigée — deviner le siècle d'une année à 2 chiffres serait
+# trop risqué.
+# NB : cette tolérance jour-d'abord est propre au chemin Python (image déployée
+# `th2forecast-py`). R/api_v1_validate.R garde `as.Date` (ISO strict) ; les deux
+# implémentations divergent donc sur ce point précis, à réaligner si l'image R
+# est un jour servie.
+_DATE_DMY_RE = re.compile(r"^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{4})")
 
 
 def error(field: str | None, message: str) -> dict:
@@ -69,11 +79,18 @@ def _as_character(v) -> str | None:
 
 
 def _parse_date(s: str | None) -> date | None:
-    m = _DATE_RE.match(s or "")
-    if not m:
-        return None
+    # ISO année-d'abord d'abord (non ambigu), sinon jour-d'abord J/M/AAAA
+    # (défaut européen). L'heure éventuelle en suffixe est ignorée.
+    m = _DATE_ISO_RE.match(s or "")
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = _DATE_DMY_RE.match(s or "")
+        if not m:
+            return None
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
     try:
-        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        return date(y, mo, d)
     except ValueError:
         return None
 
@@ -170,7 +187,7 @@ def validate(body, limits: dict) -> Request:
     dates = [_parse_date(s) for s in raw_dates]
     bad = list(dict.fromkeys(s if s is not None else "" for s, d in zip(raw_dates, dates) if d is None))
     if bad:
-        raise Invalid(400, [error("data", "Dates non parsables dans la colonne '%s' (format attendu YYYY-MM-DD) : %s."
+        raise Invalid(400, [error("data", "Dates non parsables dans la colonne '%s' (formats acceptés : YYYY-MM-DD ou JJ/MM/AAAA) : %s."
                                   % (date_var, ", ".join(bad[:5])))])
 
     values = [_as_numeric(_as_character(r.get(target_var))) for r in rows]
@@ -265,7 +282,7 @@ def parse_feedback(raw, errors: list) -> list[dict]:
             d = _parse_date(_as_character(p.get("date")))
             if d is None:
                 errors.append(error("feedback", "Élément %d de 'feedback', point %d : date invalide "
-                                    "(format attendu YYYY-MM-DD)." % (i, j)))
+                                    "(formats acceptés : YYYY-MM-DD ou JJ/MM/AAAA)." % (i, j)))
                 bad = True
                 continue
             bounds, ok = {}, True
