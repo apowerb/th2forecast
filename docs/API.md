@@ -244,7 +244,7 @@ Syntetos-Boylan (2005) method, and always returns this field, including for a fa
   explicit model (`prophet`, `arima`, ...) requested on an intermittent series is run anyway,
   with a warning suggesting `auto`, `tsb` or `imapa`.
 
-### Optional `events` and `scenarios` fields (Python engine only)
+### Optional `events` and `scenarios` fields (`scenarios` adjustments: both engines; `events`: Python engine only)
 
 Request:
 
@@ -283,6 +283,15 @@ Response, per series (only if the request contains them):
 
 `history_share`: share of history periods affected by the event. `difference`:
 scenario total minus base forecast total over the horizon.
+
+**R engine**: `scenarios` with `adjustments` follow the same contract (same limits, same
+validation, same response shape, bands shifted like the forecast). Events are not supported:
+a request-level `events` field is ignored with a response warning, and a scenario's `events`
+is ignored with a series warning (only its `adjustments` are applied). Dates in `start`/`end`
+accept `YYYY-MM-DD` and `DD/MM/YYYY`. A period ends the day before the next one (a month
+covers all its days, so `percent: 10` from the 15th to the 31st of January applies 17/31 of
+10% to January). `difference.percent` is `null` when the base total is 0. A series whose
+forecast fails returns `scenarios: []`.
 
 ### Optional `hierarchy` and `reconciliation` fields (Python engine only)
 

@@ -107,6 +107,8 @@ api_v1_validate_request <- function(body, limits) {
     }
   }
 
+  scenarios <- api_v1_parse_scenarios(body[["scenarios"]], add_error)
+
   # Erreurs de structure -> on ne peut pas aller plus loin.
   if (length(errors) > 0) {
     return(list(ok = FALSE, status = 400L, errors = errors))
@@ -251,6 +253,7 @@ api_v1_validate_request <- function(body, limits) {
     frequency = frequency,
     models = models,
     confidence_levels = sort(unique(confidence_levels)),
+    scenarios = scenarios,
     holidays_country = .api_v1_null(body[["holidays_country"]], NULL)
   ))
 }

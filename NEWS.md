@@ -1,5 +1,15 @@
 # th2forecast (development version)
 
+## Scenarios on the R engine
+
+- **Added**: `scenarios` with `adjustments` (`percent` or `add`, pro rata to the days of
+  each period covered by `start`/`end`) in `POST /v1/forecast` and `POST /v1/jobs`, with
+  the contract, limits and response shape of the Python engine (`scenarios[].forecast`,
+  `difference.total`, `difference.percent`). Invalid scenarios get a 400 naming
+  `scenarios[i]` or `scenarios[i].adjustments[j]`.
+- **Added**: warnings for fields the R engine ignores (`events`, `hierarchy`,
+  `reconciliation`) and for scenario `events`, instead of dropping them silently.
+
 ## API v1 (`feat/api-v1-json`)
 
 - **Added**: implementation of the API v1 contract (`GET /health`,
