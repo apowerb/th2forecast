@@ -20,6 +20,7 @@ Imports:
     dplyr,
     earth,
     echarts4r,
+    httr2,
     janitor,
     magrittr,
     jsonlite,

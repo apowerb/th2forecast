@@ -1,7 +1,7 @@
 #' @name api_v1_validate
 NULL
 
-ALLOWED_MODELS <- c("prophet", "arima", "ets", "snaive", "naive", "auto")
+ALLOWED_MODELS <- c("prophet", "arima", "ets", "snaive", "naive", "auto", ML_MODELS, ENSEMBLE_MODEL)
 ALLOWED_FREQUENCIES <- c("day", "week", "month", "quarter", "year")
 
 #' Construit une erreur de champ pour la réponse API v1
@@ -108,6 +108,7 @@ api_v1_validate_request <- function(body, limits) {
   }
 
   scenarios <- api_v1_parse_scenarios(body[["scenarios"]], add_error)
+  package_features <- api_v1_parse_package_features(body, add_error)
 
   # Erreurs de structure -> on ne peut pas aller plus loin.
   if (length(errors) > 0) {
@@ -254,7 +255,8 @@ api_v1_validate_request <- function(body, limits) {
     models = models,
     confidence_levels = sort(unique(confidence_levels)),
     scenarios = scenarios,
-    holidays_country = .api_v1_null(body[["holidays_country"]], NULL)
+    preprocessing = package_features$preprocessing,
+    holidays_country = package_features$holidays_country
   ))
 }
 
