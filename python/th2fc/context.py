@@ -45,7 +45,7 @@ class Scenario:
 def _date(v, where: str, errors: list) -> date | None:
     d = c._parse_date(v if isinstance(v, str) else None)
     if d is None:
-        errors.append("%s : date '%s' invalide (format attendu YYYY-MM-DD)." % (where, v))
+        errors.append("%s : date '%s' invalide (formats acceptés : YYYY-MM-DD ou JJ/MM/AAAA)." % (where, v))
     return d
 
 

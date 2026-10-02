@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from th2fc import contract as c
@@ -25,7 +27,32 @@ def test_cible_non_numerique():
 
 def test_dates_non_parsables():
     e = invalid({"data": [{"date": "pas-une-date", "sales": 1}], "date_var": "date", "target_var": "sales", "horizon": 1})
-    assert e.errors[0]["message"] == ("Dates non parsables dans la colonne 'date' (format attendu YYYY-MM-DD) : pas-une-date.")
+    assert e.errors[0]["message"] == ("Dates non parsables dans la colonne 'date' (formats acceptés : YYYY-MM-DD ou JJ/MM/AAAA) : pas-une-date.")
+
+
+def test_parse_date_formats():
+    # ISO année-d'abord, avec ou sans heure
+    assert c._parse_date("2026-01-06") == date(2026, 1, 6)
+    assert c._parse_date("2026/01/06") == date(2026, 1, 6)
+    assert c._parse_date("2026-01-06 10:56:57") == date(2026, 1, 6)
+    # jour-d'abord européen (J/M/AAAA), avec ou sans heure
+    assert c._parse_date("06/01/2026") == date(2026, 1, 6)
+    assert c._parse_date("06/01/2026 10:56:57") == date(2026, 1, 6)
+    assert c._parse_date("06-01-2026") == date(2026, 1, 6)
+    # jour > 12 : lecture jour-d'abord sans ambiguïté
+    assert c._parse_date("25/12/2026") == date(2026, 12, 25)
+    # refus : date impossible, année à 2 chiffres, non-date, None
+    assert c._parse_date("31/02/2026") is None
+    assert c._parse_date("06/01/26") is None
+    assert c._parse_date("pas-une-date") is None
+    assert c._parse_date(None) is None
+
+
+def test_validate_accepte_dates_jour_d_abord():
+    # 12 mois jour-d'abord (01/01/2022 … 01/12/2022) : acceptés comme mensuels.
+    rows = [{"date": "01/%02d/2022" % mo, "sales": float(mo)} for mo in range(1, 13)]
+    req = c.validate({"data": rows, "date_var": "date", "target_var": "sales", "horizon": 2}, LIMITS)
+    assert req is not None
 
 
 def test_modele_inconnu():
