@@ -194,7 +194,7 @@ api_v1_forecast_one_series <- function(df, request) {
   beats_baseline <- !is.na(model_mase) && !is.na(baseline_mase) && model_mase < baseline_mase
   reliability <- api_v1_reliability(model_mase, baseline_mase, holdout_points)
 
-  list(
+  out <- list(
     model = best_model,
     history = history,
     forecast = forecast,
@@ -204,6 +204,10 @@ api_v1_forecast_one_series <- function(df, request) {
     reliability = reliability,
     warnings = as.list(warnings_out)
   )
+  if (length(request$scenarios) > 0) {
+    out$scenarios <- api_v1_scenario_entries(request$scenarios, future_rows, request$frequency, fmt_num)
+  }
+  out
 }
 
 #' Point d'entree complet de `/v1/forecast` (fonction pure, sans I/O HTTP)
@@ -223,7 +227,8 @@ api_v1_run_forecast <- function(body, limits) {
 
   req <- validated$request
   df <- req$df
-  warnings_out <- character(0)
+  warnings_out <- api_v1_unsupported_warnings(body)
+  scenario_warnings <- api_v1_scenario_warnings(req$scenarios)
 
   frequency <- req$frequency
   if (is.null(frequency)) {
@@ -249,6 +254,8 @@ api_v1_run_forecast <- function(body, limits) {
       ))
     }
 
+    series_warnings <- c(series_warnings, scenario_warnings)
+
     result <- api_v1_forecast_one_series(reg$df, req)
     if (!is.null(result$error)) {
       series_warnings <- c(series_warnings, result$error$message)
@@ -260,6 +267,7 @@ api_v1_run_forecast <- function(body, limits) {
         beats_baseline = FALSE, reliability = "unknown",
         warnings = as.list(series_warnings)
       )
+      if (length(req$scenarios) > 0) series_out[[length(series_out)]]$scenarios <- list()
       next
     }
     result$group <- if (is.na(g)) NULL else g
