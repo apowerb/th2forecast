@@ -77,8 +77,10 @@ lost in this fallback case.
 - `frequency`: `null` (automatic detection) or an explicit value among
   `day`, `week`, `month`, `quarter`, `year`. An explicit frequency always
   takes precedence over detection.
-- `models`: subset of `["prophet","arima","ets","snaive","naive","auto"]`. The Python
-  engine (`python/`) additionally accepts `"croston"` (CrostonSBA), `"tsb"` (TSB, `alpha_d = alpha_p =
+- `models`: subset of `["prophet","arima","ets","snaive","naive","auto"]`. The R engine
+  additionally accepts the package's machine-learning engines `"linear"`, `"mars"`,
+  `"random_forest"`, `"xgboost"` and `"ensemble"` (see "R engine: package features" below).
+  The Python engine (`python/`) additionally accepts `"croston"` (CrostonSBA), `"tsb"` (TSB, `alpha_d = alpha_p =
   0.1`) and `"imapa"` (IMAPA), dedicated to intermittent demand; see "`demand` field" below.
 
 **Implementation note (documented choice, the contract is ambiguous on this point):**
@@ -243,6 +245,65 @@ Syntetos-Boylan (2005) method, and always returns this field, including for a fa
   is integer. A `warnings[]` warning systematically accompanies these series; an
   explicit model (`prophet`, `arima`, ...) requested on an intermittent series is run anyway,
   with a warning suggesting `auto`, `tsb` or `imapa`.
+
+### R engine: package features (`preprocessing`, `holidays_country`, machine-learning models)
+
+Request (all optional, off by default):
+
+```json
+"preprocessing": {"anomalies": true, "outliers": true},
+"holidays_country": "FR",
+"models": ["random_forest", "xgboost", "prophet", "ensemble"]
+```
+
+- **`preprocessing.anomalies`**: `anomaly_detection()` (anomalize: seasonal decomposition, then
+  anomalous points replaced by a cleaned value).
+- **`preprocessing.outliers`**: `outliers_detection(method = "cpt")`: the series is split into
+  segments of homogeneous mean/variance (changepoint), and inside each segment the points more
+  than 3 standard deviations from the segment mean are brought back to that mean. A level shift
+  itself is kept: it separates two segments.
+- Preprocessing runs per series, after gap filling and before the holdout split: models,
+  backtest metrics and the forecast use the cleaned series. **`history` keeps the original
+  values** sent by the client. If a step fails on a series (too short, for instance), the series
+  is kept as is for that step and gets a warning. With `holidays_country`, holiday dates are
+  never corrected: a dip on a holiday is the effect the models learn, not an anomaly.
+- **`holidays_country`**: `"FR"` (case-insensitive) or `null`; any other value is a 400. The
+  French public holidays (metropolitan France) come from `calendrier.api.gouv.fr`, fetched once
+  per process with a 5-second timeout. They feed Prophet, as an `is_holiday`
+  regressor (0/1), and `random_forest`/`xgboost`, as the non-working-day feature of
+  `feature_selection()`. Prophet does not get them through `th2_prophet_engine(use_holidays = ...)`:
+  that path hands a holidays table to `set_engine()`, and modeltime's `prophet_fit_impl()` does not
+  pass it on to Prophet (measured with modeltime 1.3.5: the fitted model has no holidays and the
+  forecast is identical with and without them). Other callers of `th2_prophet_engine()` are
+  affected the same way. If the calendar cannot be reached, the
+  forecast is computed without holidays and the response carries a warning; it never fails.
+  **The service needs outbound HTTPS to `calendrier.api.gouv.fr` for this option.**
+- **Machine-learning models**: `linear` (linear regression on the date and the month), `mars`
+  (MARS on the day of year), `random_forest` and `xgboost` (on the calendar features of
+  `feature_selection()`). They are never part of `auto`, which stays `{arima, prophet, ets}`:
+  they must be requested by name.
+- **`ensemble`**: mean of the other requested models (or of `arima`, `prophet` and `ets` when
+  `ensemble` is requested alone), built with `modeltime.ensemble::ensemble_average()`. It
+  competes at backtest like any other model. With fewer than two fitted members, a warning is
+  returned and the ensemble is skipped.
+
+Response, per series (only if `preprocessing` is requested):
+
+```json
+"preprocessing": {
+  "anomalies_corrected": 1,
+  "outliers_corrected": 0,
+  "corrections": [{"date": "2022-08-01", "original": 400, "corrected": 113.4, "kind": "anomaly"}]
+}
+```
+
+Not exposed, on purpose: the Shiny modules, Rmd reports and charts (user interface); holidays
+read from a database and `input_data_fetch()`/`output_data_fetch()` (they need database
+credentials); Spark (`th2_bulk_forecasting_spark()`); TimeGPT (paid external API); bulk
+forecasting (already covered by `group_var`); `th2_tune_model()`, `th2_benchmarking()` and
+`th2_rolling_forecast_stablizer()` (evaluation tools; the API already backtests);
+`th2_arimax_engine()` (without future values of external regressors it is ARIMA);
+`meteo_feature()` (sends a location and dates to open-meteo.com; separate change).
 
 ### Optional `events` and `scenarios` fields (`scenarios` adjustments: both engines; `events`: Python engine only)
 

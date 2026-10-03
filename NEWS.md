@@ -1,5 +1,23 @@
 # th2forecast (development version)
 
+## Package features in the API (R engine)
+
+- **Added**: `preprocessing` (`anomalies`: `anomaly_detection()`; `outliers`:
+  `outliers_detection(method = "cpt")`), applied per series before the holdout split.
+  The response lists every corrected point; `history` keeps the original values.
+- **Added**: `holidays_country: "FR"` is now used (it was accepted and ignored): French public
+  holidays feed Prophet, `random_forest` and `xgboost`. Other values get a 400. The calendar is
+  fetched once per process with a timeout; when it is unreachable the forecast runs without
+  holidays and warns.
+- **Added**: models `linear`, `mars`, `random_forest`, `xgboost` (the package's engines) and
+  `ensemble` (average of the other requested models). `auto` is unchanged.
+- **Known issue, not fixed here**: `th2_prophet_engine(use_holidays = ...)` never applied the
+  holidays (modeltime 1.3.5 drops the `holidays` engine argument). The API uses an `is_holiday`
+  regressor for Prophet instead.
+- **Fixed**: `holidays_detection()` needed `httr2`, which was neither declared nor installed in
+  the image, so French holidays could not work. `httr2` is now a dependency
+  (`DESCRIPTION`, `uvr.toml`, `uvr.lock`).
+
 ## Scenarios on the R engine
 
 - **Added**: `scenarios` with `adjustments` (`percent` or `add`, pro rata to the days of

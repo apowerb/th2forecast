@@ -19,15 +19,19 @@ th2_naive_engine <- function(input_data, var_target, var_date, engine = "naive",
 }
 
 #' @keywords internal
-.api_v1_fit_one_model <- function(model_name, train_df, target_var = "value", date_var = "date", seasonal_period = 1L) {
+.api_v1_fit_one_model <- function(model_name, train_df, target_var = "value", date_var = "date", seasonal_period = 1L, holidays_calendar = NULL) {
   tryCatch({
     fit <- switch(model_name,
       arima   = th2_arima_engine(train_df, target_var, date_var, fit_model = TRUE),
-      prophet = th2_prophet_engine(train_df, target_var, date_var, use_holidays = NULL, fit_model = TRUE),
+      prophet = if ("is_holiday" %in% names(train_df)) {
+        .api_v1_fit_prophet_holidays(train_df)
+      } else {
+        th2_prophet_engine(train_df, target_var, date_var, use_holidays = NULL, fit_model = TRUE)
+      },
       ets     = th2_ets_engine(train_df, date_var, target_var, fit_model = TRUE),
       naive   = th2_naive_engine(train_df, target_var, date_var, engine = "naive"),
       snaive  = th2_naive_engine(train_df, target_var, date_var, engine = "snaive", seasonal_period = seasonal_period),
-      NULL
+      .api_v1_fit_ml_model(model_name, train_df, holidays_calendar)
     )
     if (is.null(fit) || inherits(fit, "warning")) return(NULL)
     fit

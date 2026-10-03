@@ -138,16 +138,8 @@ holidays_detection <- function(input_data, model, calendar = "calendar_france", 
   var_date_feature <- colnames(input_data[, date_variable])
 
   if (calendar == "calendar_france") {
-    url <- paste0("https://calendrier.api.gouv.fr/jours-feries/", region, ".json")
-
-    holidays_req <- httr2::request(base_url = url) %>%
-      httr2::req_method("GET")
-
-    holidays_resp <- holidays_req %>%
-      httr2::req_perform(verbosity = 0)
-
-    list_holidays <- holidays_resp %>%
-      httr2::resp_body_json()
+    # Fetched once per process, with a timeout (see th2_fetch_holidays_fr()).
+    list_holidays <- th2_fetch_holidays_fr(region)
   } else {
     # tryCatch() renvoie la valeur de son bloc (succes) ou celle du handler
     # `error` (echec) : il faut recuperer ce resultat dans `list_holidays`.
