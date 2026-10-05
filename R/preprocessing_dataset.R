@@ -53,7 +53,9 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
     }
 
     date_variable <- sapply(input_data, function(x) inherits(x, "Date") || inherits(x, "POSIXct"))
-    var_date_feature <- colnames(input_data[, date_variable])
+    # colnames(input_data)[...] and not colnames(input_data[, ...]): with a single
+    # date column, a base data.frame drops to a vector and loses its name.
+    var_date_feature <- colnames(input_data)[date_variable]
 
     filter_targets <- colnames(input_data %>% dplyr::select(-all_of(var_date_feature)))
 
@@ -82,7 +84,12 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
       } else if (method_ls == "cpt") {
         cpt <- changepoint::cpt.meanvar(y)
 
-        indexes_cpt <- c(1, cpt@cpts, length(y))
+        # An isolated spike is itself a change in mean and variance, so
+        # cpt.meanvar tends to cut it into its own tiny segment, where it can
+        # never be 3 sd away from the mean: in a segment of n points no value
+        # exceeds (n - 1) / sqrt(n) sd, which stays below 3 up to n = 10.
+        # Short segments are merged into a neighbour first.
+        indexes_cpt <- c(1, .merge_short_segments(length(y), cpt@cpts), length(y))
 
         fixed_series <- as.numeric(y)
 
@@ -119,6 +126,41 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
   } else {
     return(warning("The *input_date* variable is not a data.frame ."))
   }
+}
+
+
+#' Merges changepoint segments too short for the 3 sd outlier test
+#'
+#' In a segment of n points, no value can be more than (n - 1) / sqrt(n)
+#' standard deviations from the segment mean, which stays below 3 up to
+#' n = 10. Changepoints are dropped, shortest segment first, until every
+#' segment has at least `min_length` points; the boundary removed is the one
+#' shared with the shorter neighbour.
+#'
+#' @param n series length
+#' @param cpts changepoint positions (as in `cpt@cpts`, which ends with `n`)
+#' @param min_length minimum segment length
+#' @return the remaining changepoints, without `n`
+#' @keywords internal
+.merge_short_segments <- function(n, cpts, min_length = 11L) {
+  cpts <- as.integer(cpts[cpts < n])
+  repeat {
+    bounds <- c(0L, cpts, as.integer(n))
+    lengths <- diff(bounds)
+    if (length(cpts) == 0 || all(lengths >= min_length)) break
+    k <- which.min(lengths)
+    drop <- if (k == 1) {
+      1L
+    } else if (k == length(lengths)) {
+      length(cpts)
+    } else if (lengths[k - 1] <= lengths[k + 1]) {
+      k - 1L
+    } else {
+      k
+    }
+    cpts <- cpts[-drop]
+  }
+  cpts
 }
 
 

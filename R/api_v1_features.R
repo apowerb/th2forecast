@@ -157,7 +157,14 @@ api_v1_preprocess_series <- function(df, preprocessing, fmt_num = identity, holi
     after <- as.numeric(cleaned$value)
     on_holiday <- as.Date(current$date) %in% holiday_dates
     after[on_holiday] <- before[on_holiday]
-    changed <- which(abs(after - before) > 1e-9 * pmax(1, abs(before)))
+    # anomalize recomposes the whole series, so untouched points come back
+    # with a rounding drift (1165 -> 1165.0002): below this tolerance a point
+    # keeps its exact value and is not reported as corrected.
+    # A step returning NA for a point leaves that point as it was.
+    drift <- abs(after - before) > 1e-6 * pmax(1, abs(before))
+    unchanged <- is.na(drift) | !drift
+    after[unchanged] <- before[unchanged]
+    changed <- which(!unchanged)
     for (i in changed) {
       corrections[[length(corrections) + 1]] <- list(
         date = format(as.Date(current$date[i]), "%Y-%m-%d"),
