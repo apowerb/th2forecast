@@ -32,6 +32,16 @@ CANDIDATE_MODELS <- c("arima", "prophet", "ets")
 #' @export
 api_v1_forecast_one_series <- function(df, request) {
   horizon <- request$horizon
+  original_df <- df
+  round_target <- all(df$value == round(df$value), na.rm = TRUE)
+  fmt_num <- function(x) if (round_target) round(x) else round(x, 6)
+  pre_warnings <- character(0)
+  prep <- NULL
+  if (length(request$preprocessing) > 0) {
+    prep <- api_v1_preprocess_series(df, request$preprocessing, fmt_num, request$holiday_dates)
+    df <- prep$df
+    pre_warnings <- c(pre_warnings, prep$warnings)
+  }
   n <- nrow(df)
   holdout <- max(2L, min(horizon, floor(n * 0.2)))
   holdout <- min(holdout, n - 3L)
@@ -45,13 +55,31 @@ api_v1_forecast_one_series <- function(df, request) {
   seasonal_period <- api_v1_seasonal_period(request$frequency)
   requested_models <- .api_v1_expand_models(request$models)
   baseline_name <- .api_v1_baseline_name(request$frequency)
-  models_to_fit <- unique(c(requested_models, baseline_name))
+  ensemble_requested <- ENSEMBLE_MODEL %in% requested_models
+  fit_names <- setdiff(requested_models, ENSEMBLE_MODEL)
+  if (ensemble_requested && length(fit_names) == 0) fit_names <- CANDIDATE_MODELS
+  models_to_fit <- unique(c(fit_names, baseline_name))
 
+  # Prophet takes the holidays as an `is_holiday` regressor (see
+  # .api_v1_fit_prophet_holidays()); the other models never see that column.
+  holiday_dates <- request$holiday_dates
+  with_holidays <- function(x) .api_v1_add_holiday_flag(x, holiday_dates)
   fits <- stats::setNames(
-    lapply(models_to_fit, .api_v1_fit_one_model, train_df = train_df, seasonal_period = seasonal_period),
+    lapply(models_to_fit, function(m) .api_v1_fit_one_model(
+      m, if (m == "prophet") with_holidays(train_df) else train_df,
+      seasonal_period = seasonal_period, holidays_calendar = request$holidays_calendar
+    )),
     models_to_fit
   )
   fits <- Filter(Negate(is.null), fits)
+  if (ensemble_requested) {
+    ensemble <- .api_v1_build_ensemble(fits, .api_v1_ensemble_members(requested_models, names(fits)))
+    if (is.null(ensemble)) {
+      pre_warnings <- c(pre_warnings, "Ensemble indisponible : il faut au moins deux modèles entraînés sur cette série.")
+    } else {
+      fits[[ENSEMBLE_MODEL]] <- ensemble
+    }
+  }
 
   if (length(fits) == 0) {
     return(list(error = api_v1_error("models", "Aucun modèle n'a pu être entraîné sur cette série.")))
@@ -59,14 +87,14 @@ api_v1_forecast_one_series <- function(df, request) {
 
   calib_tbl <- do.call(modeltime::modeltime_table, unname(fits))
   calib_tbl$.model_desc <- names(fits)
-  calib_tbl <- modeltime::modeltime_calibrate(calib_tbl, new_data = test_df, quiet = TRUE)
+  calib_tbl <- modeltime::modeltime_calibrate(calib_tbl, new_data = with_holidays(test_df), quiet = TRUE)
 
   accuracy_tbl <- tryCatch(
     modeltime::modeltime_accuracy(calib_tbl),
     error = function(e) NULL
   )
 
-  warnings_out <- character(0)
+  warnings_out <- pre_warnings
 
   metric_row <- function(model_name) {
     if (is.null(accuracy_tbl)) return(NULL)
@@ -98,6 +126,13 @@ api_v1_forecast_one_series <- function(df, request) {
   holdout_points <- nrow(test_df)
 
   winner_id <- calib_tbl$.model_id[calib_tbl$.model_desc == best_model][1]
+  winner_uses_holidays <- length(holiday_dates) > 0 && best_model %in% c("prophet", ENSEMBLE_MODEL) &&
+    "prophet" %in% names(fits)
+  future_data <- if (winner_uses_holidays) {
+    with_holidays(.api_v1_future_frame(df, horizon, request$frequency))
+  } else {
+    NULL
+  }
 
   # Le modele retenu est re-entraine sur toute la serie avant de prevoir : arima
   # et ets prevoient a partir de la fin de leurs donnees d'entrainement, sans
@@ -105,7 +140,7 @@ api_v1_forecast_one_series <- function(df, request) {
   # holdout, datee comme le futur. Les intervalles restent calibres sur les
   # residus du holdout (conformal_split).
   refit_tbl <- tryCatch(
-    modeltime::modeltime_refit(calib_tbl[calib_tbl$.model_id == winner_id, ], data = df),
+    modeltime::modeltime_refit(calib_tbl[calib_tbl$.model_id == winner_id, ], data = if (winner_uses_holidays) with_holidays(df) else df),
     error = function(e) NULL
   )
   if (is.null(refit_tbl)) {
@@ -119,8 +154,9 @@ api_v1_forecast_one_series <- function(df, request) {
     fc <- tryCatch(
       modeltime::modeltime_forecast(
         refit_tbl,
-        h = horizon,
-        actual_data = df,
+        h = if (is.null(future_data)) horizon else NULL,
+        new_data = future_data,
+        actual_data = original_df,
         conf_interval = level,
         conf_method = "conformal_split",
         keep_data = FALSE
@@ -158,9 +194,6 @@ api_v1_forecast_one_series <- function(df, request) {
   forecast_rows <- forecast_rows[order(forecast_rows$.index), ]
   history_rows <- forecast_rows[forecast_rows$.key == "actual", ]
   future_rows <- forecast_rows[forecast_rows$.key == "prediction", ]
-
-  round_target <- all(df$value == round(df$value), na.rm = TRUE)
-  fmt_num <- function(x) if (round_target) round(x) else round(x, 6)
 
   history <- lapply(seq_len(nrow(history_rows)), function(i) {
     list(date = format(as.Date(history_rows$.index[i]), "%Y-%m-%d"), value = fmt_num(history_rows$.value[i]))
@@ -204,6 +237,7 @@ api_v1_forecast_one_series <- function(df, request) {
     reliability = reliability,
     warnings = as.list(warnings_out)
   )
+  if (!is.null(prep)) out$preprocessing <- prep$report
   if (length(request$scenarios) > 0) {
     out$scenarios <- api_v1_scenario_entries(request$scenarios, future_rows, request$frequency, fmt_num)
   }
@@ -229,6 +263,10 @@ api_v1_run_forecast <- function(body, limits) {
   df <- req$df
   warnings_out <- api_v1_unsupported_warnings(body)
   scenario_warnings <- api_v1_scenario_warnings(req$scenarios)
+  holidays <- api_v1_resolve_holidays(req$holidays_country)
+  req$holidays_calendar <- holidays$calendar
+  req$holiday_dates <- holidays$dates
+  if (!is.null(holidays$warning)) warnings_out <- c(warnings_out, holidays$warning)
 
   frequency <- req$frequency
   if (is.null(frequency)) {
