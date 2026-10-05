@@ -283,3 +283,44 @@ jobs:
           IMAGE: apowerb/th2forecast-py
           TAGS: ${{ needs.tags.outputs.tags }}
         run: docker buildx imagetools inspect "$IMAGE:${TAGS%% *}"
+
+  # Once the Python engine image is actually published (manifest created), tell
+  # the private commercial repo thaink2/apowerb to deploy it to the OVH VMs.
+  # This runs ONLY from a real release and ONLY from this repo (forks that copy
+  # the workflow are excluded, and the secret is never exposed to fork PRs). It
+  # is fail-soft: a missing/expired token must not turn the public OSS release
+  # red -- the deploy can still be launched manually from thaink2/apowerb.
+  #
+  # The token DEPLOY_DISPATCH_TOKEN is a fine-grained PAT, resource owner
+  # thaink2, scoped to thaink2/apowerb only, with Actions: Read and write (+
+  # Metadata: Read). The private workflow reacts to the repository_dispatch
+  # type `th2forecast-released` and deploys stable -> dev then prod, pre-release
+  # -> dev only.
+  notify-deploy:
+    name: Trigger the private deploy (thaink2/apowerb)
+    needs: [tags, publish-python]
+    if: >-
+      github.event_name == 'release'
+      && github.repository == 'apowerb/th2forecast'
+      && needs.tags.outputs.tags != ''
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Dispatch th2forecast-released
+        env:
+          GH_TOKEN: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
+          TAGS: ${{ needs.tags.outputs.tags }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::DEPLOY_DISPATCH_TOKEN absent : dispatch ignore (deploiement a lancer manuellement depuis thaink2/apowerb)."
+            exit 0
+          fi
+          # Premier tag resolu = la version (ex: "0.1.1 0.1 latest" -> 0.1.1,
+          # ou "0.1.1-rc.1" seul pour une pre-release).
+          VER="${TAGS%% *}"
+          echo "Dispatch th2forecast-released version=$VER prerelease=$PRERELEASE"
+          gh api repos/thaink2/apowerb/dispatches \
+            -f event_type=th2forecast-released \
+            -F "client_payload[version]=$VER" \
+            -F "client_payload[prerelease]=$PRERELEASE"
