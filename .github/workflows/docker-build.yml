@@ -42,6 +42,24 @@ jobs:
       - name: Test the tag rules
         run: bash .github/scripts/test-image-tags.sh
 
+      # Both engines serve their version on /health and deployments roll back
+      # when it differs from the release, so DESCRIPTION, th2fc.__version__
+      # and the release tag must agree before anything is built or pushed.
+      # On a release the checkout is the tagged commit, so the tag is checked
+      # too. A workflow_dispatch republish checks out the branch it was run
+      # from, not the old tag, so only the files are compared there.
+      - name: Check the engine versions
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          bash .github/scripts/test-check-versions.sh
+          if [ "$EVENT_NAME" = "release" ]; then
+            bash .github/scripts/check-versions.sh "$RELEASE_TAG"
+          else
+            bash .github/scripts/check-versions.sh
+          fi
+
       # Empty outputs on pull requests and pushes to main: the build jobs then
       # build and test without pushing. Values go through env, not ${{ }} in
       # the script body, so a crafted tag or input cannot inject commands.

@@ -1,5 +1,12 @@
 # th2forecast (development version)
 
+## Version reported on `/health`
+
+- **Fixed**: the R engine reported the package version on `/health` (`0.0.48`), not the
+  release (`0.1.2`), so a deployment checking `/health` against the release it deploys
+  rolled back. `DESCRIPTION` now carries the release version, and CI fails when it differs
+  from `th2fc.__version__` or from the release tag (`.github/scripts/check-versions.sh`).
+
 ## Package features in the API (R engine)
 
 - **Added**: `preprocessing` (`anomalies`: `anomaly_detection()`; `outliers`:
