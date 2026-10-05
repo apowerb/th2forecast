@@ -30,11 +30,11 @@ test_that("outliers_detection accepts a base data.frame", {
 })
 
 test_that("short changepoint segments are merged into a neighbour", {
-  merged <- .merge_short_segments(36L, c(12L, 20L, 22L))
+  merged <- th2forecast:::.merge_short_segments(36L, c(12L, 20L, 22L))
   segment_lengths <- diff(c(0L, merged, 36L))
   expect_true(all(segment_lengths >= 11L))
-  expect_equal(.merge_short_segments(300L, 150L), 150L)
-  expect_equal(.merge_short_segments(8L, c(3L, 5L)), integer(0))
+  expect_equal(th2forecast:::.merge_short_segments(300L, 150L), 150L)
+  expect_equal(th2forecast:::.merge_short_segments(8L, c(3L, 5L)), integer(0))
 })
 
 test_that("the preprocessing report counts only real corrections", {
