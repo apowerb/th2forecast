@@ -257,11 +257,17 @@ Request (all optional, off by default):
 ```
 
 - **`preprocessing.anomalies`**: `anomaly_detection()` (anomalize: seasonal decomposition, then
-  anomalous points replaced by a cleaned value).
+  anomalous points replaced by a cleaned value). It looks at the residual once trend and
+  seasonality are removed, so it is the step that catches a point unusual *for its season*.
+  Only points whose value actually changes are reported: the recomposition's rounding drift
+  on untouched points is ignored and those points keep their exact value.
 - **`preprocessing.outliers`**: `outliers_detection(method = "cpt")`: the series is split into
   segments of homogeneous mean/variance (changepoint), and inside each segment the points more
   than 3 standard deviations from the segment mean are brought back to that mean. A level shift
-  itself is kept: it separates two segments.
+  itself is kept: it separates two segments. Segments shorter than 11 points are merged into a
+  neighbour first: changepoint tends to isolate a spike in a segment of a few points, where no
+  point can be 3 standard deviations away. It does not remove seasonality, so a spike smaller
+  than the seasonal swing can be missed; `anomalies` is the step for that.
 - Preprocessing runs per series, after gap filling and before the holdout split: models,
   backtest metrics and the forecast use the cleaned series. **`history` keeps the original
   values** sent by the client. If a step fails on a series (too short, for instance), the series

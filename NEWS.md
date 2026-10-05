@@ -1,5 +1,17 @@
 # th2forecast (development version)
 
+## Outlier correction
+
+- **Fixed**: `outliers_detection(method = "cpt")` missed isolated spikes: changepoint cut the
+  spike into a segment of a few points, where the 3 standard deviation test can never fire.
+  Segments shorter than 11 points are now merged into a neighbour. On `timetk::m4_monthly`
+  windows of 36 months, a x3 spike is caught 96 % of the time instead of 28 %.
+- **Fixed**: `outliers_detection()` failed on a base `data.frame` (the date column name was
+  lost when the single date column dropped to a vector).
+- **Fixed**: the API preprocessing report listed rounding drift from `anomaly_detection()`
+  (1165 -> 1165.0002) as corrections; such points now keep their exact value and are not
+  reported.
+
 ## Version reported on `/health`
 
 - **Fixed**: the R engine reported the package version on `/health` (`0.0.48`), not the
