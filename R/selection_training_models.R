@@ -62,7 +62,7 @@ th2_arima_engine <- function(input_data, var_target, var_date, engine = "auto_ar
 #' @export
 #'
 #' @examples th2_prophet_engine(input_data, "value", "datetime", engine = "prophet")
-th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet", changepoint_num = 25, changepoint_range = 0.8, use_holidays = TRUE, fit_model = TRUE, db_conn = NULL) {
+th2_prophet_engine <- function(input_data, var_target, var_date, engine = "prophet", changepoint_num = 25, changepoint_range = 0.8, use_holidays = TRUE, fit_model = TRUE, db_conn = NULL, seasonal_yearly = "auto") {
   if (!(var_date %in% colnames(input_data) && var_target %in% colnames(input_data))) {
     return(warning("Selected variables do not exist in the data."))
   } else {
@@ -75,7 +75,8 @@ th2_prophet_engine <- function(input_data, var_target, var_date, engine = "proph
 
     model_prophet <- modeltime::prophet_reg(
       changepoint_num = ifelse(fit_model == FALSE,parsnip::tune(), changepoint_num),
-      changepoint_range = ifelse(fit_model == FALSE,parsnip::tune(), changepoint_range)
+      changepoint_range = ifelse(fit_model == FALSE,parsnip::tune(), changepoint_range),
+      seasonal_yearly = seasonal_yearly
     ) %>%
       parsnip::set_engine(engine = engine, holidays = holidays_df)
 

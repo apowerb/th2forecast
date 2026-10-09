@@ -88,8 +88,13 @@ the response schema returns **only one** `model` per series. The service
 therefore systematically compares, at backtest (RMSE), all the requested
 models (`"auto"` = `{arima, prophet, ets}` in addition to the explicit models
 listed) and returns only the best one. The baseline (`snaive`/`naive`) is
-always computed separately, independently of the requested models, for the
-sole purpose of `beats_baseline`/`reliability`.
+always computed separately, independently of the requested models, for
+`beats_baseline`/`reliability`; with `"auto"` on a seasonal frequency the
+`snaive` baseline also competes for the win (R engine), so that a clearly
+seasonal series is not answered with a flat forecast. On weekly data (period 52),
+R `ets` runs on the STL-deseasonalised series from 2 years of history when the
+seasonal profile repeats from one cycle to the next; below that, or on noise,
+the forecast stays non seasonal.
 
 ### `200` response
 
