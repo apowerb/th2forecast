@@ -25,6 +25,27 @@ ENSEMBLE_SPARSE_EVENTS = ("chronos2",)  # tsb/imapa n'acceptent pas de covariabl
 STATS = {"ets", "arima", "theta", "naive", "snaive"}
 SPARSE_MODELS = {"croston", "tsb", "imapa"}
 MAX_WINDOWS = 3
+MAX_ETS_SEASON = 24  # au-delà (hebdomadaire : 52), la recherche ETS abandonne la saisonnalité
+MIN_CYCLE_CONSISTENCY = 0.5  # corrélation entre deux moitiés des cycles : le bruit blanc reste sous 0,45
+
+
+def seasonal_split(y: np.ndarray, season: int) -> tuple[np.ndarray, np.ndarray] | None:
+    """(série désaisonnalisée, dernier cycle saisonnier) si le profil se répète d'un cycle à l'autre.
+
+    Deux cycles complets au moins. Un profil non reproductible d'un cycle à l'autre est du bruit :
+    on renvoie None et la prévision reste celle d'un modèle sans saisonnalité."""
+    if len(y) < 2 * season:
+        return None
+    from statsmodels.tsa.seasonal import STL
+
+    fit = STL(y, period=season, robust=True).fit()
+    k = len(y) // season
+    cycles = (y - fit.trend)[len(y) - k * season:].reshape(k, season)
+    if np.std(cycles[: k // 2].mean(axis=0)) == 0 or np.std(cycles[k // 2:].mean(axis=0)) == 0:
+        return None
+    if np.corrcoef(cycles[: k // 2].mean(axis=0), cycles[k // 2:].mean(axis=0))[0, 1] < MIN_CYCLE_CONSISTENCY:
+        return None
+    return y - fit.seasonal, fit.seasonal[-season:]
 
 
 @dataclass
@@ -115,7 +136,8 @@ class Engine:
         for t in tasks:
             if t.x_names and t.models & (STATS - {"arima"}):
                 plain.append(t)
-        self._run_stats_plain(plain, levels, skip_arima={id(t) for t in tasks if t.x_names})
+        self._run_stats_plain(plain, levels, skip_arima={id(t) for t in tasks if t.x_names},
+                              skip_ets=self._run_stl_ets(plain, levels))
 
     def _run_arimax(self, t: Task, levels: list[float]) -> None:
         from statsforecast import StatsForecast
@@ -130,13 +152,39 @@ class Engine:
         t.out["arima"] = (f["arima"].to_numpy(),
                           {x: (f[f"arima-lo-{pct(x)}"].to_numpy(), f[f"arima-hi-{pct(x)}"].to_numpy()) for x in levels})
 
-    def _run_stats_plain(self, tasks: list[Task], levels: list[float], skip_arima: set) -> None:
+    def _run_stl_ets(self, tasks: list[Task], levels: list[float]) -> set:
+        """ETS sur la série désaisonnalisée + dernier cycle saisonnier, pour les saisonnalités que
+        ETS ne sait pas ajuster (période > 24). Renvoie les identifiants des tâches traitées."""
+        from statsforecast import StatsForecast
+        from statsforecast.models import AutoETS, Naive
+
+        done = set()
+        for t in tasks:
+            if "ets" not in t.models or t.season <= MAX_ETS_SEASON:
+                continue
+            split = seasonal_split(t.y, t.season)
+            if split is None:
+                continue
+            adjusted, cycle = split
+            df = pd.DataFrame({"unique_id": "0", "ds": np.arange(len(adjusted)), "y": adjusted})
+            sf = StatsForecast(models=[AutoETS(season_length=1, alias="ets")], freq=1, fallback_model=Naive(alias="fallback"))
+            f = sf.forecast(df=df, h=t.h, level=[pct(x) for x in levels])
+            shift = np.resize(cycle, t.h)
+            t.out["ets"] = (f["ets"].to_numpy() + shift,
+                            {x: (f[f"ets-lo-{pct(x)}"].to_numpy() + shift, f[f"ets-hi-{pct(x)}"].to_numpy() + shift) for x in levels})
+            done.add(id(t))
+        return done
+
+    def _run_stats_plain(self, tasks: list[Task], levels: list[float], skip_arima: set, skip_ets: set = frozenset()) -> None:
         from statsforecast import StatsForecast
         from statsforecast.models import AutoARIMA, AutoETS, AutoTheta, Naive, SeasonalNaive
 
+        def excluded(t: Task) -> set:
+            return ({"arima"} if id(t) in skip_arima else set()) | ({"ets"} if id(t) in skip_ets else set())
+
         for h, season in sorted({(t.h, t.season) for t in tasks}):
             batch = [t for t in tasks if (t.h, t.season) == (h, season)]
-            wanted = set().union(*((t.models & STATS) - ({"arima"} if id(t) in skip_arima else set()) for t in batch))
+            wanted = set().union(*((t.models & STATS) - excluded(t) for t in batch))
             if not wanted:
                 continue
             builders = {
@@ -154,7 +202,7 @@ class Engine:
             fc = sf.forecast(df=df, h=h, level=lv)
             for i, t in enumerate(batch):
                 f = fc[fc["unique_id"] == str(i)]
-                for m in sorted(wanted & t.models - ({"arima"} if id(t) in skip_arima else set())):
+                for m in sorted(wanted & t.models - excluded(t)):
                     bounds = {x: (f[f"{m}-lo-{pct(x)}"].to_numpy(), f[f"{m}-hi-{pct(x)}"].to_numpy()) for x in levels}
                     t.out[m] = (f[m].to_numpy(), bounds)
 
@@ -201,7 +249,7 @@ class Engine:
         for t in tasks:
             if "prophet" not in t.models:
                 continue
-            m = Prophet(uncertainty_samples=500)
+            m = Prophet(uncertainty_samples=500, yearly_seasonality=True if frequency == "week" and t.season > 1 else "auto")
             for name in _cov_frame(t.x_hist, t.x_names) if t.x_names else {}:
                 m.add_regressor(name)
             m.fit(pd.DataFrame({"ds": pd.to_datetime(t.dates), "y": t.y,
