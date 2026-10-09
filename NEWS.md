@@ -1,5 +1,16 @@
 # th2forecast (development version)
 
+## Weekly seasonality
+
+- **Fixed**: on weekly data (period 52) the R engine returned flat forecasts even on seasonal
+  series. `forecast::ets()` drops any seasonality above period 24, Prophet keeps its yearly
+  seasonality off before 2 years of history, and `snaive` never competed for the backtest win.
+  With 2 years or more, `ets` now runs on the STL-deseasonalised series (only when the seasonal
+  profile repeats from one cycle to the next, so white noise stays flat), Prophet's yearly
+  seasonality is forced from 78 weeks, and `auto` lets `snaive` compete. The Python engine gets
+  the same ETS and Prophet changes. Unrun in R at the time of writing (no R on the dev machine):
+  `Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'` in the CI image.
+
 ## Outlier correction
 
 - **Fixed**: `outliers_detection(method = "cpt")` missed isolated spikes: changepoint cut the

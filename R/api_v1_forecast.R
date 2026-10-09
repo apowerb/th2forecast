@@ -18,6 +18,18 @@ CANDIDATE_MODELS <- c("arima", "prophet", "ets")
   }
 }
 
+#' Models that compete for the backtest win. `auto` also lets the seasonal naive
+#' baseline compete: on a clearly seasonal series it can beat the statistical
+#' models, and must then be returned instead of a flat forecast.
+#' @keywords internal
+.api_v1_candidates <- function(requested_models, fitted_names, baseline_name, auto) {
+  candidates <- intersect(requested_models, fitted_names)
+  if (isTRUE(auto) && identical(baseline_name, "snaive") && "snaive" %in% fitted_names) {
+    candidates <- union(candidates, "snaive")
+  }
+  candidates
+}
+
 #' @keywords internal
 .api_v1_baseline_name <- function(frequency) {
   if (api_v1_seasonal_period(frequency) > 1L) "snaive" else "naive"
@@ -106,7 +118,7 @@ api_v1_forecast_one_series <- function(df, request) {
   baseline_row <- metric_row(baseline_name)
   baseline_mase <- if (!is.null(baseline_row)) baseline_row$mase[1] else NA_real_
 
-  candidates <- intersect(requested_models, names(fits))
+  candidates <- .api_v1_candidates(requested_models, names(fits), baseline_name, "auto" %in% request$models)
   if (length(candidates) == 0) candidates <- names(fits)
 
   best_model <- NULL
