@@ -8,8 +8,10 @@
   With 2 years or more, `ets` now runs on the STL-deseasonalised series (only when the seasonal
   profile repeats from one cycle to the next, so white noise stays flat), Prophet's yearly
   seasonality is forced from 78 weeks, and `auto` lets `snaive` compete. The Python engine gets
-  the same ETS and Prophet changes. Unrun in R at the time of writing (no R on the dev machine):
-  `Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'` in the CI image.
+  the same ETS and Prophet changes.
+- **Fixed**: Prophet was passed `seasonal_yearly`, which `modeltime::prophet_reg()` does not
+  know (the argument is `seasonality_yearly`), so every Prophet fit failed. `uvr.lock` is
+  refreshed: it had drifted from CRAN and the R image no longer built.
 
 ## Outlier correction
 
