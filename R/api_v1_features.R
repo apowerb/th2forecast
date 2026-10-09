@@ -236,7 +236,7 @@ api_v1_preprocess_series <- function(df, preprocessing, fmt_num = identity, holi
 #'
 #' @keywords internal
 .api_v1_fit_prophet_holidays <- function(train_df, seasonal_yearly = "auto") {
-  spec <- modeltime::prophet_reg(changepoint_num = 25, changepoint_range = 0.8, seasonal_yearly = seasonal_yearly) |>
+  spec <- modeltime::prophet_reg(changepoint_num = 25, changepoint_range = 0.8, seasonality_yearly = seasonal_yearly) |>
     parsnip::set_engine("prophet")
   parsnip::fit(spec, value ~ date + is_holiday, data = train_df[c("date", "value", "is_holiday")])
 }
