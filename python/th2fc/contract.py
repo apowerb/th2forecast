@@ -104,6 +104,22 @@ def _as_numeric(s: str | None) -> float | None:
         return None
 
 
+MIN_POINTS = 10  # minimum d'historique par série, quel que soit l'horizon
+MAX_LISTED = 5   # séries trop courtes détaillées dans le message
+
+
+def _points(n):
+    return "%d point%s" % (n, "" if n == 1 else "s")
+
+
+def _too_short(label, n, horizon, min_points):
+    msg = "Historique trop court%s : %s pour un horizon de %d. Il faut au moins %d points" % (
+        label, _points(n), horizon, min_points)
+    if n >= MIN_POINTS:
+        return msg + ", ou réduire l'horizon à %d au plus." % (n - 1)
+    return msg + " (%d au minimum, quel que soit l'horizon)." % MIN_POINTS
+
+
 def validate(body, limits: dict) -> Request:
     if not isinstance(body, dict):
         raise Invalid(400, [error(None, "Corps de requête JSON manquant ou invalide.")])
@@ -218,15 +234,22 @@ def validate(body, limits: dict) -> Request:
     if dups:
         raise Invalid(400, [error("data", "Doublons de dates détectés%s." % " ; ".join(dups))])
 
-    min_points = max(10, horizon + 1)
-    short = []
-    for g in order:
-        n = int(_mask(df, g).sum())
-        if n < min_points:
-            short.append("Historique trop court%s : %d points pour un horizon de %d. Il faut au moins %d points, ou réduire l'horizon à %d au plus."
-                         % (label(g), n, horizon, min_points, max(n - 1, 0)))
+    min_points = max(MIN_POINTS, horizon + 1)
+    counts = {g: int(_mask(df, g).sum()) for g in order}
+    short = [g for g in order if counts[g] < min_points]
+    if short and group_var and len(order) * 2 > len(df):
+        # Presque une série par ligne : c'est le regroupement qu'il faut changer, pas l'horizon.
+        most = max(counts.values())
+        raise Invalid(400, [error("group_var", (
+            "La colonne de regroupement '%s' crée %d séries pour %d lignes (%s au plus par série) ; "
+            "il faut au moins %d points par série pour un horizon de %d. Choisir une colonne dont les "
+            "valeurs se répètent (magasin, région…), ou aucun regroupement.")
+            % (group_var, len(order), len(df), _points(most), min_points, horizon))])
     if short:
-        raise Invalid(400, [error("horizon", " ; ".join(short))])
+        msgs = [_too_short(label(g), counts[g], horizon, min_points) for g in short[:MAX_LISTED]]
+        if len(short) > MAX_LISTED:
+            msgs.append("et %d autre(s) série(s) trop courte(s)" % (len(short) - MAX_LISTED))
+        raise Invalid(400, [error("horizon", " ; ".join(msgs))])
 
     from . import context  # import tardif : context dépend de ce module
 

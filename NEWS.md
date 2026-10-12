@@ -1,5 +1,15 @@
 # th2forecast (development version)
 
+## Short-history errors
+
+- **Fixed**: a short series was told to "reduce the horizon to n - 1" even under 10 points,
+  where no horizon is accepted. The message now says that 10 points are needed whatever the
+  horizon, and only suggests a smaller horizon from 10 points.
+- **Fixed**: a grouping column with almost one value per row (a percentage, an amount) made one
+  1-point series per row and one error per series, all on the `horizon` field. That case is now a
+  single `group_var` error naming the column. Other short series are listed up to 5. Same
+  behaviour in the R and Python engines.
+
 ## Weekly seasonality
 
 - **Fixed**: on weekly data (period 52) the R engine returned flat forecasts even on seasonal
