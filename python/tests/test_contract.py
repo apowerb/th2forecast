@@ -72,7 +72,35 @@ def test_historique_trop_court():
     e = invalid({"data": monthly(5, float), "date_var": "date", "target_var": "sales", "horizon": 12})
     assert e.errors[0]["field"] == "horizon"
     assert e.errors[0]["message"] == ("Historique trop court : 5 points pour un horizon de 12. "
-                                      "Il faut au moins 13 points, ou réduire l'horizon à 4 au plus.")
+                                      "Il faut au moins 13 points (10 au minimum, quel que soit l'horizon).")
+
+
+def test_historique_trop_court_propose_un_horizon_possible():
+    e = invalid({"data": monthly(12, float), "date_var": "date", "target_var": "sales", "horizon": 12})
+    assert e.errors[0]["message"] == ("Historique trop court : 12 points pour un horizon de 12. "
+                                      "Il faut au moins 13 points, ou réduire l'horizon à 11 au plus.")
+
+
+def test_regroupement_presque_unique_designe_la_colonne_de_regroupement():
+    # Une valeur numérique continue choisie comme regroupement : une série d'un point par ligne.
+    rows = [{"date": "2026-0%d-01" % (i + 1), "sales": 10 + i, "ecart": str(v)}
+            for i, v in enumerate([6.4, 1.1, -1.7, 5.3, 5.6])]
+    e = invalid({"data": rows, "date_var": "date", "target_var": "sales", "group_var": "ecart", "horizon": 12})
+    assert e.errors == [{"field": "group_var", "message": (
+        "La colonne de regroupement 'ecart' crée 5 séries pour 5 lignes (1 point au plus par série) ; "
+        "il faut au moins 13 points par série pour un horizon de 12. Choisir une colonne dont les "
+        "valeurs se répètent (magasin, région…), ou aucun regroupement.")}]
+
+
+def test_series_trop_courtes_listees_au_plus_cinq():
+    rows = [r for s in "ABCDEFG" for r in monthly(3, float, store=s)]
+    e = invalid({"data": rows, "date_var": "date", "target_var": "sales", "group_var": "store", "horizon": 2})
+    assert e.errors[0]["field"] == "horizon"
+    parts = e.errors[0]["message"].split(" ; ")
+    assert len(parts) == 6
+    assert parts[0] == ("Historique trop court pour la série 'A' : 3 points pour un horizon de 2. "
+                        "Il faut au moins 10 points (10 au minimum, quel que soit l'horizon).")
+    assert parts[-1] == "et 2 autre(s) série(s) trop courte(s)"
 
 
 @pytest.mark.parametrize("body, field, status", [

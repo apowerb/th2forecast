@@ -3,6 +3,22 @@ NULL
 
 ALLOWED_MODELS <- c("prophet", "arima", "ets", "snaive", "naive", "auto", ML_MODELS, ENSEMBLE_MODEL)
 ALLOWED_FREQUENCIES <- c("day", "week", "month", "quarter", "year")
+.API_V1_MIN_POINTS <- 10L # minimum d'historique par série, quel que soit l'horizon
+.API_V1_MAX_LISTED <- 5L  # séries trop courtes détaillées dans le message
+
+.api_v1_points <- function(n) sprintf("%d point%s", n, if (n == 1L) "" else "s")
+
+.api_v1_too_short <- function(label, n, horizon, min_points) {
+  msg <- sprintf(
+    "Historique trop court%s : %s pour un horizon de %d. Il faut au moins %d points",
+    label, .api_v1_points(n), horizon, min_points
+  )
+  if (n >= .API_V1_MIN_POINTS) {
+    paste0(msg, sprintf(", ou réduire l'horizon à %d au plus.", n - 1L))
+  } else {
+    paste0(msg, sprintf(" (%d au minimum, quel que soit l'horizon).", .API_V1_MIN_POINTS))
+  }
+}
 
 #' Construit une erreur de champ pour la réponse API v1
 #'
@@ -225,21 +241,32 @@ api_v1_validate_request <- function(body, limits) {
     )))
   }
 
-  min_points <- max(10L, horizon + 1L)
-  too_short <- character(0)
-  for (g in unique(group_values)) {
-    idx <- if (is.na(g)) which(is.na(group_values)) else which(group_values == g)
-    n_pts <- length(idx)
-    if (n_pts < min_points) {
+  min_points <- max(.API_V1_MIN_POINTS, horizon + 1L)
+  groups <- unique(group_values)
+  counts <- vapply(groups, function(g) {
+    if (is.na(g)) sum(is.na(group_values)) else sum(group_values == g, na.rm = TRUE)
+  }, integer(1), USE.NAMES = FALSE)
+  short <- which(counts < min_points)
+  if (length(short) > 0 && !is.null(group_var) && length(groups) * 2L > nrow(df)) {
+    # Presque une série par ligne : c'est le regroupement qu'il faut changer, pas l'horizon.
+    return(list(ok = FALSE, status = 400L, errors = list(
+      api_v1_error("group_var", sprintf(
+        "La colonne de regroupement '%s' crée %d séries pour %d lignes (%s au plus par série) ; il faut au moins %d points par série pour un horizon de %d. Choisir une colonne dont les valeurs se répètent (magasin, région…), ou aucun regroupement.",
+        group_var, length(groups), nrow(df), .api_v1_points(max(counts)), min_points, horizon
+      ))
+    )))
+  }
+  if (length(short) > 0) {
+    too_short <- vapply(utils::head(short, .API_V1_MAX_LISTED), function(i) {
+      g <- groups[[i]]
       label <- if (is.na(g)) "" else sprintf(" pour la série '%s'", g)
-      max_horizon_for_n <- max(n_pts - 1L, 0L)
+      .api_v1_too_short(label, counts[[i]], horizon, min_points)
+    }, character(1))
+    if (length(short) > .API_V1_MAX_LISTED) {
       too_short <- c(too_short, sprintf(
-        "Historique trop court%s : %d points pour un horizon de %d. Il faut au moins %d points, ou réduire l'horizon à %d au plus.",
-        label, n_pts, horizon, min_points, max_horizon_for_n
+        "et %d autre(s) série(s) trop courte(s)", length(short) - .API_V1_MAX_LISTED
       ))
     }
-  }
-  if (length(too_short) > 0) {
     return(list(ok = FALSE, status = 400L, errors = list(
       api_v1_error("horizon", paste(too_short, collapse = " ; "))
     )))
