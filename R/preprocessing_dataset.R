@@ -91,26 +91,23 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
         # Short segments are merged into a neighbour first.
         indexes_cpt <- c(1, .merge_short_segments(length(y), cpt@cpts), length(y))
 
-        fixed_series <- as.numeric(y)
-
-        # changepoint::cpt.meanvar decoupe la serie en segments homogenes en
-        # moyenne/variance : a l'interieur de chaque segment, les points qui
-        # s'ecartent de plus de 3 ecarts-types de la moyenne du segment sont
-        # des outliers et sont ramenes a cette moyenne. Auparavant ce bloc
-        # recopiait le segment tel quel dans fixed_series : aucune valeur
-        # n'etait jamais corrigee (bug, cf. test-preprocessing_dataset.R).
+        # Inside each changepoint segment, a point is an outlier when it is
+        # more than 3 sd from the segment mean, or more than 5 sd from the
+        # mean of the other points (sd of the others too), the farthest point
+        # first. The second rule stops a big spike from inflating the sd and
+        # hiding itself and the other spikes or dips of its segment.
+        flagged <- integer(0)
         for (i in 1:(length(indexes_cpt) - 1)) {
           idx <- (indexes_cpt[i]):indexes_cpt[i + 1]
-          segment <- as.numeric(y[idx])
-          segment_mean <- mean(segment)
-          segment_sd <- stats::sd(segment)
+          flagged <- union(flagged, idx[.segment_outliers(as.numeric(y[idx]))])
+        }
 
-          if (!is.na(segment_sd) && segment_sd > 0) {
-            is_outlier <- abs(segment - segment_mean) > 3 * segment_sd
-            segment[is_outlier] <- segment_mean
-          }
-
-          fixed_series[idx] <- segment
+        # Outliers are replaced by a linear interpolation of their non-outlier
+        # neighbours, which follows a trend, rather than by the segment mean.
+        fixed_series <- as.numeric(y)
+        keep <- setdiff(seq_along(fixed_series), flagged)
+        if (length(flagged) > 0 && length(keep) >= 2) {
+          fixed_series[flagged] <- stats::approx(keep, fixed_series[keep], xout = flagged, rule = 2)$y
         }
 
         # cpt <- fastcpd::fastcpd.meanvariance(input_data[[variable]])
@@ -126,6 +123,54 @@ outliers_detection <- function(input_data, method_ls = "cpt") {
   } else {
     return(warning("The *input_date* variable is not a data.frame ."))
   }
+}
+
+
+#' Outliers of one changepoint segment
+#'
+#' A point is an outlier when it is more than `threshold` sd from the segment
+#' mean, or, taken one at a time from the farthest, more than
+#' `deleted_threshold` sd from the mean of the remaining other points. The
+#' mean and sd computed with a big spike are pulled towards it, so it can
+#' hide itself and the other outliers of the segment (masking).
+#'
+#' @param segment numeric vector
+#' @param threshold limit of the plain test, in sd of the segment
+#' @param deleted_threshold limit of the leave-one-out test, in sd of the others
+#' @return positions of the outliers in `segment`, sorted
+#' @keywords internal
+.segment_outliers <- function(segment, threshold = 3, deleted_threshold = 5) {
+  out <- integer(0)
+  segment_sd <- stats::sd(segment)
+  if (!is.na(segment_sd) && segment_sd > 0) {
+    out <- which(abs(segment - mean(segment)) > threshold * segment_sd)
+  }
+  repeat {
+    rest <- setdiff(seq_along(segment), out)
+    if (length(rest) < 4L) break
+    z <- .deleted_z(segment[rest])
+    if (max(z) <= deleted_threshold) break
+    out <- c(out, rest[which.max(z)])
+  }
+  sort(out)
+}
+
+
+#' Leave-one-out scores
+#'
+#' For each point, its distance to the mean of the other points, in sd of the
+#' other points, in O(n). A point whose others are all equal scores 0.
+#'
+#' @param x numeric vector of at least 3 values
+#' @return numeric vector of scores
+#' @keywords internal
+.deleted_z <- function(x) {
+  x <- x - mean(x)
+  n <- length(x)
+  others_mean <- (sum(x) - x) / (n - 1)
+  others_var <- (sum(x^2) - x^2 - (n - 1) * others_mean^2) / (n - 2)
+  others_sd <- sqrt(pmax(others_var, 0))
+  ifelse(others_sd > 1e-12 * pmax(1, abs(x)), abs(x - others_mean) / others_sd, 0)
 }
 
 

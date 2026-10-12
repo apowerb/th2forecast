@@ -15,6 +15,15 @@
 
 ## Outlier correction
 
+- **Fixed**: several spikes or dips in the same segment masked each other. The segment mean and
+  standard deviation were computed with the spikes in them, so a big spike inflated the standard
+  deviation and hid itself and its neighbours: on 24 months with spikes at 950 and 900 and a dip
+  at 5 (trend 100 -> 184), only the 900 was corrected. A point is now also an outlier when it is
+  more than 5 standard deviations from the mean of the other points, the farthest first.
+  Outliers are replaced by a linear interpolation of their neighbours instead of the segment
+  mean, which the spike pulled up and which ignored the trend (900 -> 212, now 166). On
+  `timetk::m4_monthly` windows of 36 months, three defects in one series are caught 63 % of the
+  time instead of 43 %; false corrections on clean series go from 0.04 to 0.07 per series.
 - **Fixed**: `outliers_detection(method = "cpt")` missed isolated spikes: changepoint cut the
   spike into a segment of a few points, where the 3 standard deviation test can never fire.
   Segments shorter than 11 points are now merged into a neighbour. On `timetk::m4_monthly`

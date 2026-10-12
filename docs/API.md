@@ -267,8 +267,12 @@ Request (all optional, off by default):
   Only points whose value actually changes are reported: the recomposition's rounding drift
   on untouched points is ignored and those points keep their exact value.
 - **`preprocessing.outliers`**: `outliers_detection(method = "cpt")`: the series is split into
-  segments of homogeneous mean/variance (changepoint), and inside each segment the points more
-  than 3 standard deviations from the segment mean are brought back to that mean. A level shift
+  segments of homogeneous mean/variance (changepoint). Inside each segment, a point is an
+  outlier when it is more than 3 standard deviations from the segment mean, or, taken one at a
+  time from the farthest, more than 5 standard deviations from the mean of the other points
+  (standard deviation of the other points too): a big spike inflates the standard deviation of
+  its segment and would otherwise hide itself and the other spikes or dips next to it. Outliers
+  are replaced by a linear interpolation of their non-outlier neighbours. A level shift
   itself is kept: it separates two segments. Segments shorter than 11 points are merged into a
   neighbour first: changepoint tends to isolate a spike in a segment of a few points, where no
   point can be 3 standard deviations away. It does not remove seasonality, so a spike smaller

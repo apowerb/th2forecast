@@ -52,3 +52,35 @@ test_that("the outliers step of the API corrects the isolated spike", {
   expect_equal(res$report$outliers_corrected, 1L)
   expect_equal(res$report$corrections[[1]]$date, "2024-09-01")
 })
+
+# 24 months of trend with two spikes and a dip: a big spike inflates the
+# standard deviation of its segment and hides itself and its neighbours.
+.masked_series <- function() {
+  value <- c(100, 104, 108, 111, 950, 118, 121, 125, 129, 5, 136, 140,
+             143, 147, 151, 154, 158, 162, 900, 169, 173, 176, 180, 184)
+  tibble::tibble(date = seq(as.Date("2024-01-01"), by = "month", length.out = 24), value = value)
+}
+
+test_that("several spikes and dips in a segment do not mask each other", {
+  input <- .masked_series()
+  result <- outliers_detection(input, method_ls = "cpt")
+  changed <- which(abs(result$value - input$value) > 1e-6)
+  expect_equal(changed, c(5L, 10L, 19L))
+  # Replacement follows the neighbours, not a mean pulled up by the spike.
+  expect_lt(abs(result$value[5] - 114.5), 10)
+  expect_lt(abs(result$value[10] - 132.5), 10)
+  expect_lt(abs(result$value[19] - 165.5), 10)
+})
+
+test_that("the outliers step of the API reports the three masked points", {
+  res <- api_v1_preprocess_series(.masked_series(), list(outliers = TRUE))
+  expect_equal(res$report$outliers_corrected, 3L)
+  expect_equal(vapply(res$report$corrections, function(c) c$date, ""),
+               c("2024-05-01", "2024-10-01", "2025-07-01"))
+})
+
+test_that("leave-one-out scores match a direct computation", {
+  x <- c(10, 11, 9, 10, 12, 50)
+  direct <- vapply(seq_along(x), function(i) abs(x[i] - mean(x[-i])) / stats::sd(x[-i]), numeric(1))
+  expect_equal(th2forecast:::.deleted_z(x), direct, tolerance = 1e-9)
+})
