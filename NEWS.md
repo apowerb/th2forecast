@@ -24,6 +24,7 @@
   mean, which the spike pulled up and which ignored the trend (900 -> 212, now 166). On
   `timetk::m4_monthly` windows of 36 months, three defects in one series are caught 63 % of the
   time instead of 43 %; false corrections on clean series go from 0.04 to 0.07 per series.
+  `uvr.lock` is refreshed: CRAN published globals 0.20.0 and the R image no longer built.
 - **Fixed**: `outliers_detection(method = "cpt")` missed isolated spikes: changepoint cut the
   spike into a segment of a few points, where the 3 standard deviation test can never fire.
   Segments shorter than 11 points are now merged into a neighbour. On `timetk::m4_monthly`
