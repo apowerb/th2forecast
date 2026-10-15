@@ -22,6 +22,24 @@ COPY pytest.ini .
 COPY tests ./tests
 
 RUN useradd --uid 10001 --create-home app
+
+# Même purge que les images apowerb, th2etl et th2pulse, sur la même base
+# Debian trixie. perl-base (Essential) et util-linux/mount/login/bsdutils
+# portent l'essentiel des avis HIGH de cette image (perl CVE-2026-9538 ;
+# util-linux CVE-2026-76642, -78408, -78409, -78410, rattachés à chacun des
+# paquets binaires de la source), sans correctif Debian publié. Le service est
+# du Python pur (uvicorn) : il n'exécute ni perl, ni mount, login, su ou
+# nsenter. La purge vient après useradd, qui appartient au paquet passwd et
+# reste disponible.
+#
+# `apt-get upgrade` prend les correctifs de sécurité Debian publiés après la
+# dernière image python:3.12-slim, au lieu d'attendre sa reconstruction.
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get purge -y --allow-remove-essential perl-base util-linux mount login bsdutils \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
 USER app
 
 EXPOSE 8000
