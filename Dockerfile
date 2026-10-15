@@ -24,7 +24,16 @@ WORKDIR /build_zone
 
 # Couche de dependances (cachee tant que le manifeste ne change pas).
 COPY uvr.toml uvr.lock ./
-RUN uvr sync --frozen
+# Sans --frozen, a dessein. Dans uvr 0.4.6, --frozen re-resout le manifeste
+# contre le CRAN du jour puis exige le meme resultat que uvr.lock
+# (commands/sync.rs, lockfiles_equivalent). Avec des dependances "*", toute
+# nouvelle version publiee sur CRAN casse donc le build sans qu'un fichier du
+# depot ait change : mesure le 15/10 sur la base 3739f38, verte le 13/10.
+# `uvr sync` seul installe exactement les versions de uvr.lock (R 4.5.3,
+# identique a l'image epinglee : pas de re-resolution) et va chercher dans
+# src/contrib/Archive celles que CRAN a deplacees. Apres un changement de
+# uvr.toml, lancer `uvr lock` et committer le verrou.
+RUN uvr sync
 
 # Code source (invalide le cache a partir d'ici uniquement).
 COPY . .
