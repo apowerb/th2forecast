@@ -40,6 +40,27 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
+# libuuid1 et ncurses (libncursesw6, ncurses-bin, ncurses-base) portent sept des
+# onze avis HIGH restants -- util-linux CVE-2026-76642, -78408, -78409, -78410
+# et ncurses CVE-2025-69720 --, sans correctif Debian trixie publié (Trivy
+# 0.68.1, 16/10/2026). Le service n'en a pas besoin : seuls les modules `_uuid`
+# et `_curses` de Python lient ces bibliothèques, et ils partent avec. `import
+# uuid` prend alors son chemin pur Python ; `import curses` échoue en
+# ImportError au lieu d'un .so orphelin.
+#
+# dpkg --purge plutôt qu'`apt-get purge --allow-remove-essential` : dpkg refuse
+# de retirer un paquet dont un autre dépend, donc un consommateur ajouté plus
+# tard fait échouer la construction ici au lieu d'une cascade silencieuse. Seuls
+# ncurses-bin et ncurses-base sont Essential et demandent le forçage.
+#
+# Restent : libtinfo6 (bash, readline), libacl1 (coreutils, tar, passwd),
+# libsystemd0 et libudev1 (apt, PAM) -- les quatre HIGH qui demeurent. Même
+# purge que les images apowerb, th2etl et th2pulse.
+RUN dpkg --purge libuuid1 libncursesw6 \
+    && dpkg --purge --force-remove-essential ncurses-bin ncurses-base \
+    && rm -f /usr/local/lib/python3.12/lib-dynload/_uuid.* \
+             /usr/local/lib/python3.12/lib-dynload/_curses*
+
 USER app
 
 EXPOSE 8000
