@@ -120,18 +120,19 @@ jobs:
         run: docker run --rm th2forecast:ci Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'
 
       # Même scanner et même version que les mesures consignées pour cette
-      # image, pour que les chiffres se comparent. Rapport seulement : les HIGH
-      # restants sont des paquets Debian sans correctif publié.
+      # image, pour que les chiffres se comparent. Échoue si le scanner ne tourne
+      # pas, jamais sur les failles trouvées : les HIGH restants sont des
+      # paquets Debian sans correctif publié. Sur PR seulement.
       - name: Trivy scan of the built image (CRITICAL, HIGH)
-        continue-on-error: true
+        if: github.event_name == 'pull_request'
         run: |
           set -e
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.68.1/contrib/install.sh | sh -s -- -b /usr/local/bin v0.68.1
-          trivy image -q --severity CRITICAL,HIGH --format json -o trivy-th2forecast-r.json th2forecast:ci
-          trivy convert -q --format table trivy-th2forecast-r.json
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" aquasec/trivy:0.68.1 \
+            image -q --severity CRITICAL,HIGH --format json -o /out/trivy-th2forecast-r.json th2forecast:ci
+          docker run --rm -v "$PWD:/out" aquasec/trivy:0.68.1 convert -q --format table /out/trivy-th2forecast-r.json
 
       - name: Upload the Trivy report
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: trivy-th2forecast-r
@@ -247,22 +248,23 @@ jobs:
           "
 
       # Même scanner et même version que les mesures consignées pour cette
-      # image, pour que les chiffres se comparent. Rapport seulement : les HIGH
-      # restants sont des paquets Debian sans correctif publié.
+      # image, pour que les chiffres se comparent. Échoue si le scanner ne tourne
+      # pas, jamais sur les failles trouvées : les HIGH restants sont des
+      # paquets Debian sans correctif publié. Sur PR seulement.
       - name: Trivy scan of the built image (CRITICAL, HIGH)
-        continue-on-error: true
+        if: github.event_name == 'pull_request'
         run: |
           set -e
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.68.1/contrib/install.sh | sh -s -- -b /usr/local/bin v0.68.1
-          trivy image -q --severity CRITICAL,HIGH --format json -o trivy-th2forecast-py-${{ matrix.arch }}.json th2forecast-py:ci
-          trivy convert -q --format table trivy-th2forecast-py-${{ matrix.arch }}.json
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" aquasec/trivy:0.68.1 \
+            image -q --severity CRITICAL,HIGH --format json -o /out/trivy-th2forecast-py.json th2forecast-py:ci
+          docker run --rm -v "$PWD:/out" aquasec/trivy:0.68.1 convert -q --format table /out/trivy-th2forecast-py.json
 
       - name: Upload the Trivy report
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: trivy-th2forecast-py-${{ matrix.arch }}
-          path: trivy-th2forecast-py-${{ matrix.arch }}.json
+          path: trivy-th2forecast-py.json
           if-no-files-found: ignore
 
       - name: Start container for smoke test
