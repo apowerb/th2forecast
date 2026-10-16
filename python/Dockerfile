@@ -54,12 +54,18 @@ RUN apt-get update \
 # ncurses-bin et ncurses-base sont Essential et demandent le forçage.
 #
 # Restent : libtinfo6 (bash, readline), libacl1 (coreutils, tar, passwd),
-# libsystemd0 et libudev1 (apt, PAM) -- les quatre HIGH qui demeurent. Même
-# purge que les images apowerb, th2etl et th2pulse.
+# libsystemd0 (apt, PAM) -- les trois HIGH qui demeurent ; libudev1 part plus
+# bas. Même purge que les images apowerb, th2etl et th2pulse.
 RUN dpkg --purge libuuid1 libncursesw6 \
     && dpkg --purge --force-remove-essential ncurses-bin ncurses-base \
     && rm -f /usr/local/lib/python3.12/lib-dynload/_uuid.* \
              /usr/local/lib/python3.12/lib-dynload/_curses*
+
+# libudev1 (systemd CVE-2026-16742, sans correctif trixie) a perdu son dernier
+# consommateur avec util-linux ci-dessus : apt dépend de libsystemd0, pas de
+# libudev1, donc apt reste installé et `apt-get install` marche toujours. dpkg
+# refuse la purge si un changement ultérieur ramène un consommateur.
+RUN dpkg --purge libudev1
 
 USER app
 
