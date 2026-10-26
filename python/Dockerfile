@@ -7,6 +7,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
 
 WORKDIR /app
 
+# pip à jour d'abord : le certifi qu'il embarque doit aussi exclure la racine emSign
+# ECC Root CA - G3 compromise (GHSA-6q48-6c7w-9gw2), corrigée à partir de pip 26.2.2.
+RUN pip install --root-user-action=ignore "pip==26.2.2"
+
 # torch CPU seul (l'index par défaut tirerait CUDA, plusieurs Go inutiles).
 RUN pip install --root-user-action=ignore --index-url https://download.pytorch.org/whl/cpu torch==2.8.0
 COPY requirements.txt .
